@@ -1,0 +1,22 @@
+{
+  "name": "@puzzmo-com/belay",
+  "version": "0.0.1",
+  "author": {
+    "name": "Orta Therox",
+    "url": "https://orta.io"
+  },
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@tsconfig/node-ts": "^23.6.1",
+    "@tsconfig/node24": "^24.0.1",
+    "@types/node": "^20.11.24",
+    "typescript": "5.8.3"
+  },
+  "scripts": {
+    "type-check": "tsgo --noEmit"
+  }
+}

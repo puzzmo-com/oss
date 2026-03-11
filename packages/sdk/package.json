@@ -1,0 +1,58 @@
+{
+  "name": "@puzzmo/sdk",
+  "version": "0.0.5",
+  "description": "Puzzmo runtime SDK for game developers",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./simulator": {
+      "types": "./dist/simulator/index.d.ts",
+      "import": "./dist/simulator/index.js",
+      "require": "./dist/simulator/index.cjs"
+    },
+    "./simulator/standalone": {
+      "types": "./dist/simulator/standalone.d.ts",
+      "import": "./dist/simulator/standalone.js",
+      "require": "./dist/simulator/standalone.cjs"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js",
+      "require": "./dist/vite.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && tsc --project tsconfig.build.json",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "puzzmo",
+    "games",
+    "sdk"
+  ],
+  "author": "Puzzmo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/puzzmo-com/oss.git",
+    "directory": "packages/sdk"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "@puzzmo/agent-cli-detect",
+  "version": "0.0.1",
+  "description": "Detect installed AI coding agent CLI tools across all platforms",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "detect",
+    "claude",
+    "codex",
+    "copilot",
+    "gemini",
+    "aider",
+    "cline"
+  ],
+  "author": "Puzzmo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/puzzmo-com/oss.git",
+    "directory": "packages/agent-cli-detect"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "@types/node": "^20.1.0",
+    "typescript": "catalog:"
+  }
+}

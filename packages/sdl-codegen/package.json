@@ -1,0 +1,41 @@
+{
+  "name": "@sdl-codegen/node",
+  "version": "3.0.4",
+  "description": "GraphQL .d.ts file generation for SDL-first projects",
+  "license": "MIT",
+  "author": "Orta Therox <orta.therox@gmail.com>",
+  "type": "module",
+  "private": true,
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "vitest run",
+    "type-check": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@babel/generator": "7.26.0",
+    "@babel/parser": "^7.26.2",
+    "@babel/traverse": "7.25.9",
+    "@babel/types": "7.26.0",
+    "@mrleebo/prisma-ast": "0.13.1",
+    "ts-morph": "^22.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.12",
+    "@types/babel__generator": "^7.6.0",
+    "@types/babel__traverse": "^7.14.0",
+    "@types/node": "^20.1.0",
+    "@typescript/native-preview": "*",
+    "@typescript/vfs": "1.4.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "graphql": "*",
+    "typescript": "*"
+  }
+}

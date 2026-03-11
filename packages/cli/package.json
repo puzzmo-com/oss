@@ -1,0 +1,21 @@
+{
+  "name": "@puzzmo/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "puzzmo": "./lib/index.js"
+  },
+  "main": "./lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@puzzmo/agent-cli-detect": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.1.0",
+    "typescript": "catalog:"
+  }
+}
