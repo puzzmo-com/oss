@@ -1,6 +1,6 @@
 {
   "name": "@puzzmo/sdk",
-  "version": "0.0.5",
+  "version": "1.0.0",
   "description": "Puzzmo runtime SDK for game developers",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -49,6 +49,7 @@
   },
   "publishConfig": {
     "access": "public",
+    "provenance": true,
     "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {

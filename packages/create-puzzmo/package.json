@@ -1,6 +1,6 @@
 {
   "name": "create-puzzmo",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Create a Puzzmo game project",
   "type": "module",
   "bin": "./src/index.js",
@@ -13,6 +13,7 @@
   "license": "MIT",
   "publishConfig": {
     "access": "public",
+    "provenance": true,
     "registry": "https://registry.npmjs.org/"
   }
 }
