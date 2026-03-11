@@ -62,11 +62,4 @@ jobs:
             cd -
           done
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  # To use OIDC trusted publishing (no NPM_TOKEN needed):
-  # 1. Go to https://www.npmjs.com/package/<pkg>/access for each package
-  # 2. Under "Trusted Publishing", add a GitHub Actions publisher:
-  #    - Repository: puzzmo-com/oss
-  #    - Workflow: publish.yml
-  # 3. Remove the NPM_TOKEN env line above and the secret from GitHub
+          NPM_CONFIG_PROVENANCE: "true"
