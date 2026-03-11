@@ -1,0 +1,72 @@
+name: Publish packages to npm
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish changed packages
+        run: |
+          for dir in packages/*/; do
+            if [ ! -f "$dir/package.json" ]; then
+              continue
+            fi
+
+            # Skip private packages
+            is_private=$(node -p "try { require('./$dir/package.json').private || false } catch(e) { false }")
+            if [ "$is_private" = "true" ]; then
+              echo "⏭️ Skipping private package in $dir"
+              continue
+            fi
+
+            name=$(node -p "require('./$dir/package.json').name")
+
+            # Check if any files changed in this package (skip on workflow_dispatch — publish all)
+            if [ "${{ github.event_name }}" = "push" ]; then
+              changed=$(git diff --name-only HEAD~1 -- "$dir" | head -1)
+              if [ -z "$changed" ]; then
+                echo "⏭️ No changes in $dir"
+                continue
+              fi
+            fi
+
+            # Get the current version from npm, default to 0.0.0 if unpublished
+            current=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
+
+            # Increment patch version
+            IFS='.' read -r major minor patch <<< "$current"
+            next_version="$major.$minor.$((patch + 1))"
+
+            echo "📦 Publishing $name@$next_version (was $current)"
+
+            # Set the version in package.json before publishing
+            cd "$dir"
+            npm version "$next_version" --no-git-tag-version
+            npm publish --provenance --access public
+            cd -
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # To use OIDC trusted publishing (no NPM_TOKEN needed):
+  # 1. Go to https://www.npmjs.com/package/<pkg>/access for each package
+  # 2. Under "Trusted Publishing", add a GitHub Actions publisher:
+  #    - Repository: puzzmo-com/oss
+  #    - Workflow: publish.yml
+  # 3. Remove the NPM_TOKEN env line above and the secret from GitHub
