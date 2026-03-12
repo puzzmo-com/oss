@@ -23,12 +23,13 @@ jobs:
       - name: Install dependencies
         run: corepack enable && yarn install
 
-      - name: Build packages
+      - name: Build publishable packages
         run: |
           for dir in packages/*/; do
             if [ -f "$dir/package.json" ]; then
+              is_private=$(node -p "try { require('./$dir/package.json').private || false } catch(e) { false }")
               has_build=$(node -p "try { !!require('./$dir/package.json').scripts?.build } catch(e) { false }")
-              if [ "$has_build" = "true" ]; then
+              if [ "$is_private" != "true" ] && [ "$has_build" = "true" ]; then
                 echo "🔨 Building $dir"
                 cd "$dir"
                 yarn build

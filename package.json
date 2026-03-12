@@ -6,7 +6,8 @@
   ],
   "packageManager": "yarn@4.12.0",
   "resolutions": {
-    "@typescript/native-preview": "7.0.0-dev.20260223.1"
+    "@typescript/native-preview": "7.0.0-dev.20260223.1",
+    "@babel/types": "^7.26.3"
   },
   "devDependencies": {
     "typescript": "catalog:"
