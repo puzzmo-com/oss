@@ -5,6 +5,9 @@
     "packages/*"
   ],
   "packageManager": "yarn@4.12.0",
+  "resolutions": {
+    "@typescript/native-preview": "7.0.0-dev.20260223.1"
+  },
   "devDependencies": {
     "typescript": "catalog:"
   }
