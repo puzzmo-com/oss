@@ -19,7 +19,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Publish changed packages
         run: |
@@ -79,5 +78,3 @@ jobs:
             npm publish --provenance --access public
             cd -
           done
-        env:
-          NPM_CONFIG_PROVENANCE: "true"
