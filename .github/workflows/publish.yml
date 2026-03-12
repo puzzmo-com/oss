@@ -76,21 +76,20 @@ jobs:
             cd "$dir"
             npm version "$next_version" --no-git-tag-version
 
-            # Replace workspace:* references with "latest" so npm can resolve them
+            # Strip workspace:/catalog: references and devDependencies before publishing
             node -e "
               const fs = require('fs');
               const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-              let changed = false;
-              for (const depType of ['dependencies', 'devDependencies', 'peerDependencies']) {
+              delete pkg.devDependencies;
+              for (const depType of ['dependencies', 'peerDependencies']) {
                 if (!pkg[depType]) continue;
                 for (const [k, v] of Object.entries(pkg[depType])) {
                   if (v.startsWith('workspace:')) {
-                    pkg[depType][k] = 'latest';
-                    changed = true;
+                    pkg[depType][k] = '*';
                   }
                 }
               }
-              if (changed) fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             "
 
             npm publish --provenance --access public
