@@ -20,6 +20,23 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Install dependencies
+        run: corepack enable && yarn install
+
+      - name: Build packages
+        run: |
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              has_build=$(node -p "try { !!require('./$dir/package.json').scripts?.build } catch(e) { false }")
+              if [ "$has_build" = "true" ]; then
+                echo "🔨 Building $dir"
+                cd "$dir"
+                yarn build
+                cd -
+              fi
+            fi
+          done
+
       - name: Publish changed packages
         run: |
           for dir in packages/*/; do

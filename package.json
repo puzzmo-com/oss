@@ -1,0 +1,11 @@
+{
+  "name": "puzzmo-oss",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "packageManager": "yarn@4.12.0",
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}
