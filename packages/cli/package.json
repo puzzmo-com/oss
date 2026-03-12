@@ -6,6 +6,16 @@
     "puzzmo": "./lib/index.js"
   },
   "main": "./lib/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/puzzmo-com/oss.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsc",
     "type-check": "tsc --noEmit"

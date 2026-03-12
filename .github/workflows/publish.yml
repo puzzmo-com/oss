@@ -90,6 +90,6 @@ jobs:
               fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             "
 
-            npm publish --provenance --access public
+            npm publish --provenance --access public || echo "⚠️ Failed to publish $name@$next_version"
             cd -
           done
