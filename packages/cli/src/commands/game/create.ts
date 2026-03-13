@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import { createRequire } from "node:module"
 import * as p from "@clack/prompts"
 
 import { detectAgent } from "../../wizard/agent-detect.js"
@@ -52,7 +53,9 @@ const slugify = (str: string): string =>
 export const gameCreate = async (args: string[]) => {
   const opts = parseArgs(args)
 
-  p.intro("Puzzmo Game Creator")
+  const require = createRequire(import.meta.url)
+  const { version } = require("../../../package.json")
+  p.intro(`Puzzmo Game Importer v${version}`)
 
   // Step 1: Mode selection
   const mode = await p.select({
