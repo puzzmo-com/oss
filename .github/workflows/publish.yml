@@ -39,7 +39,9 @@ jobs:
           done
 
       - name: Publish changed packages
+        id: publish
         run: |
+          failed=""
           for dir in packages/*/; do
             if [ ! -f "$dir/package.json" ]; then
               continue
@@ -90,6 +92,24 @@ jobs:
               fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             "
 
-            npm publish --provenance --access public || echo "⚠️ Failed to publish $name@$next_version"
+            if ! npm publish --provenance --access public; then
+              echo "⚠️ Failed to publish $name@$next_version"
+              failed="$failed $name@$next_version"
+            fi
             cd -
           done
+          if [ -n "$failed" ]; then
+            echo "publish_failed=true" >> "$GITHUB_OUTPUT"
+            echo "failed_packages=$failed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack on publish failure
+        if: steps.publish.outputs.publish_failed == 'true'
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "npm publish failed for:${{ steps.publish.outputs.failed_packages }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
