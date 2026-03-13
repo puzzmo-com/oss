@@ -21,12 +21,6 @@ const parseArgs = (args: string[]): CreateOptions => {
   const opts: CreateOptions = {}
   let i = 0
 
-  // First positional arg could be access token
-  if (args[0] && !args[0].startsWith("--")) {
-    opts.accessToken = args[0]
-    i = 1
-  }
-
   while (i < args.length) {
     const arg = args[i]
     if (arg === "--name" && args[i + 1]) {
@@ -35,6 +29,8 @@ const parseArgs = (args: string[]): CreateOptions => {
       opts.url = args[++i]
     } else if (arg === "--agent" && args[i + 1]) {
       opts.agent = args[++i]
+    } else if (arg === "--token" && args[i + 1]) {
+      opts.accessToken = args[++i]
     } else if (arg === "--pm" && args[i + 1]) {
       opts.pm = args[++i]
     }
@@ -80,20 +76,20 @@ const askSelect = async (message: string, options: { value: string; label: strin
   })
 }
 
+/** Converts a string to a URL-friendly slug */
+const slugify = (str: string): string =>
+  str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
 /** Main game create wizard */
 export const gameCreate = async (args: string[]) => {
   const opts = parseArgs(args)
 
   console.log("\n  Puzzmo Game Creator\n")
 
-  // Step 1: Game name
-  const name = opts.name || (await askText("Game name"))
-  if (!name) {
-    console.error("Game name is required")
-    process.exit(1)
-  }
-
-  // Step 2: Mode selection
+  // Step 1: Mode selection
   const mode = await askSelect("How would you like to create your game?", [
     { value: "import", label: "Import an HTML game from a web page" },
     { value: "new-repo", label: "Create game in a new repo", disabled: true },
@@ -105,18 +101,31 @@ export const gameCreate = async (args: string[]) => {
     process.exit(0)
   }
 
-  // Step 3: Source URL
+  // Step 2: Source URL
   const url = opts.url || (await askText("Source URL to import"))
   if (!url) {
     console.error("Source URL is required for import mode")
     process.exit(1)
   }
 
-  // Step 4: Download page
-  const gameDir = path.resolve(name)
-  console.log(`\nDownloading ${url} into ./${name}/...`)
-  await downloadPage(url, gameDir)
+  // Step 3: Download page to a temp dir, extract title
+  const tmpDir = path.resolve(".puzzmo-import-tmp")
+  console.log(`\nDownloading ${url}...`)
+  const { title } = await downloadPage(url, tmpDir)
   console.log("Download complete.")
+
+  // Step 4: Game name (default to HTML title if available)
+  const defaultName = opts.name || title
+  const name = await askText("Game name", defaultName)
+  if (!name) {
+    console.error("Game name is required")
+    process.exit(1)
+  }
+
+  // Step 5: Move downloaded files to slugified directory
+  const slug = slugify(name)
+  const gameDir = path.resolve(slug)
+  fs.renameSync(tmpDir, gameDir)
 
   // Step 5: Detect agents
   const agents = detectAgent()
@@ -165,9 +174,9 @@ export const gameCreate = async (args: string[]) => {
   // Done
   const pm = opts.pm || "npm"
   const runCmd = pm === "npm" ? "npx" : pm === "yarn" ? "yarn dlx" : "pnpm dlx"
-  console.log(`\nDone! Your game is in ./${name}/`)
+  console.log(`\nDone! Your game is in ./${slug}/`)
   console.log(`\nNext steps:`)
-  console.log(`  cd ${name}`)
+  console.log(`  cd ${slug}`)
   console.log(`  ${runCmd} vite        # Start development server`)
   console.log(`  ${runCmd} vite build  # Build for production`)
   if (selectedAgent === "none") {
