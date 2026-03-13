@@ -43,25 +43,27 @@ jobs:
         id: publish
         run: |
           failed=""
+          published=""
+          skipped=""
           for dir in packages/*/; do
             if [ ! -f "$dir/package.json" ]; then
               continue
             fi
 
+            name=$(node -p "require('./$dir/package.json').name")
+
             # Skip private packages
             is_private=$(node -p "try { require('./$dir/package.json').private || false } catch(e) { false }")
             if [ "$is_private" = "true" ]; then
-              echo "⏭️ Skipping private package in $dir"
+              skipped="$skipped $name"
               continue
             fi
-
-            name=$(node -p "require('./$dir/package.json').name")
 
             # Check if any files changed in this package (skip on workflow_dispatch — publish all)
             if [ "${{ github.event_name }}" = "push" ]; then
               changed=$(git diff --name-only HEAD~1 -- "$dir" | head -1)
               if [ -z "$changed" ]; then
-                echo "⏭️ No changes in $dir"
+                skipped="$skipped $name"
                 continue
               fi
             fi
@@ -93,12 +95,38 @@ jobs:
               fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             "
 
-            if ! npm publish --provenance --access public; then
+            if npm publish --provenance --access public; then
+              published="$published $name@$next_version"
+            else
               echo "⚠️ Failed to publish $name@$next_version"
               failed="$failed $name@$next_version"
             fi
             cd -
           done
+          # Write job summary
+          echo "## Publish summary" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$published" ]; then
+            echo "### Published" >> "$GITHUB_STEP_SUMMARY"
+            for pkg in $published; do
+              echo "- $pkg" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+          if [ -n "$failed" ]; then
+            echo "### Failed" >> "$GITHUB_STEP_SUMMARY"
+            for pkg in $failed; do
+              echo "- $pkg" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+          if [ -n "$skipped" ]; then
+            echo "### Skipped" >> "$GITHUB_STEP_SUMMARY"
+            for pkg in $skipped; do
+              echo "- $pkg" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+          if [ -z "$published" ] && [ -z "$failed" ]; then
+            echo "No packages to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
           if [ -n "$failed" ]; then
             echo "publish_failed=true" >> "$GITHUB_OUTPUT"
             echo "failed_packages=$failed" >> "$GITHUB_OUTPUT"
