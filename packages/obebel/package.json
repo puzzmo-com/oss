@@ -4,7 +4,8 @@
   "description": "High level .ts/.d.ts/.js AST builder which sits on top of Babel's tooling. You must obebel.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/puzzmo-com/obebel"
+    "url": "git+https://github.com/puzzmo-com/oss.git",
+    "directory": "packages/obebel"
   },
   "license": "MIT",
   "author": "Orta Therox <orta.therox@gmail.com>",
