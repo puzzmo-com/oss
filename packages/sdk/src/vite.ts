@@ -13,11 +13,38 @@ export type PuzzmoSimulatorPluginOptions = {
   fixturesGlob?: string
 }
 
+const VIRTUAL_MODULE_ID = "virtual:puzzmo-simulator"
+const RESOLVED_VIRTUAL_MODULE_ID = "\0" + VIRTUAL_MODULE_ID
+
 /** Vite plugin that injects the Puzzmo simulator in dev mode and handles OAuth callbacks. */
 export function puzzmoSimulator(options: PuzzmoSimulatorPluginOptions = {}): Plugin {
   return {
     name: "puzzmo-simulator",
     apply: "serve",
+
+    resolveId(id) {
+      if (id === VIRTUAL_MODULE_ID) return RESOLVED_VIRTUAL_MODULE_ID
+    },
+
+    load(id) {
+      if (id !== RESOLVED_VIRTUAL_MODULE_ID) return
+
+      const { fixturesGlob, ...config } = options
+
+      const lines = [`import { createSimulator } from "@puzzmo/sdk/simulator"`]
+
+      if (fixturesGlob) {
+        lines.push(`const fixtures = import.meta.glob(${JSON.stringify(fixturesGlob)}, { eager: true })`)
+      }
+
+      const configEntries = Object.entries(config).filter(([, v]) => v !== undefined)
+      const configParts = configEntries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+      if (fixturesGlob) configParts.push("fixtures")
+
+      lines.push(`createSimulator({ ${configParts.join(", ")} })`)
+
+      return lines.join("\n")
+    },
 
     configureServer(server) {
       server.middlewares.use("/oauth/callback", (_req, res) => {
@@ -35,27 +62,10 @@ window.location.href = url.toString();
     },
 
     transformIndexHtml() {
-      const { fixturesGlob, ...config } = options
-
-      const lines = [
-        `import { createSimulator } from "@puzzmo/sdk/simulator"`,
-      ]
-
-      if (fixturesGlob) {
-        lines.push(`const fixtures = import.meta.glob(${JSON.stringify(fixturesGlob)}, { eager: true })`)
-      }
-
-      const configEntries = Object.entries(config).filter(([, v]) => v !== undefined)
-      const configParts = configEntries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-      if (fixturesGlob) configParts.push("fixtures")
-
-      lines.push(`createSimulator({ ${configParts.join(", ")} })`)
-
       return [
         {
           tag: "script",
-          attrs: { type: "module" },
-          children: lines.join("\n"),
+          attrs: { type: "module", src: VIRTUAL_MODULE_ID },
           injectTo: "head",
         },
       ]
