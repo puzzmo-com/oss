@@ -25,6 +25,7 @@ jobs:
 
       - name: Build publishable packages
         run: |
+          set -e
           for dir in packages/*/; do
             if [ -f "$dir/package.json" ]; then
               is_private=$(node -p "try { require('./$dir/package.json').private || false } catch(e) { false }")
