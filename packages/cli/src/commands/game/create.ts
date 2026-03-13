@@ -127,7 +127,7 @@ export const gameCreate = async (args: string[]) => {
   // Step 9: Install skills into the game directory
   if (selectedAgent !== "none") {
     p.log.step("Installing Puzzmo skills...")
-    const count = installSkills(selectedAgent, gameDir, opts.pm)
+    const count = installSkills(selectedAgent, gameDir)
     p.log.success(`Installed ${count} skill(s).`)
   }
 
