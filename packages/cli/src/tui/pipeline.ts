@@ -3,7 +3,7 @@ import fs from "node:fs"
 import path from "node:path"
 
 import { skillsPipeline, agentSkillsDir } from "../skills/registry.js"
-import { verifyBuild, runCommand, gitCommit } from "../lib/exec.js"
+import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
 type Phase = "agent" | "build" | "commit" | "idle"
@@ -110,9 +110,7 @@ class PipelineTUI {
     buf += "│ " + bold("Migration Pipeline") + " ".repeat(Math.max(0, sidebarWidth - 21)) + "│"
 
     // Output panel header
-    const headerLabel = this.done
-      ? "Done"
-      : `${skillsPipeline[this.currentStep]?.name ?? ""} ${dim(`(${this.phase})`)}`
+    const headerLabel = this.done ? "Done" : `${skillsPipeline[this.currentStep]?.name ?? ""} ${dim(`(${this.phase})`)}`
     const headerColor = phaseColor[this.phase]
     buf += " " + headerColor(bold(headerLabel))
     buf += " ".repeat(Math.max(0, outputWidth - this.stripAnsi(headerLabel).length - 2)) + "│"
@@ -157,7 +155,7 @@ class PipelineTUI {
 
       // Output column
       const lineIndex = this.outputLines.length - contentRows + row
-      const line = lineIndex >= 0 ? this.outputLines[lineIndex] ?? "" : ""
+      const line = lineIndex >= 0 ? (this.outputLines[lineIndex] ?? "") : ""
       const truncated = this.truncateVisible(line, outputWidth - 2)
       const visibleLen = this.stripAnsi(truncated).length
       buf += " " + truncated + " ".repeat(Math.max(0, outputWidth - visibleLen - 1)) + "│"

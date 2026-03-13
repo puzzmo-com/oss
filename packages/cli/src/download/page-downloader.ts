@@ -4,7 +4,9 @@ import https from "node:https"
 import http from "node:http"
 
 /** Fetch that tolerates expired/self-signed SSL certificates */
-const fetchPage = async (url: string): Promise<{ ok: boolean; status: number; text: () => Promise<string>; arrayBuffer: () => Promise<ArrayBuffer> }> => {
+const fetchPage = async (
+  url: string,
+): Promise<{ ok: boolean; status: number; text: () => Promise<string>; arrayBuffer: () => Promise<ArrayBuffer> }> => {
   const parsed = new URL(url)
   const isHttps = parsed.protocol === "https:"
 
@@ -32,8 +34,14 @@ const fetchPage = async (url: string): Promise<{ ok: boolean; status: number; te
   })
 }
 
+/** Extracts the <title> from HTML */
+export const extractTitle = (html: string): string | undefined => {
+  const match = /<title[^>]*>([^<]+)<\/title>/i.exec(html)
+  return match?.[1]?.trim() || undefined
+}
+
 /** Downloads an HTML page and its referenced assets into a src/ directory */
-export const downloadPage = async (url: string, outputDir: string) => {
+export const downloadPage = async (url: string, outputDir: string): Promise<{ title?: string }> => {
   const srcDir = path.join(outputDir, "src")
   fs.mkdirSync(srcDir, { recursive: true })
 
@@ -81,6 +89,7 @@ export const downloadPage = async (url: string, outputDir: string) => {
   fs.writeFileSync(path.join(srcDir, "index.html"), html)
 
   console.log(`  Saved index.html + ${downloaded.size} asset(s) to ${path.relative(process.cwd(), srcDir)}/`)
+  return { title: extractTitle(html) }
 }
 
 /** Extracts asset references from HTML using regex */

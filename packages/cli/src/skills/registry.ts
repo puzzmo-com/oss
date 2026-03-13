@@ -31,7 +31,27 @@ export const agentSkillsDir = (agent: string): string => {
  * Copies SKILL.md files from the bundled skills source into the game
  * directory under the agent-specific skills path.
  */
-export const installSkills = (agent: string, gameDir: string): number => {
+/** Maps npm commands to their equivalents in other package managers */
+const rewriteForPM = (content: string, pm: string): string => {
+  if (pm === "npm") return content
+  if (pm === "yarn") {
+    return content
+      .replace(/npm install --save-dev /g, "yarn add --dev ")
+      .replace(/npm install /g, "yarn add ")
+      .replace(/npm run /g, "yarn ")
+      .replace(/npx /g, "yarn dlx ")
+  }
+  if (pm === "pnpm") {
+    return content
+      .replace(/npm install --save-dev /g, "pnpm add --save-dev ")
+      .replace(/npm install /g, "pnpm add ")
+      .replace(/npm run /g, "pnpm ")
+      .replace(/npx /g, "pnpm dlx ")
+  }
+  return content
+}
+
+export const installSkills = (agent: string, gameDir: string, pm?: string): number => {
   const skillsRoot = agentSkillsDir(agent)
 
   // Locate the bundled skills source (packages/skills/ relative to this file)
@@ -49,7 +69,13 @@ export const installSkills = (agent: string, gameDir: string): number => {
 
     const destDir = path.join(gameDir, skillsRoot, skill.name)
     fs.mkdirSync(destDir, { recursive: true })
-    fs.copyFileSync(srcFile, path.join(destDir, "SKILL.md"))
+
+    if (pm && pm !== "npm") {
+      const content = fs.readFileSync(srcFile, "utf-8")
+      fs.writeFileSync(path.join(destDir, "SKILL.md"), rewriteForPM(content, pm))
+    } else {
+      fs.copyFileSync(srcFile, path.join(destDir, "SKILL.md"))
+    }
     installed++
   }
 
