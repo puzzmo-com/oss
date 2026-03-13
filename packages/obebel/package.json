@@ -8,6 +8,7 @@
     "directory": "packages/obebel"
   },
   "license": "MIT",
+  "private": true,
   "author": "Orta Therox <orta.therox@gmail.com>",
   "main": "./lib/obebel.js",
   "files": [
