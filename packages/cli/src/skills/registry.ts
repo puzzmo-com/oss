@@ -17,6 +17,15 @@ export const skillsPipeline: SkillDefinition[] = [
   { name: "setup-deploy", optional: false },
 ]
 
+/** Maps our agent binary names to the skills CLI agent identifiers */
+const toSkillsAgent = (agent: string): string => {
+  const map: Record<string, string> = {
+    claude: "claude-code",
+    gemini: "gemini-cli",
+  }
+  return map[agent] ?? agent
+}
+
 /** Returns the skills directory for a given agent inside the game dir */
 export const agentSkillsDir = (agent: string): string => {
   if (agent === "claude") return ".claude/skills"
@@ -27,7 +36,8 @@ export const agentSkillsDir = (agent: string): string => {
 
 /** Installs all Puzzmo skills from the OSS repo using `npx skills add` */
 export const installSkills = (agent: string, gameDir: string): number => {
-  const result = spawnSync("npx", ["skills", "add", "puzzmo-com/oss", "--agent", agent, "--skill", "*", "--copy", "-y"], {
+  const skillsAgent = toSkillsAgent(agent)
+  const result = spawnSync("npx", ["skills", "add", "puzzmo-com/oss", "--agent", skillsAgent, "--skill", "*", "--copy", "-y"], {
     cwd: gameDir,
     stdio: "inherit",
     encoding: "utf-8",

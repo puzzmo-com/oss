@@ -88,7 +88,8 @@ export const downloadPage = async (url: string, outputDir: string): Promise<{ ti
   // Write the HTML file
   fs.writeFileSync(path.join(srcDir, "index.html"), html)
 
-  console.log(`  Saved index.html + ${downloaded.size} asset(s) to ${path.relative(process.cwd(), srcDir)}/`)
+  const assetMsg = downloaded.size === 0 ? "no other assets" : `${downloaded.size} asset${downloaded.size === 1 ? "" : "s"}`
+  console.log(`  Saved index.html + ${assetMsg} to ${path.relative(process.cwd(), srcDir)}/`)
   return { title: extractTitle(html) }
 }
 
