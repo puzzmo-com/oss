@@ -11,6 +11,11 @@
   ],
   "author": "Puzzmo",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/puzzmo-com/oss.git",
+    "directory": "packages/create-puzzmo"
+  },
   "publishConfig": {
     "access": "public",
     "provenance": true,
