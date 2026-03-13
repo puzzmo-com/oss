@@ -80,6 +80,7 @@ export const gameCreate = async (args: string[]) => {
 
   // Step 3: Download page to a temp dir, extract title
   const tmpDir = path.resolve(".puzzmo-import-tmp")
+  if (fs.existsSync(tmpDir)) fs.rmSync(tmpDir, { recursive: true })
   const s = p.spinner()
   s.start(`Downloading ${url}`)
   const { title } = await downloadPage(url, tmpDir)
@@ -97,6 +98,7 @@ export const gameCreate = async (args: string[]) => {
   // Step 5: Move downloaded files to slugified directory
   const slug = slugify(name)
   const gameDir = path.resolve(slug)
+  if (fs.existsSync(gameDir)) fs.rmSync(gameDir, { recursive: true })
   fs.renameSync(tmpDir, gameDir)
 
   // Step 6: Detect agents

@@ -312,11 +312,40 @@ class PipelineTUI {
       })
 
       this.activeProc = proc
+      let resolved = false
+      let gotResult = false
       const debugLog = path.join(this.gameDir, "pipeline-debug.log")
 
+      const finish = (success: boolean) => {
+        if (resolved) return
+        resolved = true
+        this.activeProc = null
+        resolve(success)
+      }
+
       proc.stdout?.on("data", (data: Buffer) => {
-        fs.appendFileSync(debugLog, data.toString())
-        this.appendOutput(data.toString())
+        const text = data.toString()
+        fs.appendFileSync(debugLog, text)
+        this.appendOutput(text)
+
+        // Detect the result event in stream-json - the agent is done
+        if (!gotResult) {
+          for (const line of text.split("\n")) {
+            try {
+              const obj = JSON.parse(line)
+              if (obj.type === "result") {
+                gotResult = true
+                // Give the process a moment to exit cleanly, then force-resolve
+                setTimeout(() => {
+                  if (!resolved) {
+                    proc.kill()
+                    finish(true)
+                  }
+                }, 3000)
+              }
+            } catch {}
+          }
+        }
       })
       proc.stderr?.on("data", (data: Buffer) => {
         fs.appendFileSync(debugLog, `[stderr] ${data.toString()}`)
@@ -325,14 +354,11 @@ class PipelineTUI {
 
       proc.on("close", (code) => {
         fs.appendFileSync(debugLog, `\n[close] code=${code}\n`)
-
-        this.activeProc = null
-        resolve(code === 0)
+        finish(gotResult || code === 0)
       })
       proc.on("error", (err) => {
         this.appendOutput(`Error: ${err.message}`)
-        this.activeProc = null
-        resolve(false)
+        finish(false)
       })
     })
   }
