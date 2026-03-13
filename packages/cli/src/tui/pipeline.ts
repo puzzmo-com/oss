@@ -103,7 +103,7 @@ class PipelineTUI {
     buf += moveTo(1, 1)
 
     // Top border
-    buf += "╭" + "─".repeat(sidebarWidth - 2) + "┬" + "─".repeat(outputWidth - 1) + "╮"
+    buf += "╭" + "─".repeat(sidebarWidth - 2) + "┬" + "─".repeat(outputWidth) + "╮"
 
     // Sidebar header
     buf += moveTo(2, 1)
@@ -113,11 +113,11 @@ class PipelineTUI {
     const headerLabel = this.done ? "Done" : `${skillsPipeline[this.currentStep]?.name ?? ""} ${dim(`(${this.phase})`)}`
     const headerColor = phaseColor[this.phase]
     buf += " " + headerColor(bold(headerLabel))
-    buf += " ".repeat(Math.max(0, outputWidth - this.stripAnsi(headerLabel).length - 2)) + "│"
+    buf += " ".repeat(Math.max(0, outputWidth - this.stripAnsi(headerLabel).length - 1)) + "│"
 
     // Separator
     buf += moveTo(3, 1)
-    buf += "├" + "─".repeat(sidebarWidth - 2) + "┼" + "─".repeat(outputWidth - 1) + "┤"
+    buf += "├" + "─".repeat(sidebarWidth - 2) + "┼" + "─".repeat(outputWidth) + "┤"
 
     // Content rows
     const contentRows = rows - 4 // top border + header + separator + bottom border
@@ -163,7 +163,7 @@ class PipelineTUI {
 
     // Bottom border
     buf += moveTo(rows, 1)
-    buf += "╰" + "─".repeat(sidebarWidth - 2) + "┴" + "─".repeat(outputWidth - 1) + "╯"
+    buf += "╰" + "─".repeat(sidebarWidth - 2) + "┴" + "─".repeat(outputWidth) + "╯"
 
     this.write(buf)
   }
@@ -287,6 +287,13 @@ class PipelineTUI {
         if (obj.subtype === "init") return dim(`Session started`)
         if (obj.subtype === "hook_started") return null
         if (obj.subtype === "hook_response") return null
+        if (obj.subtype === "task_started") return dim(`Subagent: ${obj.description ?? "started"}`)
+        if (obj.subtype === "task_progress")
+          return dim(`  ${obj.last_tool_name ?? "working"}${obj.description ? ": " + obj.description : ""}`)
+        if (obj.subtype === "task_notification")
+          return obj.status === "completed"
+            ? dim(`Subagent done: ${obj.summary ?? ""}`)
+            : dim(`Subagent ${obj.status ?? "update"}: ${obj.summary ?? ""}`)
         return dim(`[system:${obj.subtype}]`)
       }
 
