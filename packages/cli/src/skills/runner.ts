@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process"
 
 import { skillsPipeline, agentSkillsDir } from "./registry.js"
-import { verifyBuild, runCommand, gitCommit } from "../lib/exec.js"
+import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 
 /** Builds the agent prompt for a given skill */
 const buildPrompt = (skillName: string, agent: string): string => {

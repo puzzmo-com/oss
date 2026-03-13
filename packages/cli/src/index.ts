@@ -39,7 +39,7 @@ const run = async () => {
       if (subcommand === "create") {
         await gameCreate(subArgs)
       } else {
-        console.error("Usage: puzzmo game create [token] [--name <name>] [--url <url>] [--agent <agent>]")
+        console.error("Usage: puzzmo game create [token] [--name <name>] [--url <url>] [--agent <agent>] [--pm <npm|yarn|pnpm>]")
         process.exit(1)
       }
       break

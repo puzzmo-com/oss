@@ -1,4 +1,4 @@
-import { writeConfig, readConfig } from "../lib/config.js"
+import { writeConfig, readConfig } from "../util/config.js"
 
 /** Saves a CLI token to ~/.puzzmo/config.json */
 export const login = (token: string) => {

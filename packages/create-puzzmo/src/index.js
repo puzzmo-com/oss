@@ -5,16 +5,21 @@ import { execSync, spawnSync } from "node:child_process"
 // Forward all args to `puzzmo game create`
 const args = process.argv.slice(2)
 
+// Detect the package manager that invoked this script
+const pm = detectPackageManager()
+
 // Check if puzzmo CLI is available
 try {
   execSync("puzzmo --help", { stdio: "ignore" })
 } catch {
   console.log("Installing @puzzmo/cli...")
-  const pm = detectPackageManager()
-  spawnSync(pm === "yarn" ? "yarn" : pm, ["add", "-g", "@puzzmo/cli"], { stdio: "inherit" })
+  spawnSync("npm", ["install", "-g", "@puzzmo/cli"], { stdio: "inherit" })
 }
 
-const result = spawnSync("puzzmo", ["game", "create", ...args], {
+// Pass --pm so the CLI knows which package manager to use in generated files
+const extraArgs = args.includes("--pm") ? [] : ["--pm", pm]
+
+const result = spawnSync("puzzmo", ["game", "create", ...args, ...extraArgs], {
   stdio: "inherit",
   env: process.env,
 })

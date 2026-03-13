@@ -3,8 +3,8 @@ import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 
-import { uploadFiles } from "../lib/api.js"
-import { getAPIURL, getToken } from "../lib/config.js"
+import { uploadFiles } from "../util/api.js"
+import { getAPIURL, getToken } from "../util/config.js"
 
 /** Collects all files in a directory recursively */
 const collectFiles = (dir: string): string[] => {

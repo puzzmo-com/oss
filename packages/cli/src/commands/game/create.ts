@@ -3,7 +3,7 @@ import path from "node:path"
 
 import { detectAgent } from "../../wizard/agent-detect.js"
 import { downloadPage } from "../../download/page-downloader.js"
-import { runCommand, gitCommit } from "../../lib/exec.js"
+import { runCommand, gitCommit } from "../../util/exec.js"
 import { runSkillsPipelineTUI } from "../../skills/runner.js"
 import { installSkills } from "../../skills/registry.js"
 import { login } from "../login.js"
@@ -13,6 +13,7 @@ type CreateOptions = {
   url?: string
   agent?: string
   accessToken?: string
+  pm?: string
 }
 
 /** Parses CLI args into CreateOptions */
@@ -34,6 +35,8 @@ const parseArgs = (args: string[]): CreateOptions => {
       opts.url = args[++i]
     } else if (arg === "--agent" && args[i + 1]) {
       opts.agent = args[++i]
+    } else if (arg === "--pm" && args[i + 1]) {
+      opts.pm = args[++i]
     }
     i++
   }
@@ -142,7 +145,7 @@ export const gameCreate = async (args: string[]) => {
   // Step 8: Install skills into the game directory
   if (selectedAgent !== "none") {
     console.log("\nInstalling Puzzmo skills...")
-    const count = installSkills(selectedAgent, gameDir)
+    const count = installSkills(selectedAgent, gameDir, opts.pm)
     console.log(`Installed ${count} skill(s).`)
   }
 
@@ -160,11 +163,13 @@ export const gameCreate = async (args: string[]) => {
   }
 
   // Done
+  const pm = opts.pm || "npm"
+  const runCmd = pm === "npm" ? "npx" : pm === "yarn" ? "yarn dlx" : "pnpm dlx"
   console.log(`\nDone! Your game is in ./${name}/`)
   console.log(`\nNext steps:`)
   console.log(`  cd ${name}`)
-  console.log(`  npx vite        # Start development server`)
-  console.log(`  npx vite build  # Build for production`)
+  console.log(`  ${runCmd} vite        # Start development server`)
+  console.log(`  ${runCmd} vite build  # Build for production`)
   if (selectedAgent === "none") {
     console.log(`\nTo run migration skills manually, see packages/skills/ for SKILL.md files.`)
   }
