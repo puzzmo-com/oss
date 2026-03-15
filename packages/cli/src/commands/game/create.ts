@@ -6,9 +6,9 @@ import * as p from "@clack/prompts"
 import { detectAgent } from "../../wizard/agent-detect.js"
 import { downloadPage } from "../../download/page-downloader.js"
 import { runCommand, gitCommit } from "../../util/exec.js"
-import { runSkillsPipelineTUI } from "../../skills/runner.js"
-import { installSkills } from "../../skills/registry.js"
+import { runSkillsPipeline } from "../../skills/runner.js"
 import { login } from "../login.js"
+import { getToken } from "../../util/config.js"
 
 type CreateOptions = {
   name?: string
@@ -104,14 +104,41 @@ export const gameCreate = async (args: string[]) => {
   if (fs.existsSync(gameDir)) fs.rmSync(gameDir, { recursive: true })
   fs.renameSync(tmpDir, gameDir)
 
-  // Step 6: Detect agents
+  // Step 6: Login if token provided
+  if (opts.accessToken) {
+    p.log.step("Logging in...")
+    login(opts.accessToken)
+  }
+
+  // Step 7: Write .mcp.json with dev server config
+  const token = getToken()
+  const mcpConfig = {
+    mcpServers: {
+      "dev.puzzmo.com": {
+        type: "http",
+        // url: "https://dev.puzzmo.com/api/mcp",
+        url: "https://dev-dj9e.onrender.com/api/mcp",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      },
+    },
+  }
+
+  fs.writeFileSync(path.join(gameDir, ".mcp.json"), JSON.stringify(mcpConfig, null, 2) + "\n")
+
+  // Step 8: Initialize git
+  if (!fs.existsSync(path.join(gameDir, ".git"))) {
+    runCommand("git init", { cwd: gameDir })
+    runCommand("git add -A", { cwd: gameDir })
+    gitCommit("Initial game import", { cwd: gameDir })
+  }
+
+  // Step 9: Detect agent and run skills pipeline
   const agents = detectAgent()
   const agentChoices = [
     ...agents.map((a) => ({ value: a.binary, label: `${a.displayName} (${a.path})` })),
     { value: "none", label: "None - I'll run the skills manually" },
   ]
 
-  // Step 7: Ask about agent
   let selectedAgent: string
   if (opts.agent) {
     selectedAgent = opts.agent
@@ -123,30 +150,9 @@ export const gameCreate = async (args: string[]) => {
     selectedAgent = "none"
   }
 
-  // Step 8: Login if token provided
-  if (opts.accessToken) {
-    p.log.step("Logging in...")
-    login(opts.accessToken)
-  }
-
-  // Step 9: Install skills into the game directory
   if (selectedAgent !== "none") {
-    p.log.step("Installing Puzzmo skills...")
-    const count = installSkills(selectedAgent, gameDir)
-    p.log.success(`Installed ${count} skill(s).`)
-  }
-
-  // Step 10: Initialize git
-  if (!fs.existsSync(path.join(gameDir, ".git"))) {
-    runCommand("git init", { cwd: gameDir })
-    runCommand("git add -A", { cwd: gameDir })
-    gitCommit("Initial game import", { cwd: gameDir })
-  }
-
-  // Step 11: Run skills pipeline
-  if (selectedAgent !== "none") {
-    p.log.step("Starting migration pipeline...")
-    await runSkillsPipelineTUI(selectedAgent, gameDir)
+    p.log.step("Running Puzzmo skills pipeline...")
+    await runSkillsPipeline(selectedAgent, gameDir)
   }
 
   // Done
@@ -157,10 +163,6 @@ export const gameCreate = async (args: string[]) => {
     [`cd ${slug}`, `${runCmd} vite        # Start development server`, `${runCmd} vite build  # Build for production`].join("\n"),
     "Next steps",
   )
-
-  if (selectedAgent === "none") {
-    p.log.info("To run migration skills manually, see packages/skills/ for SKILL.md files.")
-  }
 
   p.outro(`Done! Your game is in ./${slug}/`)
 }

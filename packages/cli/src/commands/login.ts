@@ -1,9 +1,11 @@
+import * as p from "@clack/prompts"
+
 import { writeConfig, readConfig } from "../util/config.js"
 
 /** Saves a CLI token to ~/.puzzmo/config.json */
 export const login = (token: string) => {
   if (!token.startsWith("pzt-")) {
-    console.error("Invalid CLI token. Generate one from studio.puzzmo.com.")
+    p.log.error("Invalid CLI token. Generate one from dev.puzzmo.com.")
     process.exit(1)
   }
 
@@ -11,5 +13,5 @@ export const login = (token: string) => {
   config.token = token
   writeConfig(config)
 
-  console.log("Logged in successfully. Token saved to ~/.puzzmo/config.json")
+  p.log.success("Logged in successfully. Token saved to ~/.puzzmo/config.json")
 }

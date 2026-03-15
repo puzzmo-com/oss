@@ -1,12 +1,11 @@
 import { spawnSync } from "node:child_process"
 
-import { skillsPipeline, agentSkillsDir } from "./registry.js"
+import { skillsPipeline } from "./registry.js"
 import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 
-/** Builds the agent prompt for a given skill */
-const buildPrompt = (skillName: string, agent: string): string => {
-  const skillDir = agentSkillsDir(agent)
-  return `Run the skill ${skillName}. Follow the instructions in ${skillDir}/${skillName}/SKILL.md. The game source is in the current directory.`
+/** Builds the agent prompt for a given skill, referencing the MCP prompt */
+const buildPrompt = (skillName: string): string => {
+  return `Use the MCP prompt "${skillName}" from the dev.puzzmo.com server and follow its instructions. The game source is in the current directory.`
 }
 
 /** Invokes an LLM agent with a prompt (plain mode, stdio inherited) */
@@ -37,7 +36,7 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
     const step = i + 1
     console.log(`[${step}/${total}] Running skill: ${skill.name}${skill.optional ? " (optional)" : ""}`)
 
-    const prompt = buildPrompt(skill.name, agent)
+    const prompt = buildPrompt(skill.name)
     let result = invokeAgent(agent, prompt, gameDir)
 
     if (!result.success) {
