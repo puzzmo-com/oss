@@ -19,6 +19,7 @@ Convert this HTML game into a Vite-powered project.
    - `vite` as a devDependency
 
 3. Create `vite.config.ts`:
+
    ```ts
    import { defineConfig } from "vite"
    export default defineConfig({})
@@ -32,6 +33,8 @@ Convert this HTML game into a Vite-powered project.
 5. Move any standalone JS/CSS files into `src/`
 
 6. Update all asset references to use relative paths that Vite can resolve
+
+7. Verify if you need to edit the `.gitignore` to exclude `dist/` and other build artifacts like `node_modules` etc
 
 ## Success Criteria
 

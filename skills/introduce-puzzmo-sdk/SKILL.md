@@ -10,11 +10,13 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 ## Steps
 
 1. Install `@puzzmo/sdk`:
+
    ```
    npm install @puzzmo/sdk
    ```
 
 2. In the main game entry file, import and initialize the SDK:
+
    ```ts
    import { createPuzzmoSDK } from "@puzzmo/sdk"
 
@@ -22,6 +24,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
    ```
 
 3. Replace the game's initialization flow with the SDK lifecycle:
+
    ```ts
    // Wait for puzzle data from the host
    const { puzzleString, boardState, theme, completed } = await sdk.gameReady()
@@ -41,11 +44,20 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
    ```
 
 4. Wire up lifecycle events:
+
    ```ts
-   sdk.on("start", () => { /* start game logic, timer auto-starts */ })
-   sdk.on("pause", () => { /* pause game, timer auto-pauses */ })
-   sdk.on("resume", () => { /* resume game, timer auto-resumes */ })
-   sdk.on("retry", () => { /* reset game state, timer auto-resets */ })
+   sdk.on("start", () => {
+     /* start game logic, timer auto-starts */
+   })
+   sdk.on("pause", () => {
+     /* pause game was triggered, timer auto-pauses */
+   })
+   sdk.on("resume", () => {
+     /* resume game was triggered, timer auto-resumes */
+   })
+   sdk.on("retry", () => {
+     /* retry game was triggered, timer auto-resets, */
+   })
    ```
 
 5. Wire up state saving - call `sdk.updateGameState(stateString)` whenever the game state changes so the host can save progress.
@@ -53,6 +65,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 6. Create a `sample-puzzle.json` file with test puzzle data that matches what the game expects.
 
 7. Set up the dev simulator for local testing. Add the Vite plugin to `vite.config.ts`:
+
    ```ts
    import { defineConfig } from "vite"
    import { puzzmoSimulator } from "@puzzmo/sdk/vite"
@@ -71,12 +84,13 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
    - Injects the simulator UI in dev mode only (tree-shaken from production builds)
    - Handles OAuth callback routing for authenticated API features
 
-   For non-Vite setups, use the standalone script tag instead:
+   For non-Vite setups, load the SDK and simulator from jsDelivr:
+
    ```html
    <script>
      window.SIMULATOR_CONFIG = { puzzlePath: "./sample-puzzle.json", slug: "my-game" }
    </script>
-   <script type="module" src="@puzzmo/sdk/simulator/standalone"></script>
+   <script src="https://cdn.jsdelivr.net/npm/@puzzmo/sdk/dist/simulator/standalone.js"></script>
    ```
 
 ## Key SDK APIs

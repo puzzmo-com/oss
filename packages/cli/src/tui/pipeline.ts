@@ -2,8 +2,9 @@ import { spawn, type ChildProcess } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
+import { execSync } from "node:child_process"
+
 import { skillsPipeline } from "../skills/registry.js"
-import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
 type Phase = "agent" | "build" | "commit" | "idle"
@@ -304,6 +305,19 @@ class PipelineTUI {
     }
   }
 
+  /** Run a shell command, capturing output into the TUI panel */
+  private runCmd(cmd: string): { success: boolean; output: string } {
+    try {
+      const output = execSync(cmd, { cwd: this.gameDir, encoding: "utf-8", stdio: "pipe" })
+      if (output.trim()) this.appendOutput(output.trim())
+      return { success: true, output }
+    } catch (e: any) {
+      const output = (e.stdout || "") + (e.stderr || "") || e.message
+      if (output.trim()) this.appendOutput(output.trim())
+      return { success: false, output }
+    }
+  }
+
   /** Spawn agent and stream output */
   private runAgent(prompt: string): Promise<boolean> {
     return new Promise((resolve) => {
@@ -400,13 +414,13 @@ class PipelineTUI {
     this.phase = "build"
     this.render()
     this.appendOutput("Verifying build...")
-    const buildResult = verifyBuild(this.gameDir)
+    const buildResult = this.runCmd("npx vite build")
     if (!buildResult.success) {
-      this.appendOutput(`Build failed: ${buildResult.error}\nAsking agent to fix...`)
-      const fixPrompt = `The vite build failed after running skill ${skill.name}. Fix the build errors:\n\n${buildResult.error}`
+      this.appendOutput("Asking agent to fix...")
+      const fixPrompt = `The vite build failed after running skill ${skill.name}. Fix the build errors:\n\n${buildResult.output}`
       await this.runAgent(fixPrompt)
 
-      const retry = verifyBuild(this.gameDir)
+      const retry = this.runCmd("npx vite build")
       if (!retry.success) {
         if (skill.optional) {
           this.states[stepIndex] = "skipped"
@@ -422,13 +436,10 @@ class PipelineTUI {
     // Commit
     this.phase = "commit"
     this.render()
-    try {
-      runCommand("git add -A", { cwd: this.gameDir })
-      gitCommit(`skill: ${skill.name}`, { cwd: this.gameDir })
-      this.appendOutput("Committed.")
-    } catch {
-      this.appendOutput("No changes to commit.")
-    }
+    this.runCmd("git add -A")
+    const commitResult = this.runCmd(`git commit -m "skill: ${skill.name}"`)
+    if (commitResult.success) this.appendOutput("Committed.")
+    else this.appendOutput("No changes to commit.")
 
     this.states[stepIndex] = "success"
     this.render()
