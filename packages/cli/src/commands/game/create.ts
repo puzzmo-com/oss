@@ -6,7 +6,7 @@ import * as p from "@clack/prompts"
 import { detectAgent } from "../../wizard/agent-detect.js"
 import { downloadPage } from "../../download/page-downloader.js"
 import { runCommand, gitCommit } from "../../util/exec.js"
-import { runSkillsPipeline } from "../../skills/runner.js"
+import { runSkillsPipelineTUI } from "../../skills/runner.js"
 import { login } from "../login.js"
 import { getToken } from "../../util/config.js"
 
@@ -152,7 +152,7 @@ export const gameCreate = async (args: string[]) => {
 
   if (selectedAgent !== "none") {
     p.log.step("Running Puzzmo skills pipeline...")
-    await runSkillsPipeline(selectedAgent, gameDir)
+    await runSkillsPipelineTUI(selectedAgent, gameDir)
   }
 
   // Done

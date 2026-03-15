@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
-import { skillsPipeline, agentSkillsDir } from "../skills/registry.js"
+import { skillsPipeline } from "../skills/registry.js"
 import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
@@ -56,9 +56,8 @@ const buildAgentCmd = (agent: string, prompt: string): { cmd: string; args: stri
   return { cmd: agent, args: [prompt] }
 }
 
-const buildPrompt = (skillName: string, agent: string): string => {
-  const skillDir = agentSkillsDir(agent)
-  return `Run the skill ${skillName}. Follow the instructions in ${skillDir}/${skillName}/SKILL.md. The game source is in the current directory.`
+const buildPrompt = (skillName: string): string => {
+  return `Use the MCP prompt "${skillName}" from the dev.puzzmo.com server and follow its instructions. The game source is in the current directory.`
 }
 
 class PipelineTUI {
@@ -379,7 +378,7 @@ class PipelineTUI {
     this.phase = "agent"
     this.render()
 
-    const prompt = buildPrompt(skill.name, this.agent)
+    const prompt = buildPrompt(skill.name)
     let success = await this.runAgent(prompt)
 
     if (!success) {
