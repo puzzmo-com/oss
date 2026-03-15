@@ -16,7 +16,7 @@ export default defineConfig({
         return `${entryName}.${ext}`
       },
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: ["vite"],
       output: {
         globals: {},
