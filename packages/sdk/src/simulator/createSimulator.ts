@@ -6,15 +6,16 @@
  * - Sending READY_DATA with puzzle data
  * - Providing UI controls for START_GAME, PAUSE_GAME, RESUME_GAME, RETRY_PUZZLE
  *
- * Usage in index.html:
- * ```html
- * <script type="module">
- *   import { createSimulator } from "@puzzmo/sdk/simulator"
- *   createSimulator({ puzzlePath: "./sample-puzzle.json", autoStart: true })
- * </script>
+ * Usage with Vite plugin (recommended):
+ * ```ts
+ * // vite.config.ts
+ * import { puzzmoSimulator } from "@puzzmo/sdk/vite"
+ * export default defineConfig({
+ *   plugins: [puzzmoSimulator({ slug: "my-game", fixturesGlob: "./fixtures/puzzles/**\/*.json" })]
+ * })
  * ```
  *
- * With fixtures (recommended for multiple puzzles):
+ * Usage with manual imports:
  * ```html
  * <script type="module">
  *   import { createSimulator } from "@puzzmo/sdk/simulator"
@@ -47,9 +48,6 @@ import {
 // Re-export types for consumers
 export type { SimulatorConfig, FixtureImports }
 
-// Default puzzle path
-const DEFAULT_PUZZLE_PATH = "./sample-puzzle.json"
-
 // Singleton instance state
 interface SimulatorInstance {
   updateFixtures: (fixtures: FixtureImports) => void
@@ -74,7 +72,6 @@ function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
     return simulatorInstance
   }
 
-  const puzzlePath = config.puzzlePath ?? DEFAULT_PUZZLE_PATH
   const autoStart = config.autoStart ?? true
 
   // Parse fixtures if provided
@@ -139,7 +136,10 @@ function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
         <div id="simulator-tabs">
           ${views
             .filter((v) => v.id !== "auth")
-            .map((v) => `<button class="simulator-tab" data-tab="${v.id}">${v.label}<span class="simulator-tab-badge" data-badge="${v.id}"></span></button>`)
+            .map(
+              (v) =>
+                `<button class="simulator-tab" data-tab="${v.id}">${v.label}<span class="simulator-tab-badge" data-badge="${v.id}"></span></button>`,
+            )
             .join("")}
         </div>
         <div id="simulator-content" class="hidden">
@@ -238,32 +238,37 @@ function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
     thumbView.updatePreview(context)
   }
 
-  // Load puzzle data
+  // Load puzzle data from fixtures
   const loadPuzzle = async (): Promise<any> => {
     if (state.puzzleData) return state.puzzleData
 
-    try {
-      const response = await fetch(puzzlePath)
-      if (!response.ok) {
-        throw new Error(`Failed to load puzzle from ${puzzlePath}`)
-      }
-      state.puzzleData = await response.json()
-      console.log("Simulator: Puzzle loaded", state.puzzleData)
-      state.originalPuzzle = JSON.stringify(state.puzzleData, null, 2)
-
-      // Update puzzle textarea if exists
-      const puzzleTextarea = getElement<HTMLTextAreaElement>("#simulator-puzzle")
-      if (puzzleTextarea) puzzleTextarea.value = state.originalPuzzle
-
-      // Refresh thumbnail if thumb tab is active
-      if (state.activeTab === "thumb") {
-        updateThumbnail()
-      }
-      return state.puzzleData
-    } catch (error) {
-      console.error("Simulator: Failed to load puzzle", error)
-      throw error
+    if (!fixtures || fixtures.size === 0) {
+      throw new Error("No fixtures configured. Add puzzle JSON files to a fixtures directory and pass fixturesGlob to the simulator.")
     }
+
+    // Pick the selected fixture, or the first one available
+    const category = state.selectedCategory ?? fixtureCategories[0]
+    const categoryMap = category ? fixtures.get(category) : undefined
+    if (!categoryMap || categoryMap.size === 0) {
+      throw new Error(`No puzzles found in fixture category "${category}"`)
+    }
+
+    const puzzleName = state.selectedPuzzle ?? categoryMap.keys().next().value
+    const puzzleData = puzzleName ? categoryMap.get(puzzleName) : undefined
+    if (!puzzleData) {
+      throw new Error(`Puzzle "${puzzleName}" not found in category "${category}"`)
+    }
+
+    state.puzzleData = puzzleData
+    console.log("Simulator: Puzzle loaded from fixtures", { category, puzzle: puzzleName })
+    state.originalPuzzle = JSON.stringify(state.puzzleData, null, 2)
+
+    const puzzleTextarea = getElement<HTMLTextAreaElement>("#simulator-puzzle")
+    if (puzzleTextarea) puzzleTextarea.value = state.originalPuzzle
+
+    if (state.activeTab === "thumb") updateThumbnail()
+
+    return state.puzzleData
   }
 
   // Wrapped sendToGame with logger

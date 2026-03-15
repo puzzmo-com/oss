@@ -1,8 +1,6 @@
 import type { Plugin } from "vite"
 
 export type PuzzmoSimulatorPluginOptions = {
-  /** Path to the puzzle JSON file (default: "./sample-puzzle.json") */
-  puzzlePath?: string
   /** Whether to auto-start the game after READY (default: true) */
   autoStart?: boolean
   /** Initial collapsed state (default: true) */

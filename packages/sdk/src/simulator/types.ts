@@ -4,8 +4,6 @@ import type { MessagesReceived, Theme, ThumbnailConfig } from "../types"
 export type FixtureImports = Record<string, { default?: any }>
 
 export interface SimulatorConfig {
-  /** Path to the puzzle JSON file (default: "./sample-puzzle.json") */
-  puzzlePath?: string
   /** Whether to auto-start the game after READY (default: true) */
   autoStart?: boolean
   /** Initial collapsed state (default: true) */

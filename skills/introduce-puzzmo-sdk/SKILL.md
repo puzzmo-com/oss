@@ -62,7 +62,21 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 
 5. Wire up state saving - call `sdk.updateGameState(stateString)` whenever the game state changes so the host can save progress.
 
-6. Create a `sample-puzzle.json` file with test puzzle data that matches what the game expects.
+6. Create puzzle fixture files for local testing. Make a `fixtures/puzzles/` directory and add a few different puzzle JSON files that exercise different aspects of the game:
+
+   ```
+   fixtures/puzzles/
+     easy/
+       small-grid.json
+       basic.json
+     hard/
+       large-grid.json
+       tricky.json
+   ```
+
+   Each JSON file should contain puzzle data in the format the game expects. Try to create at least 2-3 puzzles with different characteristics (e.g. varying difficulty, size, or edge cases) so the game can be tested against realistic variety.
+
+   If the original game already has a few puzzles hardcoded, use those as a starting point for creating the fixture files. Then delete the buttons which may have been used to load them, since the simulator will handle loading puzzles from the fixtures.
 
 7. Set up the dev simulator for local testing. Add the Vite plugin to `vite.config.ts`:
 
@@ -74,7 +88,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
      plugins: [
        puzzmoSimulator({
          slug: "my-game",
-         puzzlePath: "./sample-puzzle.json",
+         fixturesGlob: "./fixtures/puzzles/**/*.json",
        }),
      ],
    })
@@ -82,13 +96,14 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 
    The plugin automatically:
    - Injects the simulator UI in dev mode only (tree-shaken from production builds)
+   - Loads fixtures from the glob pattern, organized by folder as categories
    - Handles OAuth callback routing for authenticated API features
 
    For non-Vite setups, load the SDK and simulator from jsDelivr:
 
    ```html
    <script>
-     window.SIMULATOR_CONFIG = { puzzlePath: "./sample-puzzle.json", slug: "my-game" }
+     window.SIMULATOR_CONFIG = { slug: "my-game" }
    </script>
    <script src="https://cdn.jsdelivr.net/npm/@puzzmo/sdk/dist/simulator/standalone.js"></script>
    ```
@@ -107,5 +122,5 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 - Game initializes through SDK lifecycle (gameReady -> gameLoaded -> on start)
 - Game state is saved via `updateGameState` on each user action
 - Pause/resume/retry events are handled
-- A sample-puzzle.json exists for local testing
+- Fixture puzzles exist in `fixtures/puzzles/` with at least 2-3 varied puzzles
 - Simulator appears in dev mode but is not included in production builds

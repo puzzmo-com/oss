@@ -1,12 +1,12 @@
 /**
  * Standalone entry point for the simulator.
  *
- * Use as an IIFE script tag for non-Vite setups:
+ * Use as a script tag for non-Vite setups:
  * ```html
  * <script>
- *   window.SIMULATOR_CONFIG = { puzzlePath: "./sample-puzzle.json" }
+ *   window.SIMULATOR_CONFIG = { slug: "my-game" }
  * </script>
- * <script src="path/to/simulator/standalone.iife.js"></script>
+ * <script src="https://cdn.jsdelivr.net/npm/@puzzmo/sdk/dist/simulator/standalone.js"></script>
  * ```
  */
 import { createSimulator } from "./createSimulator"
