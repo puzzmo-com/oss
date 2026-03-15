@@ -5,6 +5,7 @@ import path from "node:path"
 import { execSync } from "node:child_process"
 
 import { skillsPipeline } from "../skills/registry.js"
+import { getMcpUrl } from "../skills/mcp-client.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
 type Phase = "agent" | "build" | "commit" | "idle"
@@ -57,24 +58,42 @@ const buildAgentCmd = (agent: string, prompt: string): { cmd: string; args: stri
   return { cmd: agent, args: [prompt] }
 }
 
-const buildPrompt = (skillName: string): string => {
-  return `Use the MCP prompt "${skillName}" from the dev.puzzmo.com server and follow its instructions. The game source is in the current directory.`
+const buildPrompt = (skillName: string, mcpUrl: string | null): string => {
+  if (!mcpUrl) return `Run the skill "${skillName}". The game source is in the current directory.`
+
+  return `First, fetch the skill instructions by using WebFetch to make a POST request to:
+${mcpUrl}
+
+With headers:
+- Content-Type: application/json
+- Accept: application/json, text/event-stream
+
+And body:
+{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"${skillName}"}}
+
+The response will be in SSE format. Parse the "data:" line to get the JSON result, which contains the skill instructions in result.messages[0].content.text.
+
+Then follow those instructions. The game source is in the current directory.`
 }
 
 class PipelineTUI {
   private states: StepState[]
   private currentStep = 0
   private outputLines: string[] = []
+  private chatLines: string[] = []
   private phase: Phase = "idle"
   private done = false
   private activeProc: ChildProcess | null = null
   private sidebarWidth = 30
+  private logsDir: string
 
   constructor(
     private agent: string,
     private gameDir: string,
   ) {
     this.states = skillsPipeline.map(() => "pending")
+    this.logsDir = path.join(gameDir, ".puzzmo", "logs")
+    fs.mkdirSync(this.logsDir, { recursive: true })
   }
 
   private get rows(): number {
@@ -205,13 +224,13 @@ class PipelineTUI {
     for (const line of rawLines) {
       const parsed = this.parseStreamLine(line)
       if (parsed) {
-        // Split multi-line parsed output into separate display lines
         for (const displayLine of parsed.split("\n")) {
           this.outputLines.push(displayLine)
+          this.chatLines.push(this.stripAnsi(displayLine))
         }
       }
     }
-    // Keep buffer bounded
+    // Keep display buffer bounded, but chatLines grows unbounded per skill
     if (this.outputLines.length > 500) {
       this.outputLines = this.outputLines.slice(-this.maxOutputLines)
     }
@@ -389,14 +408,17 @@ class PipelineTUI {
     this.states[stepIndex] = "running"
     this.currentStep = stepIndex
     this.outputLines = []
+    this.chatLines = []
     this.phase = "agent"
     this.render()
 
-    const prompt = buildPrompt(skill.name)
+    const mcpUrl = getMcpUrl(this.gameDir)
+    const prompt = buildPrompt(skill.name, mcpUrl)
     let success = await this.runAgent(prompt)
 
     if (!success) {
       if (skill.optional) {
+        this.writeSkillLog(skill.name)
         this.states[stepIndex] = "skipped"
         this.render()
         return true
@@ -404,6 +426,7 @@ class PipelineTUI {
       this.appendOutput("\n--- Retrying ---\n")
       success = await this.runAgent(prompt)
       if (!success) {
+        this.writeSkillLog(skill.name)
         this.states[stepIndex] = "failed"
         this.render()
         return false
@@ -423,10 +446,12 @@ class PipelineTUI {
       const retry = this.runCmd("npx vite build")
       if (!retry.success) {
         if (skill.optional) {
+          this.writeSkillLog(skill.name)
           this.states[stepIndex] = "skipped"
           this.render()
           return true
         }
+        this.writeSkillLog(skill.name)
         this.states[stepIndex] = "failed"
         this.render()
         return false
@@ -441,9 +466,18 @@ class PipelineTUI {
     if (commitResult.success) this.appendOutput("Committed.")
     else this.appendOutput("No changes to commit.")
 
+    // Write chat log for this skill
+    this.writeSkillLog(skill.name)
+
     this.states[stepIndex] = "success"
     this.render()
     return true
+  }
+
+  /** Writes the collected chat lines for a skill to a log file */
+  private writeSkillLog(skillName: string) {
+    const logPath = path.join(this.logsDir, `${skillName}.txt`)
+    fs.writeFileSync(logPath, this.chatLines.join("\n") + "\n")
   }
 
   /** Set up keyboard handling (Ctrl+C to quit) */

@@ -110,7 +110,10 @@ export const gameCreate = async (args: string[]) => {
     login(opts.accessToken)
   }
 
-  // Step 7: Write .mcp.json with dev server config
+  // Step 7: Write .gitignore
+  fs.writeFileSync(path.join(gameDir, ".gitignore"), ["node_modules", "dist", ".DS_Store", ".yarn", ".pnp.*", ".puzzmo", ""].join("\n"))
+
+  // Step 8: Write .mcp.json with dev server config
   const token = getToken()
   const mcpConfig = {
     mcpServers: {

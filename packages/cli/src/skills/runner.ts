@@ -2,10 +2,24 @@ import { spawnSync } from "node:child_process"
 
 import { skillsPipeline } from "./registry.js"
 import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
+import { getMcpUrl } from "./mcp-client.js"
 
-/** Builds the agent prompt for a given skill, referencing the MCP prompt */
-const buildPrompt = (skillName: string): string => {
-  return `Use the MCP prompt "${skillName}" from the dev.puzzmo.com server and follow its instructions. The game source is in the current directory.`
+const buildPrompt = (skillName: string, mcpUrl: string | null): string => {
+  if (!mcpUrl) return `Run the skill "${skillName}". The game source is in the current directory.`
+
+  return `First, fetch the skill instructions by using WebFetch to make a POST request to:
+${mcpUrl}
+
+With headers:
+- Content-Type: application/json
+- Accept: application/json, text/event-stream
+
+And body:
+{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"${skillName}"}}
+
+The response will be in SSE format. Parse the "data:" line to get the JSON result, which contains the skill instructions in result.messages[0].content.text.
+
+Then follow those instructions. The game source is in the current directory.`
 }
 
 /** Invokes an LLM agent with a prompt (plain mode, stdio inherited) */
@@ -36,7 +50,8 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
     const step = i + 1
     console.log(`[${step}/${total}] Running skill: ${skill.name}${skill.optional ? " (optional)" : ""}`)
 
-    const prompt = buildPrompt(skill.name)
+    const mcpUrl = getMcpUrl(gameDir)
+    const prompt = buildPrompt(skill.name, mcpUrl)
     let result = invokeAgent(agent, prompt, gameDir)
 
     if (!result.success) {

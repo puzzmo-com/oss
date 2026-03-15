@@ -43,26 +43,31 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
    sdk.gameLoaded()
    ```
 
-4. Wire up lifecycle events:
+4. Handle the `start` event to trigger the game start:
 
    ```ts
    sdk.on("start", () => {
-     /* start game logic, timer auto-starts */
-   })
-   sdk.on("pause", () => {
-     /* pause game was triggered, timer auto-pauses */
-   })
-   sdk.on("resume", () => {
-     /* resume game was triggered, timer auto-resumes */
-   })
-   sdk.on("retry", () => {
-     /* retry game was triggered, timer auto-resets, */
+     startGame()
    })
    ```
 
-5. Wire up state saving - call `sdk.updateGameState(stateString)` whenever the game state changes so the host can save progress.
+5. Wire up other lifecycle events if there is relevant game logic for pause/resume/retry:
 
-6. Create puzzle fixture files for local testing. Make a `fixtures/puzzles/` directory and add a few different puzzle JSON files that exercise different aspects of the game:
+   ```ts
+   sdk.on("pause", () => {
+     /* pause game was triggered, system timer auto-pauses */
+   })
+   sdk.on("resume", () => {
+     /* resume game was triggered, system timer auto-resumes */
+   })
+   sdk.on("retry", () => {
+     /* retry game was triggered, system timer auto-resets, */
+   })
+   ```
+
+6. Wire up state saving - call `sdk.updateGameState(stateString)` whenever the game state changes so the host can save progress.
+
+7. Create puzzle fixture files for local testing. Make a `fixtures/puzzles/` directory and add a few different puzzle JSON files that exercise different aspects of the game:
 
    ```
    fixtures/puzzles/
@@ -78,7 +83,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 
    If the original game already has a few puzzles hardcoded, use those as a starting point for creating the fixture files. Then delete the buttons which may have been used to load them, since the simulator will handle loading puzzles from the fixtures.
 
-7. Set up the dev simulator for local testing. Add the Vite plugin to `vite.config.ts`:
+8. Set up the dev simulator for local testing. Add the Vite plugin to `vite.config.ts`:
 
    ```ts
    import { defineConfig } from "vite"
