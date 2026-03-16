@@ -48,6 +48,23 @@ export const getMcpUrl = (gameDir: string): string | null => {
   return server?.url ?? null
 }
 
+/** Lists all available prompts from the MCP server configured in .mcp.json */
+export const listMcpPrompts = async (gameDir: string): Promise<{ name: string; description?: string }[] | null> => {
+  const config = readMcpConfig(gameDir)
+  if (!config) return null
+
+  const server = Object.values(config.mcpServers)[0]
+  if (!server) return null
+
+  try {
+    const result = await mcpRequest(server.url, server.headers ?? {}, "prompts/list", {})
+    if (!result?.prompts) return null
+    return result.prompts.map((p: any) => ({ name: p.name, description: p.description }))
+  } catch {
+    return null
+  }
+}
+
 /** Fetches a skill prompt's content from the MCP server configured in .mcp.json */
 export const fetchSkillPrompt = async (skillName: string, gameDir: string): Promise<string | null> => {
   const config = readMcpConfig(gameDir)

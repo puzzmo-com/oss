@@ -151,7 +151,7 @@ class PipelineTUI {
         const isActive = skillIndex === this.currentStep && !this.done
         const icon = stateIcon[state]
         const colorFn = stateColor[state]
-        const label = `${icon} ${skill.name}${skill.optional ? " *" : ""}`
+        const label = `${icon} ${skill.name}`
         const styled = isActive ? bold(colorFn(label)) : colorFn(label)
         const rawLen = this.stripAnsi(styled).length
         buf += "│ " + styled + " ".repeat(Math.max(0, sidebarWidth - rawLen - 3)) + "│"
@@ -166,8 +166,6 @@ class PipelineTUI {
           : dim(`${completedCount}/${skillsPipeline.length} done`)
         const rawLen = this.stripAnsi(status).length
         buf += "│ " + status + " ".repeat(Math.max(0, sidebarWidth - rawLen - 3)) + "│"
-      } else if (skillIndex === skillsPipeline.length + 2) {
-        buf += "│ " + dim("* = optional") + " ".repeat(Math.max(0, sidebarWidth - 15)) + "│"
       } else {
         buf += "│" + " ".repeat(sidebarWidth - 2) + "│"
       }
@@ -417,12 +415,6 @@ class PipelineTUI {
     let success = await this.runAgent(prompt)
 
     if (!success) {
-      if (skill.optional) {
-        this.writeSkillLog(skill.name)
-        this.states[stepIndex] = "skipped"
-        this.render()
-        return true
-      }
       this.appendOutput("\n--- Retrying ---\n")
       success = await this.runAgent(prompt)
       if (!success) {
@@ -445,12 +437,6 @@ class PipelineTUI {
 
       const retry = this.runCmd("npx vite build")
       if (!retry.success) {
-        if (skill.optional) {
-          this.writeSkillLog(skill.name)
-          this.states[stepIndex] = "skipped"
-          this.render()
-          return true
-        }
         this.writeSkillLog(skill.name)
         this.states[stepIndex] = "failed"
         this.render()

@@ -40,6 +40,51 @@ export const extractTitle = (html: string): string | undefined => {
   return match?.[1]?.trim() || undefined
 }
 
+/** Download a single asset ref, returning true if successful */
+const downloadAsset = async (
+  ref: string,
+  baseURL: URL,
+  srcDir: string,
+  downloaded: Set<string>,
+  content: Map<string, string>,
+  optional: boolean,
+): Promise<boolean> => {
+  if (downloaded.has(ref)) return false
+  if (ref.startsWith("data:") || ref.startsWith("#") || ref.startsWith("javascript:")) return false
+
+  try {
+    const assetURL = new URL(ref, baseURL)
+    // Only download same-origin assets
+    if (assetURL.origin !== baseURL.origin) return false
+
+    const assetPath = assetURL.pathname.replace(/^\//, "")
+    if (!assetPath) return false
+    const localPath = path.join(srcDir, assetPath)
+
+    fs.mkdirSync(path.dirname(localPath), { recursive: true })
+
+    const assetResponse = await fetchPage(assetURL.href)
+    if (!assetResponse.ok) {
+      if (optional) console.warn(`  Warning: could not download optional asset ${ref} (${assetResponse.status})`)
+      return false
+    }
+
+    const ab = await assetResponse.arrayBuffer()
+    fs.writeFileSync(localPath, new Uint8Array(ab))
+
+    // Cache text content for JS/CSS so we can scan them for more refs
+    if (/\.(js|css|mjs)(\?.*)?$/i.test(assetPath)) {
+      content.set(ref, Buffer.from(ab).toString("utf-8"))
+    }
+
+    downloaded.add(ref)
+    return true
+  } catch {
+    if (optional) console.warn(`  Warning: failed to download optional asset ${ref}`)
+    return false
+  }
+}
+
 /** Downloads an HTML page and its referenced assets into a src/ directory */
 export const downloadPage = async (url: string, outputDir: string): Promise<{ title?: string }> => {
   const srcDir = path.join(outputDir, "src")
@@ -52,36 +97,30 @@ export const downloadPage = async (url: string, outputDir: string): Promise<{ ti
 
   const baseURL = new URL(url)
   const downloaded = new Set<string>()
+  const assetContent = new Map<string, string>()
 
   // Find referenced assets (src, href, url())
   const assetRefs = extractAssetRefs(html)
 
   for (const ref of assetRefs) {
-    if (downloaded.has(ref)) continue
-    if (ref.startsWith("data:") || ref.startsWith("#") || ref.startsWith("javascript:")) continue
+    const ok = await downloadAsset(ref, baseURL, srcDir, downloaded, assetContent, false)
+    if (ok) html = html.replaceAll(ref, new URL(ref, baseURL).pathname.replace(/^\//, ""))
+  }
 
-    try {
-      const assetURL = new URL(ref, baseURL)
-      // Only download same-origin assets
-      if (assetURL.origin !== baseURL.origin) continue
+  // Second pass: scan downloaded JS/CSS files for string literals referencing
+  // paths with known asset extensions (images, fonts, audio, video).
+  // These are optional — the game may still work without them.
+  const jsAssetRefs = new Set<string>()
+  for (const [, text] of assetContent) {
+    for (const ref of extractAssetFileRefs(text)) {
+      if (!downloaded.has(ref)) jsAssetRefs.add(ref)
+    }
+  }
 
-      const assetPath = assetURL.pathname.replace(/^\//, "")
-      if (!assetPath) continue
-      const localPath = path.join(srcDir, assetPath)
-
-      fs.mkdirSync(path.dirname(localPath), { recursive: true })
-
-      const assetResponse = await fetchPage(assetURL.href)
-      if (!assetResponse.ok) continue
-
-      const ab = await assetResponse.arrayBuffer()
-      fs.writeFileSync(localPath, new Uint8Array(ab))
-
-      // Rewrite reference in HTML to local path
-      html = html.replaceAll(ref, assetPath)
-      downloaded.add(ref)
-    } catch {
-      // Skip assets that fail to download
+  if (jsAssetRefs.size > 0) {
+    console.log(`  Found ${jsAssetRefs.size} additional asset reference${jsAssetRefs.size === 1 ? "" : "s"} in JS/CSS files`)
+    for (const ref of jsAssetRefs) {
+      await downloadAsset(ref, baseURL, srcDir, downloaded, assetContent, true)
     }
   }
 
@@ -110,5 +149,20 @@ const extractAssetRefs = (html: string): string[] => {
     if (match[1]) refs.push(match[1])
   }
 
+  return [...new Set(refs)]
+}
+
+/** Known asset file extensions to look for in JS/CSS string literals */
+const ASSET_EXTENSIONS = "webp|png|jpe?g|gif|svg|ico|mp3|ogg|wav|mp4|webm|woff2?|ttf|eot"
+
+/** Extracts paths with known asset extensions from JS/CSS string literals */
+const extractAssetFileRefs = (source: string): string[] => {
+  const refs: string[] = []
+
+  const regex = new RegExp(`["'\`](/[^"'\`\\s]*\\.(?:${ASSET_EXTENSIONS}))(?:\\?[^"'\`\\s]*)?["'\`]`, "gi")
+  let match
+  while ((match = regex.exec(source)) !== null) {
+    if (match[1]) refs.push(match[1])
+  }
   return [...new Set(refs)]
 }

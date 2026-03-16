@@ -3,14 +3,17 @@
 import { login } from "./commands/login.js"
 import { upload } from "./commands/upload.js"
 import { gameCreate } from "./commands/game/create.js"
+import { migrate } from "./commands/migrate.js"
 
 const [command, ...args] = process.argv.slice(2)
 
 const printUsage = () => {
   console.log(`Usage:
   puzzmo login <token>            Save a CLI auth token
+  puzzmo game create [token]      Create a new Puzzmo game project
+
   puzzmo upload <slug> <dir>      Upload game build from <dir>
-  puzzmo game create [token]      Create a new Puzzmo game project`)
+  puzzmo migrate                  List and select migration skills from dev.puzzmo.com`)
 }
 
 const run = async () => {
@@ -42,6 +45,10 @@ const run = async () => {
         console.error("Usage: puzzmo game create [token] [--name <name>] [--url <url>] [--agent <agent>] [--pm <npm|yarn|pnpm>]")
         process.exit(1)
       }
+      break
+    }
+    case "migrate": {
+      await migrate()
       break
     }
     default:

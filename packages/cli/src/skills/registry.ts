@@ -1,52 +1,14 @@
-import { spawnSync } from "node:child_process"
-
 export type SkillDefinition = {
   name: string
-  optional: boolean
 }
 
 /** Ordered list of skills for the migration pipeline */
 export const skillsPipeline: SkillDefinition[] = [
-  { name: "convert-to-vite", optional: false },
-  { name: "introduce-puzzmo-sdk", optional: false },
-  { name: "game-completion", optional: false },
-  { name: "puzzmo-theme", optional: true },
-  { name: "add-deeds", optional: false },
-  { name: "setup-augmentations", optional: false },
-  { name: "create-app-bundle", optional: false },
-  { name: "setup-deploy", optional: false },
+  { name: "convert-to-vite" },
+  { name: "introduce-puzzmo-sdk" },
+  { name: "game-completion" },
+  { name: "add-deeds" },
+  { name: "setup-augmentations" },
+  { name: "create-app-bundle" },
+  { name: "setup-deploy" },
 ]
-
-/** Maps our agent binary names to the skills CLI agent identifiers */
-const toSkillsAgent = (agent: string): string => {
-  const map: Record<string, string> = {
-    claude: "claude-code",
-    gemini: "gemini-cli",
-  }
-  return map[agent] ?? agent
-}
-
-/** Returns the skills directory for a given agent inside the game dir */
-export const agentSkillsDir = (agent: string): string => {
-  if (agent === "claude") return ".claude/skills"
-  if (agent === "codex") return ".codex/skills"
-  if (agent === "gemini") return ".gemini/skills"
-  return `.${agent}/skills`
-}
-
-/** Installs all Puzzmo skills from the OSS repo using `npx skills add` */
-export const installSkills = (agent: string, gameDir: string): number => {
-  const skillsAgent = toSkillsAgent(agent)
-  const result = spawnSync("npx", ["skills", "add", "puzzmo-com/oss", "--agent", skillsAgent, "--skill", "*", "--copy", "-y"], {
-    cwd: gameDir,
-    stdio: "inherit",
-    encoding: "utf-8",
-  })
-
-  if (result.status !== 0) {
-    console.error("Failed to install skills from puzzmo-com/oss")
-    process.exit(1)
-  }
-
-  return skillsPipeline.length
-}

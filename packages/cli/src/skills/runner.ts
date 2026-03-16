@@ -48,17 +48,13 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
   for (let i = 0; i < total; i++) {
     const skill = skillsPipeline[i]
     const step = i + 1
-    console.log(`[${step}/${total}] Running skill: ${skill.name}${skill.optional ? " (optional)" : ""}`)
+    console.log(`[${step}/${total}] Running skill: ${skill.name}`)
 
     const mcpUrl = getMcpUrl(gameDir)
     const prompt = buildPrompt(skill.name, mcpUrl)
     let result = invokeAgent(agent, prompt, gameDir)
 
     if (!result.success) {
-      if (skill.optional) {
-        console.log(`  Skipped (optional skill failed)`)
-        continue
-      }
       console.log(`  Agent failed, retrying...`)
       result = invokeAgent(agent, prompt, gameDir)
       if (!result.success) {
@@ -76,10 +72,6 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
 
       const retryBuild = verifyBuild(gameDir)
       if (!retryBuild.success) {
-        if (skill.optional) {
-          console.log(`  Skipped (build still failing after fix attempt)`)
-          continue
-        }
         console.error(`  Build still failing after fix attempt. Stopping.`)
         process.exit(1)
       }
