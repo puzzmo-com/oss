@@ -25,7 +25,7 @@
     "@puzzmo/agent-cli-detect": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^20.1.0",
+    "@types/node": "^20.19.0",
     "typescript": "catalog:"
   }
 }
