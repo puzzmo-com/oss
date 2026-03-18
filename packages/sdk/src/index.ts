@@ -1,5 +1,7 @@
 export { createPuzzmoSDK } from "./sdk"
+
 export type { SDK as PuzzmoSDK, PuzzmoSDKOptions, SDKEventMap, SDKEventType, SDKTimer } from "./sdk"
+
 export type {
   Theme,
   GamePlay,
@@ -11,6 +13,8 @@ export type {
   MessagesReceived,
   MessagesSentFromEmbed,
   ThumbnailConfig,
-  ThumbnailFunction,
 } from "./types"
-export * from "./workshop"
+
+export type { ValidationIssue, ValidationReport, ImportErrorType, ImportResult, EditorBundle } from "./editor"
+
+export { EditorImportError } from "./editor"

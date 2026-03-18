@@ -1,4 +1,6 @@
 import type { Plugin } from "vite"
+import { build } from "vite"
+import path from "path"
 
 export type PuzzmoSimulatorPluginOptions = {
   /** Whether to auto-start the game after READY (default: true) */
@@ -89,3 +91,55 @@ window.location.href = url.toString();
     },
   }
 }
+
+type BundlePluginOptions = {
+  /** Entry file for the bundle */
+  entry: string
+  /** Output file name */
+  outputFile: string
+}
+
+function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
+  return (options: Partial<BundlePluginOptions> = {}): Plugin => {
+    const { entry, outputFile } = { ...defaults, ...options }
+    return {
+      name: pluginName,
+      apply: "build",
+      async closeBundle() {
+        try {
+          await build({
+            configFile: false,
+            logLevel: "warn",
+            build: {
+              lib: {
+                entry: path.isAbsolute(entry) ? entry : path.resolve(process.cwd(), entry),
+                formats: ["es"],
+                fileName: () => outputFile,
+              },
+              outDir: "dist",
+              emptyOutDir: false,
+            },
+          })
+        } catch (error) {
+          console.error(`[${pluginName}] build failed:`, error)
+          throw error
+        }
+      },
+    }
+  }
+}
+
+export type AppBundlePluginOptions = Partial<BundlePluginOptions>
+
+/**
+ * Vite plugin that produces dist/app-bundle.js after the main build for app-level integrations.
+ *
+ * The bundle exports `renderThumbnail(puzzleStr, inputStr?, config?)` — a pure
+ * SVG-string renderer used by the Puzzmo platform for puzzle previews.
+ */
+export const appBundlePlugin = createBundlePlugin("app-bundle", { entry: "src/appBundle.js", outputFile: "app-bundle.js" })
+
+export type EditorBundlePluginOptions = Partial<BundlePluginOptions>
+
+/** Vite plugin that produces dist/editor-bundle.js after the main build for editor-level integrations. */
+export const editorBundlePlugin = createBundlePlugin("editor-bundle", { entry: "src/editorBundle.js", outputFile: "editor-bundle.js" })

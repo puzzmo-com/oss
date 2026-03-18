@@ -1,12 +1,4 @@
-import type {
-  MessagesSentFromEmbed,
-  MessagesReceived,
-  GamePlay,
-  AugmentationConfig,
-  CheckpointConfig,
-  Theme,
-  Deed,
-} from "./types"
+import type { MessagesSentFromEmbed, MessagesReceived, GamePlay, AugmentationConfig, CheckpointConfig, Theme, Deed } from "./types"
 
 export type SDK = ReturnType<typeof createPuzzmoSDK>
 
@@ -159,27 +151,22 @@ function createHostAPI() {
   const sendMessage = <T extends keyof SupportedOutgoingMessages>(type: T, json: SupportedOutgoingMessages[T]) => {
     const message = { type, json, _: "p", __: "mp", private: true }
 
-    if ("parent" in window && window.parent !== window)
-      window.parent.postMessage(message, "*")
+    if ("parent" in window && window.parent !== window) window.parent.postMessage(message, "*")
 
     window.postMessage(message, "*")
 
-    if ("webkit" in window && (window as any).webkit?.messageHandlers?.app)
-      (window as any).webkit.messageHandlers.app.postMessage(message)
+    if ("webkit" in window && (window as any).webkit?.messageHandlers?.app) (window as any).webkit.messageHandlers.app.postMessage(message)
 
-    if ("puzzmoMessageString" in window)
-      (window as any).puzzmoMessageString(JSON.stringify(message))
+    if ("puzzmoMessageString" in window) (window as any).puzzmoMessageString(JSON.stringify(message))
 
     if ("ReactNativeWebView" in window && (window as any).ReactNativeWebView?.postMessage)
       (window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
 
-    if (type !== "TIMER_TICK" && type !== "TIMER_SYNC")
-      console.log("[Puzzmo SDK] sent:", type, json)
+    if (type !== "TIMER_TICK" && type !== "TIMER_SYNC") console.log("[Puzzmo SDK] sent:", type, json)
   }
 
   const onMessage = <T extends keyof SupportedIncomingMessages>(type: T, handler: MessageHandler<T>) => {
-    if (!messageHandlers.has(type))
-      messageHandlers.set(type, new Set())
+    if (!messageHandlers.has(type)) messageHandlers.set(type, new Set())
     messageHandlers.get(type)!.add(handler)
 
     return () => {
@@ -194,8 +181,7 @@ function createHostAPI() {
       const handlers = messageHandlers.get(msgType)
       if (handlers) {
         const msgData = event.data.data ?? event.data.json ?? {}
-        if (msgType !== "TIMER_TICK" && msgType !== "TIMER_SYNC")
-          console.log("[Puzzmo SDK] received:", msgType, msgData)
+        if (msgType !== "TIMER_TICK" && msgType !== "TIMER_SYNC") console.log("[Puzzmo SDK] received:", msgType, msgData)
         handlers.forEach((handler) => handler(msgData))
       }
     })
@@ -364,8 +350,7 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
     },
 
     on: <T extends SDKEventType>(event: T, listener: (data?: SDKEventMap[T]) => void): (() => void) => {
-      if (!eventListeners.has(event))
-        eventListeners.set(event, new Set())
+      if (!eventListeners.has(event)) eventListeners.set(event, new Set())
       eventListeners.get(event)!.add(listener)
       return () => {
         eventListeners.get(event)?.delete(listener)
@@ -386,13 +371,6 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
           boardState: inputString,
           elapsedTimeSecs: play?.elapsedTimeSecs ?? internalTimer.timeWithoutPenaltySecs(),
           additionalTimeAddedSecs: play?.additionalTimeAddedSecs ?? internalTimer.addedTimeSecs(),
-          hintsUsed: play?.hintsUsed,
-          resetsUsed: play?.resetsUsed,
-          metric1: 0,
-          metric2: 0,
-          metric3: 0,
-          metric4: 0,
-          metricStrings: [],
           collabUserReferences: [],
         },
       })

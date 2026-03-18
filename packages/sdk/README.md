@@ -1,11 +1,30 @@
-# @puzzmo/sdk
+# Puzzmo Game Infra
 
-SDK for building games on the Puzzmo platform. Handles communication between your game and the Puzzmo host (puzzmo.com, embeds, native apps).
+Over the years we have a pretty refined route for making web games: prototype in HTML with no concern for code quality, share with people you like, then migrate it to a "real" codebase.
+
+LLMs have changed this, and we're finding that the 'prototype in HTML' phase is getting close enough to production quality that it does not always warrant a a multi-month conversion to React/TypeScript/Redux to ensure the codebase can live forever.
+
+So, after shipping two full games with this pipeline, we've knocked enough kinks out that it's ready for a more public space.
+
+So, how do you make a game? Well first, you need a game - we can't help there! However, once you do, then you can start migrating it to run on Puzzmo by: `yarn create puzzmo game`.
+
+## @puzzmo/sdk
+
+This repo is the SDK for building games on the Puzzmo platform. Handles communication between your game and Puzzmo.
+
+There are a few parts here!
+
+1. The SDK, e.g. the runtime API for launching a game, completing it and other essentials
+2. The simulator, which provides the same message sending infrastructure Puzzmo.com will send to your game
+3. App integration information, e.g. how to make custom thumbnails for your puzzles (and more)
+4. Vite plugins which can help you get up and running faster
 
 ## Install
 
 ```bash
 npm install @puzzmo/sdk
+
+yarn add @puzzmo/sdk
 ```
 
 ## Quick Start
@@ -43,33 +62,33 @@ Creates an SDK instance. Options:
 
 ### Lifecycle
 
-| Method                     | Description                                                                |
-| -------------------------- | -------------------------------------------------------------------------- |
-| `sdk.gameReady()`          | Async. Signals readiness, returns puzzle data and theme.                   |
-| `sdk.gameLoaded(state?)`   | Signals game UI is ready. Host will send `start`.                          |
-| `sdk.on(event, handler)`   | Listen for events: `start`, `pause`, `resume`, `retry`, `settingsUpdate`.  |
-| `sdk.off(event, handler)`  | Remove an event listener.                                                  |
+| Method                    | Description                                                               |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `sdk.gameReady()`         | Async. Signals readiness, returns puzzle data and theme.                  |
+| `sdk.gameLoaded(state?)`  | Signals game UI is ready. Host will send `start`.                         |
+| `sdk.on(event, handler)`  | Listen for events: `start`, `pause`, `resume`, `retry`, `settingsUpdate`. |
+| `sdk.off(event, handler)` | Remove an event listener.                                                 |
 
 ### Game State
 
-| Method                                                      | Description                                                |
-| ----------------------------------------------------------- | ---------------------------------------------------------- |
-| `sdk.updateGameState(stateString, play?)`                   | Save current game state for persistence.                   |
-| `sdk.gameCompleted(play, config?)`                          | Signal game completion with metrics and deeds.             |
-| `sdk.showCompletionScreen(results, gameplay, showRetry?)`   | Show the Puzzmo completion UI.                             |
-| `sdk.hitCheckpoint(name, config, augConfig?)`               | Signal a gameplay milestone (for ads, leaderboards).       |
+| Method                                                    | Description                                          |
+| --------------------------------------------------------- | ---------------------------------------------------- |
+| `sdk.updateGameState(stateString, play?)`                 | Save current game state for persistence.             |
+| `sdk.gameCompleted(play, config?)`                        | Signal game completion with metrics and deeds.       |
+| `sdk.showCompletionScreen(results, gameplay, showRetry?)` | Show the Puzzmo completion UI.                       |
+| `sdk.hitCheckpoint(name, config, augConfig?)`             | Signal a gameplay milestone (for ads, leaderboards). |
 
 ### Timer
 
 The SDK manages a timer automatically (starts on `start`, pauses on `pause`, resets on `retry`).
 
 ```ts
-sdk.timer.timeMs()              // Elapsed time in ms
-sdk.timer.timeSecs()            // Elapsed time in seconds
-sdk.timer.display()             // ["1:23", "0:05"] (elapsed, penalty)
-sdk.timer.addPenalty(5000)      // Add 5s penalty
-sdk.timer.isPaused()            // Check if paused
-sdk.timer.isRunning()           // Check if running
+sdk.timer.timeMs() // Elapsed time in ms
+sdk.timer.timeSecs() // Elapsed time in seconds
+sdk.timer.display() // ["1:23", "0:05"] (elapsed, penalty)
+sdk.timer.addPenalty(5000) // Add 5s penalty
+sdk.timer.isPaused() // Check if paused
+sdk.timer.isRunning() // Check if running
 ```
 
 ## Theme
@@ -80,14 +99,14 @@ The `theme` object from `gameReady()` contains color tokens for the current Puzz
 const { theme } = await sdk.gameReady()
 
 // Key colors
-theme.g_bg       // Game background
-theme.fg         // Foreground text
-theme.key        // Primary accent
-theme.player     // Player color (blue)
-theme.alt1       // Accent green
-theme.alt2       // Accent yellow
-theme.alt3       // Accent purple
-theme.type       // "light" or "dark"
+theme.g_bg // Game background
+theme.fg // Foreground text
+theme.key // Primary accent
+theme.player // Player color (blue)
+theme.alt1 // Accent green
+theme.alt2 // Accent yellow
+theme.alt3 // Accent purple
+theme.type // "light" or "dark"
 ```
 
 See the `Theme` type export for the full list of tokens.
@@ -101,23 +120,42 @@ sdk.gameCompleted(metrics, {
   deeds: [
     { id: "moves", value: 42 },
     { id: "accuracy", value: 95 },
-    { id: "streak", value: 8 },
+    { id: "hit-streak", value: 8 },
   ],
 })
 ```
 
 The SDK automatically adds `points` and `time` deeds.
 
-## Workshop Types
+## App Integration
 
-For games that support puzzle editing in Puzzmo Workshop:
+For games to show a dynamic thumbnail, you will need an App Bundle
 
 ```ts
-import type { WorkshopBundle, ValidationReport } from "@puzzmo/sdk"
+import type { EditorBundle, ValidationReport } from "@puzzmo/sdk"
+import { puzzleToSVG } from "./src/puzzleToSVG"
+
+export const AppBundle = {
+  renderThumbnail(puzzleString, boardState, config) {
+    return puzzleToSVG(puzzleString, boardState, config)
+  },
+} satisfies EditorBundle
+```
+
+This and the editor bundle are separate JavaScript files from your main game.
+
+There are Vite plugins to make this easy, but otherwise, they should be files in your upload named `app-bundle.js` and `editor-bundle.js` with ESM exports which match the shapes of the TypeScript types.
+
+## Editor Integration
+
+For games that support puzzle editing in Puzzmo Workshop, you will need an Editor Bundle:
+
+```ts
+import type { EditorBundle, ValidationReport } from "@puzzmo/sdk"
 
 export const validator = {
-  validate(data: string): ValidationReport {
+  validate(data) {
     return { success: true, issues: [] }
   },
-}
+} satisfies EditorBundle
 ```

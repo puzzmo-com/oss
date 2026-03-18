@@ -7,6 +7,7 @@
  * - Providing UI controls for START_GAME, PAUSE_GAME, RESUME_GAME, RETRY_PUZZLE
  *
  * Usage with Vite plugin (recommended):
+ *
  * ```ts
  * // vite.config.ts
  * import { puzzmoSimulator } from "@puzzmo/sdk/vite"
@@ -14,6 +15,8 @@
  *   plugins: [puzzmoSimulator({ slug: "my-game", fixturesGlob: "./fixtures/puzzles/**\/*.json" })]
  * })
  * ```
+ *
+ * The plugin handles making sure it is removed on vite builds.
  *
  * Usage with manual imports:
  * ```html
@@ -414,11 +417,6 @@ function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
           elapsedTimeSecs: 0,
           hintsUsed: 0,
           id: `simulator-gameplay-${Date.now()}`,
-          metric1: 0,
-          metric2: 0,
-          metric3: 0,
-          metric4: 0,
-          metricStrings: [],
           ownerID: "simulator-owner",
           pointsAwarded: 0,
           resetsUsed: 0,

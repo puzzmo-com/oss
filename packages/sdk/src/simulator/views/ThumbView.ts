@@ -1,15 +1,15 @@
-import type { ThumbnailConfig, ThumbnailFunction } from "../../types"
+import type { AppBundle, ThumbnailConfig } from "../../types"
 import type { SimulatorContext, SimulatorView } from "../types"
 import { persistRenderContext, persistRenderHost } from "../state"
 
 /**
  * Find thumbnail function on globalThis (looks for functions ending in "Thumbnail")
  */
-function findThumbnailFn(): { name: string; fn: ThumbnailFunction } | null {
+function findThumbnailFn(): { name: string; fn: AppBundle["renderThumbnail"] } | null {
   const globalObj = globalThis as Record<string, unknown>
   for (const key of Object.keys(globalObj)) {
     if (key.endsWith("Thumbnail") && typeof globalObj[key] === "function") {
-      return { name: key, fn: globalObj[key] as ThumbnailFunction }
+      return { name: key, fn: globalObj[key] as AppBundle["renderThumbnail"] }
     }
   }
   return null
