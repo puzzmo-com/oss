@@ -47,12 +47,7 @@ export function createCtrlView(): SimulatorView {
 
         if (categorySelect && puzzleSelect && ctx.state.selectedCategory) {
           // Update puzzle options
-          ctx.state.selectedPuzzle = updatePuzzleOptions(
-            puzzleSelect,
-            ctx.fixtures,
-            ctx.state.selectedCategory,
-            ctx.state.selectedPuzzle,
-          )
+          ctx.state.selectedPuzzle = updatePuzzleOptions(puzzleSelect, ctx.fixtures, ctx.state.selectedCategory, ctx.state.selectedPuzzle)
 
           // Load initial puzzle data
           const puzzleData = getFixturePuzzle(ctx.fixtures, ctx.state.selectedCategory, ctx.state.selectedPuzzle)

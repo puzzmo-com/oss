@@ -12,6 +12,7 @@ Add proper game completion signaling so Puzzmo knows when the player has finishe
 1. Find the game's win condition / completion check.
 
 2. When the game is won, call `sdk.gameCompleted()` with gameplay metrics:
+
    ```ts
    sdk.gameCompleted({
      pointsAwarded: calculateScore(),
@@ -29,13 +30,12 @@ Add proper game completion signaling so Puzzmo knows when the player has finishe
    ```
 
 3. After any victory animation completes, call `sdk.showCompletionScreen()`:
+
    ```ts
    sdk.showCompletionScreen(
-     [
-       { type: "md", text: "**Congratulations!** You solved the puzzle!" },
-     ],
+     [{ type: "md", text: "**Congratulations!** You solved the puzzle!" }],
      gameplayData,
-     true // showRetry
+     true, // showRetry
    )
    ```
 

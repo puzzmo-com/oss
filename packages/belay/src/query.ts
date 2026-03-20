@@ -22,7 +22,7 @@ import type { GraphQLResponse, OperationType, RequestOptions } from "./types"
  */
 export const query = async <T extends OperationType>(
   queryString: string,
-  options: RequestOptions<T["variables"]>
+  options: RequestOptions<T["variables"]>,
 ): Promise<GraphQLResponse<T["response"]>> => {
   const { variables, url, headers, credentials, signal } = options
 

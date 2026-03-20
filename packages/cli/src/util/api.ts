@@ -72,4 +72,3 @@ export const uploadFiles = async (
   // Step 3: Complete
   return (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {})) as CompleteResponse
 }
-

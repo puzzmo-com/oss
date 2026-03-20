@@ -32,20 +32,20 @@ if (claude) {
 
 <!-- cspell:ignore sourcegraph auggie augmentcode kiro opencode PATHEXT -->
 
-| ID         | Agent              | Binary     | Install                                 |
-| ---------- | ------------------ | ---------- | --------------------------------------- |
-| `aider`    | Aider              | `aider`    | `pip install aider-chat`                |
-| `amp`      | Amp (Sourcegraph)  | `amp`      | `npm i -g @sourcegraph/amp`             |
-| `augment`  | Augment CLI        | `auggie`   | `npm i -g @augmentcode/auggie`          |
-| `claude`   | Claude Code        | `claude`   | `npm i -g @anthropic-ai/claude-code`    |
-| `cline`    | Cline              | `cline`    | `npm i -g cline`                        |
-| `codex`    | Codex CLI          | `codex`    | `npm i -g @openai/codex`                |
-| `copilot`  | GitHub Copilot CLI | `copilot`  | `npm i -g @github/copilot`              |
-| `cursor`   | Cursor             | `cursor`   | Install from cursor.com                 |
-| `gemini`   | Gemini CLI         | `gemini`   | `npm i -g @google/gemini-cli`           |
-| `goose`    | Goose (Block)      | `goose`    | `brew install block-goose-cli`          |
-| `kiro`     | Kiro CLI           | `kiro-cli` | Installer from kiro.dev                 |
-| `opencode` | OpenCode           | `opencode` | `npm i -g opencode-ai`                  |
+| ID         | Agent              | Binary     | Install                              |
+| ---------- | ------------------ | ---------- | ------------------------------------ |
+| `aider`    | Aider              | `aider`    | `pip install aider-chat`             |
+| `amp`      | Amp (Sourcegraph)  | `amp`      | `npm i -g @sourcegraph/amp`          |
+| `augment`  | Augment CLI        | `auggie`   | `npm i -g @augmentcode/auggie`       |
+| `claude`   | Claude Code        | `claude`   | `npm i -g @anthropic-ai/claude-code` |
+| `cline`    | Cline              | `cline`    | `npm i -g cline`                     |
+| `codex`    | Codex CLI          | `codex`    | `npm i -g @openai/codex`             |
+| `copilot`  | GitHub Copilot CLI | `copilot`  | `npm i -g @github/copilot`           |
+| `cursor`   | Cursor             | `cursor`   | Install from cursor.com              |
+| `gemini`   | Gemini CLI         | `gemini`   | `npm i -g @google/gemini-cli`        |
+| `goose`    | Goose (Block)      | `goose`    | `brew install block-goose-cli`       |
+| `kiro`     | Kiro CLI           | `kiro-cli` | Installer from kiro.dev              |
+| `opencode` | OpenCode           | `opencode` | `npm i -g opencode-ai`               |
 
 ## How It Works
 
@@ -82,11 +82,11 @@ const agents = detectAgentCLIs() // now includes my-agent
 
 ```ts
 type DetectedAgentCLI = {
-  id: string           // Registry key
-  displayName: string  // Human-readable name
-  binary: string       // Binary name found
-  path: string         // Full path to binary
-  mtime: number        // Last modified timestamp (ms)
+  id: string // Registry key
+  displayName: string // Human-readable name
+  binary: string // Binary name found
+  path: string // Full path to binary
+  mtime: number // Last modified timestamp (ms)
 }
 
 type AgentCLIDefinition = {

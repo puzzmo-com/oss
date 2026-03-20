@@ -10,6 +10,7 @@ Create an `augmentations.json` file that configures leaderboards and other meta-
 ## Steps
 
 1. Create `augmentations.json` in the project root:
+
    ```json
    {
      "_v": 1,

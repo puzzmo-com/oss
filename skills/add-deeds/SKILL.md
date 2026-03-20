@@ -20,11 +20,12 @@ Deeds are interesting statistics about a gameplay session. They're sent on compl
 2. Track these metrics during gameplay. Add counters/trackers to the game state.
 
 3. On completion, include deeds in the `gameCompleted` call via the config parameter:
+
    ```ts
    sdk.gameCompleted(gameplayMetrics, {
      deeds: [
        { id: "moves", value: totalMoves },
-       { id: "accuracy", value: Math.round(correctMoves / totalMoves * 100) },
+       { id: "accuracy", value: Math.round((correctMoves / totalMoves) * 100) },
        { id: "streak", value: longestStreak },
        { id: "items-found", value: itemsFound },
      ],
@@ -40,13 +41,17 @@ Deeds are interesting statistics about a gameplay session. They're sent on compl
 
 6. Also send deeds during checkpoints if the game has intermediate milestones:
    ```ts
-   sdk.hitCheckpoint("level-complete", {
-     interruptible: true,
-     complete: false,
-     process: [],
-   }, {
-     deeds: [{ id: "items-found", value: itemsFound }],
-   })
+   sdk.hitCheckpoint(
+     "level-complete",
+     {
+       interruptible: true,
+       complete: false,
+       process: [],
+     },
+     {
+       deeds: [{ id: "items-found", value: itemsFound }],
+     },
+   )
    ```
 
 ## Success Criteria

@@ -113,7 +113,7 @@ const isTokenExpired = (token: string): boolean => {
     const exp = payload.exp
     if (!exp) return true
     // Consider expired if less than 5 minutes remaining
-    return Date.now() >= (exp * 1000) - 5 * 60 * 1000
+    return Date.now() >= exp * 1000 - 5 * 60 * 1000
   } catch {
     return true
   }

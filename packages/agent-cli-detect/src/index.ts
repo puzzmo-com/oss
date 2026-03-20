@@ -36,10 +36,7 @@ export const agentRegistry: Record<string, AgentCLIDefinition> = {
     displayName: "Claude Code",
     binaries: ["claude"],
     npmPackage: "@anthropic-ai/claude-code",
-    knownPaths: [
-      path.join(home, ".claude", "bin"),
-      path.join(home, ".local", "bin"),
-    ],
+    knownPaths: [path.join(home, ".claude", "bin"), path.join(home, ".local", "bin")],
   },
   codex: {
     displayName: "Codex CLI",
@@ -91,9 +88,8 @@ export const agentRegistry: Record<string, AgentCLIDefinition> = {
   cursor: {
     displayName: "Cursor",
     binaries: ["cursor"],
-    knownPaths: process.platform === "win32"
-      ? [path.join(process.env.LOCALAPPDATA ?? "", "Programs", "cursor", "resources", "app", "bin")]
-      : [],
+    knownPaths:
+      process.platform === "win32" ? [path.join(process.env.LOCALAPPDATA ?? "", "Programs", "cursor", "resources", "app", "bin")] : [],
   },
 }
 

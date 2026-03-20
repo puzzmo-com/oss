@@ -22,12 +22,12 @@ yarn create puzzmo game [accesstoken] --name <name> --url <url> --agent <agent>
 
 <!-- cspell:ignore accesstoken -->
 
-| Option            | Description                                               |
-| ----------------- | --------------------------------------------------------- |
-| `[accesstoken]`   | Optional Puzzmo API token for deployment setup            |
-| `--name <name>`   | Game name (prompted if not provided)                      |
-| `--url <url>`     | Source URL to import an HTML game from                    |
-| `--agent <agent>` | LLM agent to use: `claude`, `codex`, `gemini`, or `none`  |
+| Option            | Description                                              |
+| ----------------- | -------------------------------------------------------- |
+| `[accesstoken]`   | Optional Puzzmo API token for deployment setup           |
+| `--name <name>`   | Game name (prompted if not provided)                     |
+| `--url <url>`     | Source URL to import an HTML game from                   |
+| `--agent <agent>` | LLM agent to use: `claude`, `codex`, `gemini`, or `none` |
 
 ## Workflow
 

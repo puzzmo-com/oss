@@ -24,6 +24,7 @@ Convert the game's colors to use Puzzmo theme tokens, enabling automatic light/d
    - `theme.alwaysDark` / `theme.alwaysLight` - Colors that don't change with theme
 
 2. Create a `applyTheme(theme)` function that maps theme tokens to CSS custom properties:
+
    ```ts
    function applyTheme(theme: Theme) {
      const root = document.documentElement
@@ -38,6 +39,7 @@ Convert the game's colors to use Puzzmo theme tokens, enabling automatic light/d
 3. Replace all hardcoded color values in CSS with `var(--game-*)` custom properties.
 
 4. Wire up theme updates for live changes:
+
    ```ts
    sdk.on("settingsUpdate", (settings) => {
      if (settings.theme) applyTheme(settings.theme)
