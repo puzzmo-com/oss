@@ -60,10 +60,22 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
 
   let prismaSchema: PrismaMap = new Map()
   const getPrismaSchemaFromFile = (settings: AppContext["pathSettings"]) => {
-    const prismaSchemaText = sys.readFile(settings.prismaDSLPath)
-    if (!prismaSchemaText) throw new Error("No prisma file found at " + settings.prismaDSLPath)
-    const prismaSchemaBlocks = getPrismaSchema(prismaSchemaText)
-    prismaSchema = prismaModeller(prismaSchemaBlocks)
+    const isDirectory = sys.directoryExists(settings.prismaDSLPath)
+    if (isDirectory) {
+      const prismaFiles = sys.readDirectory(settings.prismaDSLPath, [".prisma"])
+      if (!prismaFiles.length) throw new Error("No .prisma files found in " + settings.prismaDSLPath)
+      const mergedList: ReturnType<typeof getPrismaSchema>["list"] = []
+      for (const filePath of prismaFiles) {
+        const text = sys.readFile(filePath)
+        if (!text) throw new Error("Could not read prisma file at " + filePath)
+        mergedList.push(...getPrismaSchema(text).list)
+      }
+      prismaSchema = prismaModeller({ type: "schema", list: mergedList })
+    } else {
+      const prismaSchemaText = sys.readFile(settings.prismaDSLPath)
+      if (!prismaSchemaText) throw new Error("No prisma file found at " + settings.prismaDSLPath)
+      prismaSchema = prismaModeller(getPrismaSchema(prismaSchemaText))
+    }
   }
 
   step("Read the GraphQL schema", () => getGraphQLSDLFromFile(pathSettings))
@@ -125,7 +137,7 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
           step("GraphQL schema changed", () => getGraphQLSDLFromFile(appContext.pathSettings))
           step("Create all shared schema files", () => createSharedSchemaFiles(appContext, verbose))
           step("Create all service files", createDTSFilesForAllServices)
-        } else if (path === appContext.pathSettings.prismaDSLPath) {
+        } else if (isPrismaSchemaPath(path, appContext.pathSettings.prismaDSLPath, sys)) {
           step("Prisma schema changed", () => getPrismaSchemaFromFile(appContext.pathSettings))
           step("Create all shared schema files", createDTSFilesForAllServices)
         } else if (isRedwoodServiceFile(path)) {
@@ -146,6 +158,12 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
 }
 
 const isTypesFile = (file: string) => file.endsWith(".d.ts")
+
+const isPrismaSchemaPath = (changedPath: string, prismaDSLPath: string, sys: typescript.System) => {
+  if (changedPath === prismaDSLPath) return true
+  if (sys.directoryExists(prismaDSLPath) && changedPath.startsWith(prismaDSLPath) && changedPath.endsWith(".prisma")) return true
+  return false
+}
 
 const isRedwoodServiceFile = (file: string) => {
   if (!file.includes("services")) return false

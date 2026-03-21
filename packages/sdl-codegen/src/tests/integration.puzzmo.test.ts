@@ -23,7 +23,7 @@ desc("Puzzmo", () => {
       api: {
         base: puzzmoAPIWD,
         config: "-",
-        dbSchema: join(puzzmoAPIWD, "prisma", "schema.prisma"),
+        dbSchema: join(puzzmoAPIWD, "prisma", "schema"),
         directives: join(puzzmoAPIWD, "src", "directives"),
         graphql: join(puzzmoAPIWD, "src", "functions", "graphql.ts"),
         lib: join(puzzmoAPIWD, "src", "lib"),
