@@ -1,4 +1,13 @@
-import type { MessagesSentFromEmbed, MessagesReceived, GamePlay, AugmentationConfig, CheckpointConfig, Theme, Deed } from "./types"
+import type {
+  MessagesSentFromEmbed,
+  MessagesReceived,
+  GamePlay,
+  AugmentationConfig,
+  CheckpointConfig,
+  Theme,
+  Deed,
+  KeyboardConfig,
+} from "./types"
 
 export type SDK = ReturnType<typeof createPuzzmoSDK>
 
@@ -17,11 +26,20 @@ type SupportedOutgoingMessages = Pick<
   | "TIMER_SYNC"
   | "UPLOAD_NEW_GAME_STATE"
   | "HIT_CHECKPOINT"
+  | "KEYBOARD_UPDATE_CONFIG"
 >
 
 type SupportedIncomingMessages = Pick<
   MessagesReceived,
-  "READY_DATA" | "START_GAME" | "PAUSE_GAME" | "RESUME_GAME" | "SETTINGS_UPDATE" | "RETRY_PUZZLE"
+  | "READY_DATA"
+  | "START_GAME"
+  | "PAUSE_GAME"
+  | "RESUME_GAME"
+  | "SETTINGS_UPDATE"
+  | "RETRY_PUZZLE"
+  | "KEYBOARD_KEY_PRESS"
+  | "KEYBOARD_CURSOR_CHANGE"
+  | "KEYBOARD_CURSOR_END"
 >
 
 type MessageHandler<T extends keyof SupportedIncomingMessages> = (data: SupportedIncomingMessages[T]) => void
@@ -32,6 +50,12 @@ export type SDKEventMap = {
   resume: void
   retry: void
   settingsUpdate: any
+  /** A key on the on-screen keyboard was tapped. */
+  keyboardKeyPress: { key: string }
+  /** The drag cursor moved across the keyboard. Only fires when `supportsDragCursor` is true. */
+  keyboardCursorChange: { position: [number, number] }
+  /** The drag cursor was released. Only fires when `supportsDragCursor` is true. */
+  keyboardCursorEnd: void
 }
 
 export type SDKEventType = keyof SDKEventMap
@@ -259,6 +283,10 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
 
   hostAPI.onMessage("SETTINGS_UPDATE", (data) => emit("settingsUpdate", data))
 
+  hostAPI.onMessage("KEYBOARD_KEY_PRESS", (data) => emit("keyboardKeyPress", data))
+  hostAPI.onMessage("KEYBOARD_CURSOR_CHANGE", (data) => emit("keyboardCursorChange", data))
+  hostAPI.onMessage("KEYBOARD_CURSOR_END", () => emit("keyboardCursorEnd"))
+
   hostAPI.onMessage("RETRY_PUZZLE", () => {
     internalTimer._reset()
     stopTimerIntervals()
@@ -427,6 +455,25 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
         checkpointConfig,
         augConfig: config ?? {},
       })
+    },
+
+    keyboard: {
+      /** Show the on-screen keyboard with the given config. Call again to update state (e.g. to change disabled keys). */
+      show: (config: KeyboardConfig) => {
+        hostAPI.sendMessage("KEYBOARD_UPDATE_CONFIG", config)
+      },
+      /** Hide the on-screen keyboard. */
+      hide: () => {
+        hostAPI.sendMessage("KEYBOARD_UPDATE_CONFIG", {
+          layout: [],
+          symbols: {},
+          highlight: [],
+          disabled: [],
+          xl: [],
+          l: [],
+          supportsDragCursor: false,
+        })
+      },
     },
 
     _hostAPI: hostAPI,

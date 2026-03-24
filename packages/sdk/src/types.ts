@@ -204,10 +204,152 @@ export type ThumbnailConfig = {
   viewerMetadata?: any | null
 }
 
+/**
+ * Configuration for the Puzzmo on-screen keyboard shown on touch devices.
+ *
+ * Keys in the layout are single characters. Special/action keys should use non-alphabet
+ * Unicode characters (e.g. `"⌫"` for backspace, `"↵"` for enter) so they don't conflict
+ * with letter input. Map those characters to display labels via `symbols`.
+ *
+ * @example
+ * // Simple QWERTY keyboard — a good starting point for word games
+ *
+ * const config: KeyboardConfig = {
+ *   layout: ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined],
+ *   symbols: { "↵": "Enter", "⌫": "bsp" },
+ *   highlight: ["↵", "⌫"],
+ *   disabled: [],
+ *   xl: [],
+ *   l: ["↵", "⌫"],
+ *   supportsDragCursor: false,
+ * }
+ *
+ * @example
+ * // Crossword keyboard — complex layout with two panels, direction controls, and drag cursor.
+ * // Special characters are used as action key tokens; symbols maps them to display labels.
+ * // The "∂" key flips cursor direction; "≤"/"≥" move between cells; "✱" switches panels.
+ *
+ * const crosswordConfig: KeyboardConfig = {
+ *   layout: ["qwertyuiop", "∂asdfghjkl⟳", "≤✱zxcvbnm⌫≥"],
+ *   symbols: {
+ *     "∂": "flip-down",   // switches cursor direction (emitted as key press "∂")
+ *     "⟳": "flip-across", // alternate direction flip
+ *     "≤": "prev",        // move cursor to previous cell
+ *     "≥": "next",        // move cursor to next cell
+ *     "✱": "123",         // switch to number/rebus panel
+ *     "⌫": "bsp",         // backspace
+ *   },
+ *   highlight: ["∂", "⟳", "≤", "≥", "✱", "⌫"],
+ *   disabled: [],
+ *   xl: [],
+ *   l: [],
+ *   supportsDragCursor: true, // enables the drag-to-position cursor feature
+ * }
+ */
+export type KeyboardConfig = {
+  /**
+   * The key rows to render. Up to 4 rows — pass `undefined` for the 4th row to omit it.
+   * Each string is one row; each character is one key. Use non-letter Unicode characters
+   * for action keys (backspace, enter, panel-switch, etc.) to avoid input conflicts.
+   *
+   * Accepts either a 4-tuple `[row1, row2, row3, row4 | undefined]` or a plain array of
+   * strings/nulls (null renders an empty row).
+   *
+   * @example ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined]
+   */
+  layout: [string, string, string, string | undefined] | (string | null)[]
+
+  /**
+   * Maps action-key tokens to the label string displayed on the key face.
+   * The token character is what the game receives in a `keyboardKeyPress` event;
+   * the label is purely visual.
+   *
+   * @example { "⌫": "bsp", "↵": "Enter", "✱": "123" }
+   */
+  symbols: Record<string, string>
+
+  /**
+   * Keys that should render with the highlight/accent background color.
+   * Typically used for action keys (backspace, enter, direction keys) so they
+   * stand out from the letter keys.
+   *
+   * @example ["↵", "⌫"]
+   */
+  highlight: string[]
+
+  /**
+   * Keys that are non-interactive and visually dimmed.
+   * Update this array dynamically to disable letters that are no longer valid
+   * for the current game state (e.g. letters already placed in a word game).
+   *
+   * @example ["q", "z", "x"] // letters unavailable given current board state
+   */
+  disabled: string[]
+
+  /**
+   * Keys that should render at extra-large width (~17.85% of the keyboard row).
+   * Use for high-priority action keys like spacebar or a main confirm key.
+   *
+   * @example ["␣"]
+   */
+  xl: string[]
+
+  /**
+   * Keys that should render at large width (~14.7% of the keyboard row).
+   * Use for secondary action keys like Enter and Backspace that need more touch area.
+   *
+   * @example ["↵", "⌫"]
+   */
+  l: string[]
+
+  /**
+   * When `true`, the keyboard renders a drag cursor — the player can press-and-hold then
+   * drag across the keys to position a cursor before releasing to confirm a character.
+   * Listen for `keyboardCursorChange` and `keyboardCursorEnd` events to handle this.
+   *
+   * Only enable if your game has a spatial input model that benefits from drag-cursor
+   * positioning (e.g. selecting a cell in a grid).
+   */
+  supportsDragCursor: boolean
+
+  /**
+   * Controls horizontal alignment for each row. Index matches the `layout` row index.
+   * Defaults to `"center"` for any row not listed.
+   *
+   * @example ["center", "center", "end", "center"]
+   */
+  rowPositioning?: ("end" | "start" | "center" | undefined)[]
+
+  /**
+   * Keys that expand to fill remaining horizontal space in their row (flex-grow).
+   * Useful for a spacebar key that should stretch across the bottom row.
+   *
+   * @example ["␣"]
+   */
+  flexGrowSymbols?: string[]
+
+  /**
+   * CSS properties applied to every key face. Use for font overrides or color tweaks
+   * that apply uniformly across the keyboard.
+   *
+   * @example { textTransform: "lowercase", color: "#888" }
+   */
+  keyStyles?: Record<string, string>
+
+  /**
+   * CSS properties applied to the keyboard container element. Use for positioning or
+   * background tweaks that apply to the whole keyboard.
+   */
+  kbdStyles?: Record<string, string>
+}
+
 /** Messages from the SDK to the host */
 export type MessagesSentFromEmbed = {
+  /** Tells the host to send back the bootstrap data (puzzle, theme, gameplay state). Send once on startup via `sdk.gameReady()`. */
   READY: object
+  /** Signals that the game has finished loading and is ready to start. The host will respond with `START_GAME`. */
   READY_GAME_LOADED: { state: any; gameRuntimeContract: string; embedRuntimeContract: string }
+  /** Persist the current in-progress game state to the API. Call this after every meaningful player action. */
   UPLOAD_NEW_GAME_STATE: {
     id: string
     input: {
@@ -221,21 +363,36 @@ export type MessagesSentFromEmbed = {
       collabUserReferences: string[]
     }
   }
+  /** Upload the final completed game state. Triggers scoring, deeds, and augmentations on the host. */
   GAME_COMPLETED: {
+    /** The gameplay ID returned from `READY_DATA`. */
     id: string
+    /** See CompleteGamePlayedInput — elapsed time, board state, score, etc. */
     input: any
-    pipelineStats?: any[]
     config?: {
+      /** Interesting values from the game used for scoring and stats (e.g. points, time). */
       deeds?: Deed[] | readonly Deed[]
     }
   }
+  /** Ask the host to show the post-game completion screen. Send after `GAME_COMPLETED`. */
   SHOW_GAME_COMPLETE_SCREEN: {
+    /** @deprecated Components to render in the sidebar — no longer used by the host. */
     results: GameOverMessageUIComponent[]
+    /** Whether to show the retry button — currently ignored by the host but good practice to send. */
     showRetry: boolean
+    /** The gameplay object that was sent with `GAME_COMPLETED`. */
     gameplay: GamePlay
   }
+  /** Update the timer display string shown in the host UI. Sent automatically by the SDK every 500ms. */
   TIMER_TICK: { display: [string, string] }
+  /**
+   * Sync the authoritative elapsed time to the host. Used for idle detection and co-op collab state.
+   * Sent automatically by the SDK every 10 seconds.
+   */
   TIMER_SYNC: number
+  /** Show or update the on-screen keyboard. Pass the full config each time — the host replaces its entire state. To hide, call `sdk.keyboard.hide()`. */
+  KEYBOARD_UPDATE_CONFIG: KeyboardConfig
+  /** Notify the host that a named checkpoint was reached (e.g. completing a sub-puzzle or bonus round). */
   HIT_CHECKPOINT: {
     checkpointName: string
     gameplay: { inputStr: string; play: Partial<GamePlay> }
@@ -246,11 +403,24 @@ export type MessagesSentFromEmbed = {
 
 /** Messages from the host to the SDK */
 export type MessagesReceived = {
+  /** The bootstrap payload containing puzzle data, theme, and existing gameplay state. Received in response to `READY`. */
   READY_DATA: BootstrapGameData
+  /** Sent by REPLs and dev tooling to reset the game with a revised puzzle string without a full reload. */
   RESET_DATA: { data: any }
+  /** The player requested a fresh attempt at the same puzzle. Reset all game state and restart. */
   RETRY_PUZZLE: object
+  /** The host is ready — start the game clock and begin accepting player input. */
   START_GAME: undefined
+  /** The host paused the game (e.g. player switched tabs or app moved to background). Freeze input and pause the timer. */
   PAUSE_GAME: object
+  /** The host resumed the game after a pause. Restore input and resume the timer. */
   RESUME_GAME: object
+  /** The player changed a game setting. The payload is the full updated settings object for this game. */
   SETTINGS_UPDATE: any
+  /** A key on the on-screen keyboard was tapped. `key` is the raw character token from the layout. */
+  KEYBOARD_KEY_PRESS: { key: string }
+  /** The drag cursor moved to a new position while the player holds on the keyboard. Only fires when `supportsDragCursor` is `true`. */
+  KEYBOARD_CURSOR_CHANGE: { position: [number, number] }
+  /** The player lifted their finger, ending a drag-cursor gesture. Only fires when `supportsDragCursor` is `true`. */
+  KEYBOARD_CURSOR_END: object
 }

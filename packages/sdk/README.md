@@ -127,6 +127,49 @@ sdk.gameCompleted(metrics, {
 
 The SDK automatically adds `points` and `time` deeds.
 
+## On-Screen Keyboard
+
+For games that need text input on touch devices, the SDK can show Puzzmo's on-screen keyboard.
+The keyboard is only visible on touch devices — calling these methods on desktop is a no-op.
+
+```ts
+import { createPuzzmoSDK, defaultKeyboardConfig } from "@puzzmo/sdk"
+
+const sdk = createPuzzmoSDK()
+
+// Show the keyboard when the player selects an input
+sdk.keyboard.show(defaultKeyboardConfig)
+
+// Listen for key presses
+sdk.on("keyboardKeyPress", ({ key }) => {
+  if (key === "⌫") handleBackspace()
+  else if (key === "↵") handleEnter()
+  else handleLetter(key)
+})
+
+// Hide when input is dismissed
+sdk.keyboard.hide()
+```
+
+`defaultKeyboardConfig` is a standard QWERTY layout with Enter and Backspace. Customize it by spreading:
+
+```ts
+// Disable letters that are no longer valid given the current game state
+sdk.keyboard.show({ ...defaultKeyboardConfig, disabled: usedLetters })
+```
+
+For games with a spatial input model (e.g. selecting a grid cell by dragging across the keyboard),
+enable drag cursor support and listen for the additional events:
+
+```ts
+sdk.keyboard.show({ ...defaultKeyboardConfig, supportsDragCursor: true })
+
+sdk.on("keyboardCursorChange", ({ position }) => highlightCellAtPosition(position))
+sdk.on("keyboardCursorEnd", () => confirmCellSelection())
+```
+
+See the `KeyboardConfig` type export and the `add-keyboard-support` skill for full field documentation.
+
 ## App Integration
 
 For games to show a dynamic thumbnail, you will need an App Bundle
