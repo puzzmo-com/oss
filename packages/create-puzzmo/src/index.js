@@ -8,15 +8,15 @@ const args = process.argv.slice(2)
 // Detect the package manager that invoked this script
 const pm = detectPackageManager()
 
-// Fetch the actual latest version from the registry to avoid npm cache staleness
+// Resolve the actual latest version from the registry to avoid npm cache staleness
 const version = await fetchLatestVersion("@puzzmo/cli")
-console.log(`Installing @puzzmo/cli@${version}...`)
-spawnSync("npm", ["install", "-g", `@puzzmo/cli@${version}`], { stdio: "inherit" })
+console.log(`Running @puzzmo/cli@${version}...`)
 
 // Pass --pm so the CLI knows which package manager to use in generated files
 const extraArgs = args.includes("--pm") ? [] : ["--pm", pm]
 
-const result = spawnSync("puzzmo", ["game", "create", ...args, ...extraArgs], {
+// Use npx with the exact version to avoid stale global installs
+const result = spawnSync("npx", [`@puzzmo/cli@${version}`, "game", "create", ...args, ...extraArgs], {
   stdio: "inherit",
   env: process.env,
 })
