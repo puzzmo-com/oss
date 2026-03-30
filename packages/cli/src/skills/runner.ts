@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process"
 import { skillsPipeline } from "./registry.js"
 import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 import { getMcpUrl } from "./mcp-client.js"
+import { runPipelineTUI } from "../tui/pipeline.js"
 
 const buildPrompt = (skillName: string, mcpUrl: string | null): string => {
   if (!mcpUrl) return `Run the skill "${skillName}". The game source is in the current directory.`
@@ -92,6 +93,5 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
 
 /** Runs the skills pipeline with a split-pane TUI */
 export const runSkillsPipelineTUI = async (agent: string, gameDir: string) => {
-  const { runPipelineTUI } = await import("../tui/pipeline.js")
   await runPipelineTUI(agent, gameDir)
 }
