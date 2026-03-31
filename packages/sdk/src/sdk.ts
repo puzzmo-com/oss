@@ -327,7 +327,7 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
 
     gameReady: async (): Promise<{
       puzzleString: string
-      boardState: string | null
+      inputString: string | null
       theme: Theme | null
       completed: boolean
       readyData: MessagesReceived["READY_DATA"] | null
@@ -335,13 +335,15 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
       hostAPI.sendMessage("READY", {})
 
       if (getPuzzleString()) {
+        const inputString = getBoardState()
         return {
           puzzleString: getPuzzleString()!,
-          boardState: getBoardState(),
+          inputString,
+          boardState: inputString,
           theme: getTheme(),
           completed: getCompleted(),
           readyData,
-        }
+        } as any
       }
 
       const timeout = options.timeout ?? 5000
@@ -360,13 +362,15 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
       const puzzleString = getPuzzleString()
       if (!puzzleString) throw new Error("READY_DATA received but no puzzle data found")
 
+      const inputString = getBoardState()
       return {
         puzzleString,
-        boardState: getBoardState(),
+        inputString,
+        boardState: inputString,
         theme: getTheme(),
         completed: getCompleted(),
         readyData,
-      }
+      } as any
     },
 
     gameLoaded: (state: any = {}) => {

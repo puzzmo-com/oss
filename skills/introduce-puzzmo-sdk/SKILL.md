@@ -27,14 +27,14 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 
    ```ts
    // Wait for puzzle data from the host
-   const { puzzleString, boardState, theme, completed } = await sdk.gameReady()
+   const { puzzleString, inputString, theme, completed } = await sdk.gameReady()
 
    // Parse puzzle data and set up the game
    const puzzle = JSON.parse(puzzleString)
    initializeGame(puzzle)
 
    // If there's saved state, restore it
-   if (boardState) restoreState(boardState)
+   if (inputString) restoreState(inputString)
 
    // Apply the Puzzmo theme colors
    if (theme) applyTheme(theme)
@@ -93,7 +93,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
      plugins: [
        puzzmoSimulator({
          slug: "my-game",
-         fixturesGlob: "./fixtures/puzzles/**/*.json",
+         fixturesGlob: "/fixtures/puzzles/**/*.json",
        }),
      ],
    })
@@ -115,7 +115,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 
 ## Key SDK APIs
 
-- `sdk.gameReady()` - Async. Sends READY, waits for puzzle data. Returns `{ puzzleString, boardState, theme, completed }`.
+- `sdk.gameReady()` - Async. Sends READY, waits for puzzle data. Returns `{ puzzleString, inputString, theme, completed }`.
 - `sdk.gameLoaded()` - Signals game is ready. Host will send START_GAME.
 - `sdk.on(event, handler)` - Listen for lifecycle events: `start`, `pause`, `resume`, `retry`, `settingsUpdate`.
 - `sdk.updateGameState(stateString)` - Save current game state.

@@ -12,6 +12,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./inputs": {
+      "types": "./dist/inputs/index.d.ts",
+      "import": "./dist/inputs/index.js",
+      "require": "./dist/inputs/index.cjs"
+    },
     "./simulator": {
       "types": "./dist/simulator/index.d.ts",
       "import": "./dist/simulator/index.js",
@@ -51,6 +56,9 @@
     "access": "public",
     "provenance": true,
     "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "lz-string": "^1.5.0"
   },
   "devDependencies": {
     "typescript": "catalog:",

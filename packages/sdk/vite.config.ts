@@ -6,6 +6,7 @@ export default defineConfig({
     lib: {
       entry: {
         index: resolve(__dirname, "src/index.ts"),
+        "inputs/index": resolve(__dirname, "src/inputs/index.ts"),
         "simulator/index": resolve(__dirname, "src/simulator/index.ts"),
         "simulator/standalone": resolve(__dirname, "src/simulator/standalone.ts"),
         vite: resolve(__dirname, "src/vite.ts"),
@@ -17,7 +18,7 @@ export default defineConfig({
       },
     },
     rolldownOptions: {
-      external: ["vite"],
+      external: ["vite", "lz-string"],
       output: {
         globals: {},
       },

@@ -35,12 +35,12 @@ import { createPuzzmoSDK } from "@puzzmo/sdk"
 const sdk = createPuzzmoSDK()
 
 // 1. Wait for puzzle data from Puzzmo
-const { puzzleString, boardState, theme, completed } = await sdk.gameReady()
+const { puzzleString, inputString, theme, completed } = await sdk.gameReady()
 
 // 2. Set up your game with the puzzle data
 const puzzle = JSON.parse(puzzleString)
 initializeGame(puzzle)
-if (boardState) restoreState(boardState)
+if (inputString) restoreState(inputString)
 
 // 3. Signal that you're ready
 sdk.gameLoaded()
@@ -179,8 +179,8 @@ import type { EditorBundle, ValidationReport } from "@puzzmo/sdk"
 import { puzzleToSVG } from "./src/puzzleToSVG"
 
 export const AppBundle = {
-  renderThumbnail(puzzleString, boardState, config) {
-    return puzzleToSVG(puzzleString, boardState, config)
+  renderThumbnail(puzzleString, inputString, config) {
+    return puzzleToSVG(puzzleString, inputString, config)
   },
 } satisfies EditorBundle
 ```
