@@ -198,7 +198,7 @@ export const gameCreate = async (args: string[]) => {
   const agents = detectAgent()
   const agentChoices = [
     ...agents.map((a) => ({ value: a.binary, label: `${a.displayName} (${a.path})` })),
-    { value: "none", label: "None - I'll run the skills manually" },
+    { value: "none", label: "None - I'll run the steps manually" },
   ]
 
   let selectedAgent: string
@@ -213,7 +213,7 @@ export const gameCreate = async (args: string[]) => {
   }
 
   if (selectedAgent !== "none") {
-    p.log.step("Running Puzzmo skills pipeline...")
+    p.log.step("Running Puzzmo migration pipeline...")
     await runSkillsPipelineTUI(selectedAgent, gameDir)
   }
 

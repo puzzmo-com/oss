@@ -5,11 +5,10 @@ import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 import { fetchSkillPrompt } from "./mcp-client.js"
 import { runPipelineTUI } from "../tui/pipeline.js"
 
-/** Fetches skill instructions from the MCP server, then builds a self-contained prompt for the agent */
-const buildPrompt = async (skillName: string, gameDir: string): Promise<string> => {
-  const instructions = await fetchSkillPrompt(skillName, gameDir)
-  if (instructions) return `${instructions}\n\nThe game source is in the current directory.`
-  return `Run the skill "${skillName}". The game source is in the current directory.`
+/** Fetches step instructions from the MCP server and wraps them as an agent prompt */
+const buildPrompt = async (stepName: string, gameDir: string): Promise<string> => {
+  const instructions = await fetchSkillPrompt(stepName, gameDir)
+  return `Follow these instructions. The game source is in the current directory.\n\n${instructions}`
 }
 
 /** Invokes an LLM agent with a prompt (plain mode, stdio inherited) */
@@ -38,7 +37,7 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
   for (let i = 0; i < total; i++) {
     const skill = skillsPipeline[i]
     const step = i + 1
-    console.log(`[${step}/${total}] Running skill: ${skill.name}`)
+    console.log(`[${step}/${total}] Running step: ${skill.name}`)
 
     const prompt = await buildPrompt(skill.name, gameDir)
     let result = invokeAgent(agent, prompt, gameDir)
@@ -47,7 +46,7 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
       console.log(`  Agent failed, retrying...`)
       result = invokeAgent(agent, prompt, gameDir)
       if (!result.success) {
-        console.error(`  Skill ${skill.name} failed after retry. Stopping pipeline.`)
+        console.error(`  Step ${skill.name} failed after retry. Stopping pipeline.`)
         process.exit(1)
       }
     }
@@ -56,7 +55,7 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
     const buildResult = verifyBuild(gameDir)
     if (!buildResult.success) {
       console.log(`  Build failed after ${skill.name}, asking agent to fix...`)
-      const fixPrompt = `The vite build failed after running skill ${skill.name}. Fix the build errors:\n\n${buildResult.error}`
+      const fixPrompt = `The vite build failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.error}`
       invokeAgent(agent, fixPrompt, gameDir)
 
       const retryBuild = verifyBuild(gameDir)
@@ -69,7 +68,7 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
     // Commit
     try {
       runCommand("git add -A", { cwd: gameDir })
-      gitCommit(`skill: ${skill.name}`, { cwd: gameDir })
+      gitCommit(`step: ${skill.name}`, { cwd: gameDir })
       console.log(`  Committed.`)
     } catch {
       console.log(`  No changes to commit.`)

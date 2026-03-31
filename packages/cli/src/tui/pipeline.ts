@@ -58,11 +58,10 @@ const buildAgentCmd = (agent: string, prompt: string): { cmd: string; args: stri
   return { cmd: agent, args: [prompt] }
 }
 
-/** Fetches skill instructions from the MCP server, then builds a self-contained prompt for the agent */
-const buildPrompt = async (skillName: string, gameDir: string): Promise<string> => {
-  const instructions = await fetchSkillPrompt(skillName, gameDir)
-  if (instructions) return `${instructions}\n\nThe game source is in the current directory.`
-  return `Run the skill "${skillName}". The game source is in the current directory.`
+/** Fetches step instructions from the MCP server and wraps them as an agent prompt */
+const buildPrompt = async (stepName: string, gameDir: string): Promise<string> => {
+  const instructions = await fetchSkillPrompt(stepName, gameDir)
+  return `Follow these instructions. The game source is in the current directory.\n\n${instructions}`
 }
 
 class PipelineTUI {
@@ -115,7 +114,7 @@ class PipelineTUI {
 
     // Sidebar header
     buf += moveTo(2, 1)
-    buf += "│ " + bold("Migration Pipeline") + " ".repeat(Math.max(0, sidebarWidth - 21)) + "│"
+    buf += "│ " + bold("Migration Steps") + " ".repeat(Math.max(0, sidebarWidth - 18)) + "│"
 
     // Output panel header
     const headerLabel = this.done ? "Done" : `${skillsPipeline[this.currentStep]?.name ?? ""} ${dim(`(${this.phase})`)}`
@@ -399,7 +398,17 @@ class PipelineTUI {
     this.phase = "agent"
     this.render()
 
-    const prompt = await buildPrompt(skill.name, this.gameDir)
+    let prompt: string
+    try {
+      prompt = await buildPrompt(skill.name, this.gameDir)
+    } catch (e: any) {
+      this.appendOutput(`Failed to fetch instructions: ${e.message}`)
+      this.writeSkillLog(skill.name)
+      this.states[stepIndex] = "failed"
+      this.render()
+      return false
+    }
+
     let success = await this.runAgent(prompt)
 
     if (!success) {
@@ -420,7 +429,7 @@ class PipelineTUI {
     const buildResult = this.runCmd("npx vite build")
     if (!buildResult.success) {
       this.appendOutput("Asking agent to fix...")
-      const fixPrompt = `The vite build failed after running skill ${skill.name}. Fix the build errors:\n\n${buildResult.output}`
+      const fixPrompt = `The vite build failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.output}`
       await this.runAgent(fixPrompt)
 
       const retry = this.runCmd("npx vite build")
@@ -436,7 +445,7 @@ class PipelineTUI {
     this.phase = "commit"
     this.render()
     this.runCmd("git add -A")
-    const commitResult = this.runCmd(`git commit -m "skill: ${skill.name}"`)
+    const commitResult = this.runCmd(`git commit -m "step: ${skill.name}"`)
     if (commitResult.success) this.appendOutput("Committed.")
     else this.appendOutput("No changes to commit.")
 
