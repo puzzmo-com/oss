@@ -339,11 +339,12 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
         return {
           puzzleString: getPuzzleString()!,
           inputString,
+          // @ts-expect-error - this is backwards compat
           boardState: inputString,
           theme: getTheme(),
           completed: getCompleted(),
           readyData,
-        } as any
+        }
       }
 
       const timeout = options.timeout ?? 5000
@@ -366,11 +367,12 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
       return {
         puzzleString,
         inputString,
+        // @ts-expect-error - this is backwards compat
         boardState: inputString,
         theme: getTheme(),
         completed: getCompleted(),
         readyData,
-      } as any
+      }
     },
 
     gameLoaded: (state: any = {}) => {
