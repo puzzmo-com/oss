@@ -179,6 +179,8 @@ export const gameCreate = async (args: string[]) => {
 
     if (hasGames) {
       parentFolder = "games"
+    } else if (repo.workspaceFolders.length === 0) {
+      parentFolder = "games"
     } else if (repo.workspaceFolders.length === 1) {
       parentFolder = repo.workspaceFolders[0]
     } else {

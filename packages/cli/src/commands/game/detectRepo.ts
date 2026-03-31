@@ -77,5 +77,8 @@ export const detectRepoContext = (): RepoContext => {
   const hasWorkspaces = globs !== null
   const workspaceFolders = globs ? foldersFromGlobs(globs) : []
 
-  return { inGitRepo: true, repoRoot, hasWorkspaces, workspaceFolders }
+  // Also recognize a games/ directory even without formal workspaces config
+  if (!workspaceFolders.includes("games") && fs.existsSync(path.join(repoRoot, "games"))) workspaceFolders.push("games")
+
+  return { inGitRepo: true, repoRoot, hasWorkspaces: hasWorkspaces || workspaceFolders.length > 0, workspaceFolders }
 }
