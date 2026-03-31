@@ -6,9 +6,9 @@ import { fetchSkillPrompt } from "./mcp-client.js"
 import { runPipelineTUI } from "../tui/pipeline.js"
 
 /** Fetches step instructions from the MCP server and wraps them as an agent prompt */
-const buildPrompt = async (stepName: string, gameDir: string): Promise<string> => {
+const buildPrompt = async (stepName: string, gameDir: string, repoContext: string): Promise<string> => {
   const instructions = await fetchSkillPrompt(stepName, gameDir)
-  return `Follow these instructions. The game source is in the current directory.\n\n${instructions}`
+  return `Follow these instructions. The game source is in the current directory.\n\n${repoContext}\n\n${instructions}`
 }
 
 /** Invokes an LLM agent with a prompt (plain mode, stdio inherited) */
@@ -31,7 +31,7 @@ const invokeAgent = (agent: string, prompt: string, cwd: string): { success: boo
 }
 
 /** Runs the skills pipeline with plain console output (no TUI) */
-export const runSkillsPipeline = async (agent: string, gameDir: string) => {
+export const runSkillsPipeline = async (agent: string, gameDir: string, repoContext: string) => {
   const total = skillsPipeline.length
 
   for (let i = 0; i < total; i++) {
@@ -39,7 +39,7 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
     const step = i + 1
     console.log(`[${step}/${total}] Running step: ${skill.name}`)
 
-    const prompt = await buildPrompt(skill.name, gameDir)
+    const prompt = await buildPrompt(skill.name, gameDir, repoContext)
     let result = invokeAgent(agent, prompt, gameDir)
 
     if (!result.success) {
@@ -79,6 +79,6 @@ export const runSkillsPipeline = async (agent: string, gameDir: string) => {
 }
 
 /** Runs the skills pipeline with a split-pane TUI */
-export const runSkillsPipelineTUI = async (agent: string, gameDir: string) => {
-  await runPipelineTUI(agent, gameDir)
+export const runSkillsPipelineTUI = async (agent: string, gameDir: string, repoContext: string) => {
+  await runPipelineTUI(agent, gameDir, repoContext)
 }

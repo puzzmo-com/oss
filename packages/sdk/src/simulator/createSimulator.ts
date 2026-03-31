@@ -12,7 +12,7 @@
  * // vite.config.ts
  * import { puzzmoSimulator } from "@puzzmo/sdk/vite"
  * export default defineConfig({
- *   plugins: [puzzmoSimulator({ slug: "my-game", fixturesGlob: "./fixtures/puzzles/**\/*.json" })]
+ *   plugins: [puzzmoSimulator({ slug: "my-game", fixturesGlob: "/fixtures/puzzles/**\/*.json" })]
  * })
  * ```
  *

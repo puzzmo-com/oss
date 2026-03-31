@@ -56,7 +56,7 @@ Deeds are interesting statistics about a gameplay session. They're sent on compl
 
 ## Success Criteria
 
-- `npm run build` completes without errors
+- The `build` script completes without errors
 - At least 3 meaningful deeds are tracked during gameplay
 - Deeds are sent with `gameCompleted`
 - Deed IDs are kebab-case and descriptive

@@ -45,7 +45,7 @@ Add proper game completion signaling so Puzzmo knows when the player has finishe
 
 ## Success Criteria
 
-- `npm run build` completes without errors
+- The `build` script completes without errors
 - When the game is won, `gameCompleted` fires with score data
 - After victory animation, `showCompletionScreen` fires
 - The completion flow works: play -> win -> gameCompleted -> animation -> showCompletionScreen

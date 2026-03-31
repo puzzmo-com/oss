@@ -59,9 +59,9 @@ const buildAgentCmd = (agent: string, prompt: string): { cmd: string; args: stri
 }
 
 /** Fetches step instructions from the MCP server and wraps them as an agent prompt */
-const buildPrompt = async (stepName: string, gameDir: string): Promise<string> => {
+const buildPrompt = async (stepName: string, gameDir: string, repoContext: string): Promise<string> => {
   const instructions = await fetchSkillPrompt(stepName, gameDir)
-  return `Follow these instructions. The game source is in the current directory.\n\n${instructions}`
+  return `Follow these instructions. The game source is in the current directory.\n\n${repoContext}\n\n${instructions}`
 }
 
 class PipelineTUI {
@@ -78,6 +78,7 @@ class PipelineTUI {
   constructor(
     private agent: string,
     private gameDir: string,
+    private repoContext: string,
   ) {
     this.states = skillsPipeline.map(() => "pending")
     this.logsDir = path.join(gameDir, ".puzzmo", "logs")
@@ -400,7 +401,7 @@ class PipelineTUI {
 
     let prompt: string
     try {
-      prompt = await buildPrompt(skill.name, this.gameDir)
+      prompt = await buildPrompt(skill.name, this.gameDir, this.repoContext)
     } catch (e: any) {
       this.appendOutput(`Failed to fetch instructions: ${e.message}`)
       this.writeSkillLog(skill.name)
@@ -512,7 +513,7 @@ class PipelineTUI {
 }
 
 /** Render the pipeline TUI and wait for it to complete */
-export const runPipelineTUI = async (agent: string, gameDir: string): Promise<void> => {
-  const tui = new PipelineTUI(agent, gameDir)
+export const runPipelineTUI = async (agent: string, gameDir: string, repoContext: string): Promise<void> => {
+  const tui = new PipelineTUI(agent, gameDir, repoContext)
   await tui.run()
 }

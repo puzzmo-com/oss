@@ -9,7 +9,7 @@ import { runCommand, gitCommit } from "../../util/exec.js"
 import { runSkillsPipelineTUI } from "../../skills/runner.js"
 import { login } from "../login.js"
 import { getToken } from "../../util/config.js"
-import { detectRepoContext } from "./detectRepo.js"
+import { detectRepoContext, type RepoType } from "./detectRepo.js"
 
 type CreateOptions = {
   name?: string
@@ -83,8 +83,8 @@ const setupNewRepo = (gameDir: string) => {
   }
 }
 
-/** Sets up the game inside an existing monorepo */
-const setupMonorepoGame = (tmpDir: string, slug: string, repoRoot: string, parentFolder: string): string => {
+/** Places a game inside an existing repo's parent folder (games/, packages/, etc.) */
+const setupRepoGame = (tmpDir: string, slug: string, repoRoot: string, parentFolder: string): string => {
   const parentDir = path.join(repoRoot, parentFolder)
   if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true })
 
@@ -102,6 +102,60 @@ const setupMonorepoGame = (tmpDir: string, slug: string, repoRoot: string, paren
   return gameDir
 }
 
+/** Files/dirs that stay at the repo root during a standalone→multi-game conversion */
+const rootKeepList = new Set([
+  ".git",
+  ".gitignore",
+  ".mcp.json",
+  "node_modules",
+  "dist",
+  ".puzzmo",
+  ".DS_Store",
+  "package.json",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+  ".yarnrc.yml",
+  ".yarn",
+  ".pnp.cjs",
+  ".pnp.loader.mjs",
+  "tsconfig.json",
+  "vite.config.ts",
+  "vite.config.js",
+  ".prettierrc",
+  ".prettierrc.json",
+  "prettier.config.js",
+  ".eslintrc",
+  ".eslintrc.json",
+  "eslint.config.js",
+])
+
+/** Converts a standalone single-game repo into a multi-game repo by moving existing files into games/<name>/ */
+const convertToMultiGame = (repoRoot: string): string => {
+  // Derive existing game name from package.json or directory name
+  let existingName: string | undefined
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf-8"))
+    if (pkg.name) existingName = slugify(pkg.name)
+  } catch {}
+  if (!existingName) existingName = path.basename(repoRoot)
+
+  const gamesDir = path.join(repoRoot, "games")
+  const existingGameDir = path.join(gamesDir, existingName)
+  fs.mkdirSync(existingGameDir, { recursive: true })
+
+  // Move all non-root files into games/<existing>/
+  for (const entry of fs.readdirSync(repoRoot)) {
+    if (rootKeepList.has(entry) || entry === "games") continue
+    fs.renameSync(path.join(repoRoot, entry), path.join(existingGameDir, entry))
+  }
+
+  runCommand("git add -A", { cwd: repoRoot })
+  gitCommit(`Restructure: move existing game to games/${existingName}`, { cwd: repoRoot })
+
+  return existingName
+}
+
 /** Main game create wizard */
 export const gameCreate = async (args: string[]) => {
   const opts = parseArgs(args)
@@ -112,13 +166,13 @@ export const gameCreate = async (args: string[]) => {
 
   // Step 1: Detect repo context and choose mode
   const repo = detectRepoContext()
-  const isMonorepo = repo.inGitRepo && repo.hasWorkspaces && repo.workspaceFolders.length > 0
+  const canAddToRepo = repo.repoType === "multi-game" || repo.repoType === "workspace-monorepo" || repo.repoType === "standalone"
 
   const modeOptions = [
     { value: "new-repo" as const, label: "Create game in a new repo" },
-    { value: "add-to-repo" as const, label: "Add a game to this repo" },
+    ...(canAddToRepo ? [{ value: "add-to-repo" as const, label: "Add a game to this repo" }] : []),
   ]
-  if (isMonorepo) modeOptions.reverse()
+  if (canAddToRepo && repo.repoType !== "none") modeOptions.reverse()
 
   const mode = await p.select({
     message: "How would you like to create your game?",
@@ -159,39 +213,51 @@ export const gameCreate = async (args: string[]) => {
     login(opts.accessToken)
   }
 
-  // Step 6: Diamond — set up repo or monorepo subdir
+  // Step 6: Diamond — set up repo or add to existing
   let gameDir: string
+  let repoType: RepoType = repo.repoType
 
   if (mode === "new-repo") {
     gameDir = path.resolve(slug)
     if (fs.existsSync(gameDir)) fs.rmSync(gameDir, { recursive: true })
     fs.renameSync(tmpDir, gameDir)
     setupNewRepo(gameDir)
+    repoType = "standalone"
   } else {
     if (!repo.repoRoot) {
       p.log.error("Could not detect repository root. Are you inside a git repo?")
       process.exit(1)
     }
 
-    // Determine which workspace folder to place the game in
-    let parentFolder: string
-    const hasGames = repo.workspaceFolders.includes("games")
-
-    if (hasGames) {
-      parentFolder = "games"
-    } else if (repo.workspaceFolders.length === 0) {
-      parentFolder = "games"
-    } else if (repo.workspaceFolders.length === 1) {
-      parentFolder = repo.workspaceFolders[0]
-    } else {
-      parentFolder = (await p.select({
-        message: "Which folder should the game be added to?",
-        options: repo.workspaceFolders.map((f) => ({ value: f, label: f })),
-      })) as string
-      if (p.isCancel(parentFolder)) process.exit(0)
+    // Standalone repo → convert to multi-game first
+    if (repo.repoType === "standalone") {
+      const existingGame = convertToMultiGame(repo.repoRoot)
+      p.log.step(`Moved existing game to games/${existingGame}/`)
+      repoType = "multi-game"
     }
 
-    gameDir = setupMonorepoGame(tmpDir, slug, repo.repoRoot, parentFolder)
+    // Determine which folder to place the game in
+    let parentFolder: string
+    if (repoType === "multi-game") {
+      parentFolder = "games"
+    } else {
+      const hasGames = repo.workspaceFolders.includes("games")
+      if (hasGames) {
+        parentFolder = "games"
+      } else if (repo.workspaceFolders.length === 1) {
+        parentFolder = repo.workspaceFolders[0]
+      } else if (repo.workspaceFolders.length === 0) {
+        parentFolder = "games"
+      } else {
+        parentFolder = (await p.select({
+          message: "Which folder should the game be added to?",
+          options: repo.workspaceFolders.map((f) => ({ value: f, label: f })),
+        })) as string
+        if (p.isCancel(parentFolder)) process.exit(0)
+      }
+    }
+
+    gameDir = setupRepoGame(tmpDir, slug, repo.repoRoot, parentFolder)
   }
 
   // Step 7: Detect agent and run skills pipeline
@@ -213,12 +279,22 @@ export const gameCreate = async (args: string[]) => {
   }
 
   if (selectedAgent !== "none") {
+    const repoContextLines = [
+      `Repo type: ${repoType}`,
+      `Package manager: ${repo.packageManager} (use this instead of npm/npx when running commands or adding dependencies)`,
+    ]
+    if (repoType === "multi-game")
+      repoContextLines.push(
+        "This is a multi-game repo with a shared root package.json. Do not create a per-game package.json or vite config.",
+      )
+    if (repoType === "workspace-monorepo") repoContextLines.push("This is a workspace monorepo. The game has its own package.json.")
+
     p.log.step("Running Puzzmo migration pipeline...")
-    await runSkillsPipelineTUI(selectedAgent, gameDir)
+    await runSkillsPipelineTUI(selectedAgent, gameDir, repoContextLines.join("\n"))
   }
 
   // Done
-  const pm = opts.pm || "npm"
+  const pm = opts.pm || repo.packageManager
   const runCmd = pm === "npm" ? "npx" : pm === "yarn" ? "yarn dlx" : "pnpm dlx"
   const relativePath = path.relative(process.cwd(), gameDir)
 

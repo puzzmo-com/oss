@@ -12,7 +12,7 @@ Configure the project to deploy game builds to Puzzmo using the CLI.
 1. Install the Puzzmo CLI as a dev dependency:
 
    ```
-   npm install --save-dev @puzzmo/cli
+   Install @puzzmo/cli as a dev dependency using the project's package manager (e.g. npm, yarn, pnpm).
    ```
 
 2. Add deploy scripts to `package.json`:
@@ -20,7 +20,7 @@ Configure the project to deploy game builds to Puzzmo using the CLI.
    ```json
    {
      "scripts": {
-       "deploy": "npm run build && puzzmo upload GAMESLUG dist",
+       "deploy": "puzzmo upload GAMESLUG dist",
        "deploy:only": "puzzmo upload GAMESLUG dist"
      }
    }
@@ -49,21 +49,21 @@ Configure the project to deploy game builds to Puzzmo using the CLI.
 
    ## Development
 
-   npm run dev
+   Run the `dev` script to start development.
 
    ## Build
 
-   npm run build
+   Run the `build` script to create a production build.
 
    ## Deploy
 
    puzzmo login <your-token>
-   npm run deploy
+   Run the `deploy` script to upload to Puzzmo.
    ```
 
 ## Success Criteria
 
-- `npm run build` completes without errors
+- The `build` script completes without errors
 - `puzzmo upload` command is configured in package.json
 - `.gitignore` excludes node_modules and dist
 - Game slug matches across all config files

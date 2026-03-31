@@ -12,7 +12,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 1. Install `@puzzmo/sdk`:
 
    ```
-   npm install @puzzmo/sdk
+   Install `@puzzmo/sdk` using the project's package manager (e.g. npm, yarn, pnpm).
    ```
 
 2. In the main game entry file, import and initialize the SDK:
@@ -123,7 +123,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 
 ## Success Criteria
 
-- `npm run build` completes without errors
+- The `build` script completes without errors
 - Game initializes through SDK lifecycle (gameReady -> gameLoaded -> on start)
 - Game state is saved via `updateGameState` on each user action
 - Pause/resume/retry events are handled

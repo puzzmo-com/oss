@@ -131,7 +131,7 @@ The runtime shows the keyboard automatically on touch devices when the game call
 
 ## Success Criteria
 
-- `npm run build` completes without errors
+- The `build` script completes without errors
 - On a touch device (or browser dev tools touch emulation), the keyboard appears when a tile is selected
 - Tapping a key triggers the correct game action
 - Keyboard hides when input focus is lost or the game completes

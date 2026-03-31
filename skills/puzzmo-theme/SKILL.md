@@ -53,7 +53,7 @@ Convert the game's colors to use Puzzmo theme tokens, enabling automatic light/d
 
 ## Success Criteria
 
-- `npm run build` completes without errors
+- The `build` script completes without errors
 - No hardcoded color values remain in CSS (except for shadows, gradients with opacity, etc.)
 - Game renders correctly with both light and dark themes
 - Theme changes are applied without page reload

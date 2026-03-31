@@ -49,6 +49,6 @@ The function should return an SVG string that visually represents the puzzle. Yo
 
 ## Success Criteria
 
-- `npm run build` completes without errors
+- The `build` script completes without errors
 - `dist/` directory contains a complete, self-contained game
 - Thumbnail SVG exists and renders

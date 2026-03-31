@@ -9,7 +9,7 @@ export type PuzzmoSimulatorPluginOptions = {
   collapsed?: boolean
   /** Game slug for API features (e.g. "crossword", "my-game") */
   slug?: string
-  /** Glob pattern for fixture files, passed to import.meta.glob (e.g. "./fixtures/puzzles/**\/*.json") */
+  /** Glob pattern for fixture files, passed to import.meta.glob (e.g. "/fixtures/puzzles/**\/*.json") */
   fixturesGlob?: string
 }
 
