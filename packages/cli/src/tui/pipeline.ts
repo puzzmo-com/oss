@@ -5,7 +5,7 @@ import path from "node:path"
 import { execSync } from "node:child_process"
 
 import { skillsPipeline } from "../skills/registry.js"
-import { getMcpUrl } from "../skills/mcp-client.js"
+import { fetchSkillPrompt } from "../skills/mcp-client.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
 type Phase = "agent" | "build" | "commit" | "idle"
@@ -58,22 +58,11 @@ const buildAgentCmd = (agent: string, prompt: string): { cmd: string; args: stri
   return { cmd: agent, args: [prompt] }
 }
 
-const buildPrompt = (skillName: string, mcpUrl: string | null): string => {
-  if (!mcpUrl) return `Run the skill "${skillName}". The game source is in the current directory.`
-
-  return `First, fetch the skill instructions by using WebFetch to make a POST request to:
-${mcpUrl}
-
-With headers:
-- Content-Type: application/json
-- Accept: application/json, text/event-stream
-
-And body:
-{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"${skillName}"}}
-
-The response will be in SSE format. Parse the "data:" line to get the JSON result, which contains the skill instructions in result.messages[0].content.text.
-
-Then follow those instructions. The game source is in the current directory.`
+/** Fetches skill instructions from the MCP server, then builds a self-contained prompt for the agent */
+const buildPrompt = async (skillName: string, gameDir: string): Promise<string> => {
+  const instructions = await fetchSkillPrompt(skillName, gameDir)
+  if (instructions) return `${instructions}\n\nThe game source is in the current directory.`
+  return `Run the skill "${skillName}". The game source is in the current directory.`
 }
 
 class PipelineTUI {
@@ -410,8 +399,7 @@ class PipelineTUI {
     this.phase = "agent"
     this.render()
 
-    const mcpUrl = getMcpUrl(this.gameDir)
-    const prompt = buildPrompt(skill.name, mcpUrl)
+    const prompt = await buildPrompt(skill.name, this.gameDir)
     let success = await this.runAgent(prompt)
 
     if (!success) {
