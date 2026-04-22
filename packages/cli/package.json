@@ -17,8 +17,8 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsc",
-    "type-check": "tsc --noEmit"
+    "build": "tsgo",
+    "type-check": "tsgo --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^1.1.0",
@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.0",
+    "@typescript/native-preview": "*",
     "typescript": "catalog:"
   }
 }
