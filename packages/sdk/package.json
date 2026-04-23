@@ -27,6 +27,11 @@
       "import": "./dist/simulator/standalone.js",
       "require": "./dist/simulator/standalone.cjs"
     },
+    "./fonts": {
+      "types": "./dist/fonts.d.ts",
+      "import": "./dist/fonts.js",
+      "require": "./dist/fonts.cjs"
+    },
     "./vite": {
       "types": "./dist/vite.d.ts",
       "import": "./dist/vite.js",

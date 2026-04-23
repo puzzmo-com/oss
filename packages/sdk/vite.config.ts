@@ -9,6 +9,7 @@ export default defineConfig({
         "inputs/index": resolve(__dirname, "src/inputs/index.ts"),
         "simulator/index": resolve(__dirname, "src/simulator/index.ts"),
         "simulator/standalone": resolve(__dirname, "src/simulator/standalone.ts"),
+        fonts: resolve(__dirname, "src/fonts.ts"),
         vite: resolve(__dirname, "src/vite.ts"),
       },
       formats: ["es", "cjs"],
