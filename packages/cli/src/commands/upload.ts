@@ -18,10 +18,10 @@ const collectFiles = (dir: string): string[] => {
   return files
 }
 
-/** Tries to get the current git SHA, returns null if not in a git repo */
+/** Tries to get the shortest unique git SHA, returns null if not in a git repo */
 const getGitSHA = (): string | null => {
   try {
-    return execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim()
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim()
   } catch {
     return null
   }
@@ -90,5 +90,5 @@ export const upload = async (gameSlug: string, dir: string) => {
   })
 
   console.log(`\nDone - ${result.versionID}`)
-  console.log(`CDN: ${result.cdnBase}`)
+  console.log(`Assets: ${result.assetsBase}`)
 }

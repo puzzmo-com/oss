@@ -7,7 +7,7 @@ const BATCH_SIZE = 10
 
 type InitResponse = { sessionID: string; basePath: string; error?: string }
 type FileResponse = { path: string; error?: string }
-type CompleteResponse = { cdnBase: string; versionID: string; error?: string }
+type CompleteResponse = { assetsBase: string; versionID: string; error?: string }
 
 /** Callback for reporting batch upload progress */
 export type UploadProgress = (batch: number, totalBatches: number, uploaded: number) => void
