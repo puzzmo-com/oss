@@ -3,6 +3,16 @@ import path from "node:path"
 
 import { getAPIURL } from "./config.js"
 
+/** The schema for a puzzmo.json file - mirrors PuzzmoFile from @puzzmo-com/shared/hostAPI */
+export type PuzzmoFile = {
+  game: {
+    displayName: string
+    slug: string
+    teamID: string
+  }
+  integrations?: Record<string, unknown>
+}
+
 const BATCH_SIZE = 10
 
 type InitResponse = { sessionID: string; basePath: string; error?: string }
@@ -49,12 +59,13 @@ export const uploadFiles = async (
   sha: string,
   filePaths: string[],
   baseDir: string,
+  puzzmoFile: PuzzmoFile,
   onProgress?: UploadProgress,
 ): Promise<CompleteResponse> => {
   const apiURL = getAPIURL()
 
-  // Step 1: Init session
-  const init = (await jsonPost(`${apiURL}/cliUpload`, token, { gameSlug, sha })) as InitResponse
+  // Step 1: Init session (includes puzzmo.json metadata)
+  const init = (await jsonPost(`${apiURL}/cliUpload`, token, { gameSlug, sha, puzzmoFile })) as InitResponse
 
   // Step 2: Upload files in concurrent batches
   const fileURL = `${apiURL}/cliUpload/${init.sessionID}/file`

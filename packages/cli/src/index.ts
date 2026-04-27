@@ -2,6 +2,7 @@
 
 import { login } from "./commands/login.js"
 import { upload } from "./commands/upload.js"
+import { validate } from "./commands/validate.js"
 import { gameCreate } from "./commands/game/create.js"
 import { migrate } from "./commands/migrate.js"
 
@@ -13,6 +14,7 @@ const printUsage = () => {
   puzzmo game create [token]      Create a new Puzzmo game project
 
   puzzmo upload <slug> <dir>      Upload game build from <dir>
+  puzzmo validate [dir]           Validate puzzmo.json in a directory (default: .)
   puzzmo migrate                  List and select migration skills from dev.puzzmo.com`)
 }
 
@@ -45,6 +47,10 @@ const run = async () => {
         console.error("Usage: puzzmo game create [token] [--name <name>] [--url <url>] [--agent <agent>] [--pm <npm|yarn|pnpm>]")
         process.exit(1)
       }
+      break
+    }
+    case "validate": {
+      validate(args[0] || ".")
       break
     }
     case "migrate": {

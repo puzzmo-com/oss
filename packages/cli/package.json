@@ -21,6 +21,7 @@
     "type-check": "tsgo --noEmit"
   },
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
     "@clack/prompts": "^1.1.0",
     "@puzzmo/agent-cli-detect": "workspace:*"
   },

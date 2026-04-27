@@ -5,6 +5,7 @@ import path from "node:path"
 
 import { uploadFiles } from "../util/api.js"
 import { getAPIURL, getToken } from "../util/config.js"
+import { validatePuzzmoJson } from "../util/validatePuzzmoFile.js"
 
 /** Collects all files in a directory recursively */
 const collectFiles = (dir: string): string[] => {
@@ -63,6 +64,30 @@ export const upload = async (gameSlug: string, dir: string) => {
     process.exit(1)
   }
 
+  // Require and validate puzzmo.json
+  const puzzmoJsonPath = path.join(distDir, "puzzmo.json")
+  if (!fs.existsSync(puzzmoJsonPath)) {
+    console.error(`Missing puzzmo.json in ${dir}`)
+    console.error("Every game upload must include a puzzmo.json file.")
+    process.exit(1)
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(fs.readFileSync(puzzmoJsonPath, "utf-8"))
+  } catch (e) {
+    console.error(`Invalid puzzmo.json: ${e instanceof Error ? e.message : e}`)
+    process.exit(1)
+  }
+
+  const validation = await validatePuzzmoJson(parsed)
+  if (!validation.valid) {
+    console.error(`Invalid puzzmo.json:\n`)
+    for (const err of validation.errors) console.error(`  ${err}`)
+    process.exit(1)
+  }
+  const puzzmoFile = validation.data
+
   // Determine SHA
   const sha = getGitSHA() || hashFiles(files)
 
@@ -85,7 +110,7 @@ export const upload = async (gameSlug: string, dir: string) => {
   if (apiURL !== defaultURL) console.log(`Uploading to ${apiURL}...`)
   else console.log("Uploading...")
 
-  const result = await uploadFiles(token, gameSlug, sha, files, distDir, (batch, totalBatches, uploaded) => {
+  const result = await uploadFiles(token, gameSlug, sha, files, distDir, puzzmoFile, (batch, totalBatches, uploaded) => {
     console.log(`  Batch ${batch}/${totalBatches} done (${uploaded} file(s) uploaded)`)
   })
 
