@@ -115,19 +115,19 @@ The runtime shows the keyboard automatically on touch devices when the game call
 
 ## KeyboardConfig fields
 
-| Field | Type | Purpose |
-|---|---|---|
-| `layout` | `string[]` | Rows of keys — each character is one key |
-| `symbols` | `Record<string, string>` | Maps token chars to display labels |
-| `highlight` | `string[]` | Keys rendered with accent background |
-| `disabled` | `string[]` | Keys that are non-interactive/dimmed |
-| `xl` | `string[]` | Extra-large width keys (~17.85% of row) |
-| `l` | `string[]` | Large width keys (~14.7% of row) |
-| `supportsDragCursor` | `boolean` | Enable drag-cursor mode |
-| `rowPositioning` | `("start"\|"center"\|"end")[]` | Per-row alignment |
-| `flexGrowSymbols` | `string[]` | Keys that stretch to fill row width |
-| `keyStyles` | `Record<string, string>` | CSS applied to every key face |
-| `kbdStyles` | `Record<string, string>` | CSS applied to the keyboard container |
+| Field                | Type                           | Purpose                                  |
+| -------------------- | ------------------------------ | ---------------------------------------- |
+| `layout`             | `string[]`                     | Rows of keys — each character is one key |
+| `symbols`            | `Record<string, string>`       | Maps token chars to display labels       |
+| `highlight`          | `string[]`                     | Keys rendered with accent background     |
+| `disabled`           | `string[]`                     | Keys that are non-interactive/dimmed     |
+| `xl`                 | `string[]`                     | Extra-large width keys (~17.85% of row)  |
+| `l`                  | `string[]`                     | Large width keys (~14.7% of row)         |
+| `supportsDragCursor` | `boolean`                      | Enable drag-cursor mode                  |
+| `rowPositioning`     | `("start"\|"center"\|"end")[]` | Per-row alignment                        |
+| `flexGrowSymbols`    | `string[]`                     | Keys that stretch to fill row width      |
+| `keyStyles`          | `Record<string, string>`       | CSS applied to every key face            |
+| `kbdStyles`          | `Record<string, string>`       | CSS applied to the keyboard container    |
 
 ## Success Criteria
 
@@ -136,3 +136,4 @@ The runtime shows the keyboard automatically on touch devices when the game call
 - Tapping a key triggers the correct game action
 - Keyboard hides when input focus is lost or the game completes
 - `disabled` keys update correctly as game state changes
+- The game does not have its own on-screen keyboard implementation that conflicts with the Puzzmo keyboard

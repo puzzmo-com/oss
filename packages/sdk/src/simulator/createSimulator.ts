@@ -1,35 +1,3 @@
-/**
- * Simulator - A development UI for testing games with the Puzzmo Proto SDK.
- *
- * This script simulates the Puzzmo host environment by:
- * - Listening for READY messages from the game
- * - Sending READY_DATA with puzzle data
- * - Providing UI controls for START_GAME, PAUSE_GAME, RESUME_GAME, RETRY_PUZZLE
- *
- * Usage with Vite plugin (recommended):
- *
- * ```ts
- * // vite.config.ts
- * import { puzzmoSimulator } from "@puzzmo/sdk/vite"
- * export default defineConfig({
- *   plugins: [puzzmoSimulator({ slug: "my-game", fixturesGlob: "/fixtures/puzzles/**\/*.json" })]
- * })
- * ```
- *
- * The plugin handles making sure it is removed on vite builds.
- *
- * Usage with manual imports:
- * ```html
- * <script type="module">
- *   import { createSimulator } from "@puzzmo/sdk/simulator"
- *   const fixtures = import.meta.glob("./fixtures/puzzles/**\/*.json", { eager: true })
- *   createSimulator({ fixtures })
- * </script>
- * ```
- * The fixtures folder structure should be: fixtures/puzzles/{category}/{puzzle}.json
- * This will show dropdowns in the Ctrl tab to select category and puzzle.
- */
-
 import type { BootstrapGameData, MessagesReceived } from "../types"
 import type { SimulatorConfig, SimulatorContext, SimulatorState, SimulatorView, TabName, FixtureImports } from "./types"
 import { simulatorStyles } from "./styles"
@@ -46,6 +14,7 @@ import {
   createThemeView,
   createAuthView,
   createFeaturesView,
+  createKeyboardView,
 } from "./views"
 
 // Re-export types for consumers
@@ -60,10 +29,40 @@ interface SimulatorInstance {
 let simulatorInstance: SimulatorInstance | null = null
 
 /**
- * Creates the Simulator UI and message handling.
- * If called multiple times, updates the existing instance with new settings (e.g., fixtures).
+ * Simulator - A development UI for testing games with the Puzzmo Proto SDK.
+ *
+ * This script simulates the Puzzmo host environment by:
+ * - Listening for READY messages from the game
+ * - Sending READY_DATA with puzzle data
+ * - Providing UI controls for START_GAME, PAUSE_GAME, RESUME_GAME, RETRY_PUZZLE
+ *
+ * Usage with Vite plugin (recommended):
+ *
+ * ```ts
+ * // vite.config.ts
+ * import { puzzmoSimulator } from "@puzzmo/sdk/vite"
+ * export default defineConfig({
+ *   plugins: [puzzmoSimulator({})]
+ * })
+ * ```
+ *
+ * The plugin automatically reads the game slug from the nearest puzzmo.json.
+ *
+ * The plugin handles making sure it is removed on vite builds.
+ *
+ * Usage with manual imports:
+ * ```html
+ * <script type="module">
+ *   import { createSimulator } from "@puzzmo/sdk/simulator"
+ *   const fixtures = import.meta.glob("./fixtures/puzzles/**\/*.json", { eager: true })
+ *   createSimulator({ fixtures })
+ * </script>
+ * ```
+ * The fixtures folder structure should be: fixtures/puzzles/{category}/{puzzle}.json
+ * This will show dropdowns in the Ctrl tab to select category and puzzle.
  */
-function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
+
+export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
   console.log("[Simulator] createSimulator called with config:", { slug: config.slug, hasFixtures: !!config.fixtures })
 
   // If instance already exists, update it with new config
@@ -94,6 +93,7 @@ function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
     createThemeView(),
     createAuthView(),
     createFeaturesView(),
+    createKeyboardView(),
   ] satisfies SimulatorView[]
 
   const validTabIds = views.map((v) => v.id)
@@ -582,5 +582,3 @@ function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
 
   return simulatorInstance
 }
-
-export { createSimulator }

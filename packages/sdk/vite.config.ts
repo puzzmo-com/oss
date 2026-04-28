@@ -10,6 +10,7 @@ export default defineConfig({
         "simulator/index": resolve(__dirname, "src/simulator/index.ts"),
         "simulator/standalone": resolve(__dirname, "src/simulator/standalone.ts"),
         fonts: resolve(__dirname, "src/fonts.ts"),
+        svgJSX: resolve(__dirname, "src/svgJSX.ts"),
         vite: resolve(__dirname, "src/vite.ts"),
       },
       formats: ["es", "cjs"],
@@ -19,7 +20,7 @@ export default defineConfig({
       },
     },
     rolldownOptions: {
-      external: ["vite", "lz-string"],
+      external: ["vite", "lz-string", "path", "fs"],
       output: {
         globals: {},
       },

@@ -32,6 +32,11 @@
       "import": "./dist/fonts.js",
       "require": "./dist/fonts.cjs"
     },
+    "./svgJSX": {
+      "types": "./dist/svgJSX.d.ts",
+      "import": "./dist/svgJSX.js",
+      "require": "./dist/svgJSX.cjs"
+    },
     "./vite": {
       "types": "./dist/vite.d.ts",
       "import": "./dist/vite.js",
@@ -43,6 +48,7 @@
   ],
   "scripts": {
     "build": "vite build && tsgo --project tsconfig.build.json",
+    "test": "vitest run",
     "type-check": "tsgo --noEmit"
   },
   "keywords": [

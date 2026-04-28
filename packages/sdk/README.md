@@ -189,6 +189,39 @@ This and the editor bundle are separate JavaScript files from your main game.
 
 There are Vite plugins to make this easy, but otherwise, they should be files in your upload named `app-bundle.js` and `editor-bundle.js` with ESM exports which match the shapes of the TypeScript types.
 
+### Thumbnail JSX
+
+We have found over time that using JSX for thumbnails makes it a lot easier to ensure correct SVG output, but React/Preact are big runtimes, so we have a smaller JSX runtime built just for non-interactive SVGs based on [understated](https://github.com/callmecavs/understated).
+
+To use it, configure your file's JSX pragma to use `h` and `render` from `@puzzmo/sdk/svgJSX`:
+
+```tsx
+/** @jsxRuntime classic @jsx h */
+import { h, render } from "@puzzmo/sdk/svgJSX"
+
+// Needed for fragments
+const React = { Fragment: "g" }
+
+export function renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): string {
+  const puzzle = JSON.parse(puzzleStr)
+  const size = 200
+
+  const svg = (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${size} ${size}`}>
+      <rect width={size} height={size} fill={config?.theme?.g_bg ?? "#1a1a2e"} />
+      <text x={size / 2} y={size / 2} textAnchor="middle" fill={config?.theme?.fg ?? "#fff"} fontSize="24">
+        {puzzle.title}
+      </text>
+    </svg>
+  )
+
+  const el = render(svg)
+  return el instanceof Element ? el.outerHTML : ""
+}
+```
+
+The `h` function is a JSX factory that creates virtual DOM nodes, and `render` converts them into real DOM elements. Since thumbnails can run server-side or in a DOM-shimmed environment, the result is serialized to an SVG string via `outerHTML`.
+
 ## Editor Integration
 
 For games that support puzzle editing in Puzzmo Workshop, you will need an Editor Bundle:

@@ -28,6 +28,7 @@ export const simulatorStyles = `
     border-radius: 4px;
     color: var(--sim-text);
     width: 420px;
+    max-width: calc(100vw - 8px);
     box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
   }
   #simulator-panel.collapsed {
@@ -1070,5 +1071,79 @@ export const simulatorStyles = `
   .checkpoint-time {
     color: var(--sim-text-dim);
     font-size: 9px;
+  }
+  /* Keyboard view styles */
+  .keyboard-view-container {
+    padding: 4px;
+  }
+  .sim-kb-empty {
+    color: var(--sim-text-dim);
+    text-align: center;
+    padding: 16px 8px;
+    font-size: 10px;
+    line-height: 1.6;
+  }
+  .sim-kb-empty code {
+    background: var(--sim-bg);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 10px;
+  }
+  .sim-kb {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sim-kb-row {
+    display: flex;
+    justify-content: center;
+    gap: 3px;
+  }
+  .sim-kb-key {
+    min-width: 28px;
+    height: 30px;
+    padding: 0 4px;
+    border: 1px solid var(--sim-border);
+    border-radius: 3px;
+    background: var(--sim-bg);
+    color: var(--sim-text);
+    font: inherit;
+    font-size: 11px;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sim-kb-key:hover {
+    background: var(--sim-bg-alt);
+    border-color: var(--sim-border-light);
+  }
+  .sim-kb-key:active {
+    background: var(--sim-accent);
+    color: var(--sim-panel);
+  }
+  .sim-kb-key.highlight {
+    background: var(--sim-bg-alt);
+    border-color: var(--sim-accent);
+    color: var(--sim-accent);
+    font-size: 9px;
+  }
+  .sim-kb-key.highlight:active {
+    background: var(--sim-accent);
+    color: var(--sim-panel);
+  }
+  .sim-kb-key.l {
+    min-width: 40px;
+  }
+  .sim-kb-key.xl {
+    min-width: 52px;
+  }
+  .sim-kb-key.grow {
+    flex: 1;
+  }
+  .sim-kb-key.disabled {
+    opacity: 0.3;
+    cursor: default;
   }
 `

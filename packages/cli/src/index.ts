@@ -13,7 +13,7 @@ const printUsage = () => {
   puzzmo login <token>            Save a CLI auth token
   puzzmo game create [token]      Create a new Puzzmo game project
 
-  puzzmo upload <slug> <dir>      Upload game build from <dir>
+  puzzmo upload <dir>             Upload game build from <dir> (slug from puzzmo.json)
   puzzmo validate [dir]           Validate puzzmo.json in a directory (default: .)
   puzzmo migrate                  List and select migration skills from dev.puzzmo.com`)
 }
@@ -30,13 +30,12 @@ const run = async () => {
       break
     }
     case "upload": {
-      const gameSlug = args[0]
-      const dir = args[1]
-      if (!gameSlug || !dir) {
-        console.error("Usage: puzzmo upload <gameSlug> <dir>")
+      const dir = args[0]
+      if (!dir) {
+        console.error("Usage: puzzmo upload <dir>")
         process.exit(1)
       }
-      await upload(gameSlug, dir)
+      await upload(dir)
       break
     }
     case "game": {

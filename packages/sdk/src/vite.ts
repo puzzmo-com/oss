@@ -1,54 +1,130 @@
-import type { Plugin } from "vite"
+import type { Plugin, ResolvedConfig } from "vite"
 import { build } from "vite"
 import path from "path"
+import fs from "fs"
 
 export type PuzzmoSimulatorPluginOptions = {
   /** Whether to auto-start the game after READY (default: true) */
   autoStart?: boolean
   /** Initial collapsed state (default: true) */
   collapsed?: boolean
-  /** Game slug for API features (e.g. "crossword", "my-game") */
-  slug?: string
-  /** Glob pattern for fixture files, passed to import.meta.glob (e.g. "/fixtures/puzzles/**\/*.json") */
-  fixturesGlob?: string
+  /** Glob pattern for fixture files, passed to import.meta.glob which is relative to the closest puzzmo.json. Defaults to "/fixtures/puzzles/**\/*.json". Pass false to disable. */
+  fixturesGlob?: string | false
 }
 
-const SIMULATOR_URL = "/@puzzmo-simulator-init.js"
-const VIRTUAL_ID = "virtual:puzzmo-simulator"
-const RESOLVED_VIRTUAL_ID = "\0" + VIRTUAL_ID
+const simulatorURL = "/@puzzmo-simulator-init.js"
+const virtualID = "virtual:puzzmo-simulator"
+
+export type GameInfo = {
+  /** Directory containing the puzzmo.json */
+  dir: string
+  slug: string
+  displayName: string
+  /** Vite-root-relative path to app bundle entry, if it exists */
+  appBundlePath: string | null
+}
+
+/** Discover all games from puzzmo.json files under a root directory. */
+export function discoverGames(viteRoot: string): Map<string, GameInfo> {
+  const games = new Map<string, GameInfo>()
+  const candidates = findPuzzmoJsonDirs(viteRoot, 3)
+  if (fs.existsSync(path.join(viteRoot, "puzzmo.json"))) {
+    candidates.unshift(viteRoot)
+  }
+  for (const dir of candidates) {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(dir, "puzzmo.json"), "utf-8"))
+      if (!data?.game?.slug) continue
+      const bundleEntry = path.join(dir, "src", "appBundle.js")
+      let appBundle: string | null = null
+      if (fs.existsSync(bundleEntry)) {
+        const relative = path.relative(viteRoot, bundleEntry)
+        appBundle = "/" + relative.split(path.sep).join("/")
+      }
+      games.set(data.game.slug, { dir, slug: data.game.slug, displayName: data.game.displayName, appBundlePath: appBundle })
+    } catch {
+      // skip invalid files
+    }
+  }
+  return games
+}
+
+/** Resolve which game a request belongs to using the referer URL */
+export function resolveGameFromReferer(referer: string | undefined, games: Map<string, GameInfo>, viteRoot: string): GameInfo | undefined {
+  if (referer) {
+    try {
+      const refPath = new URL(referer).pathname
+      for (const g of games.values()) {
+        const relDir = "/" + path.relative(viteRoot, g.dir).split(path.sep).join("/")
+        if (refPath.startsWith(relDir + "/") || refPath === relDir) return g
+      }
+    } catch {
+      // ignore malformed referer
+    }
+  }
+  if (games.size === 1) return games.values().next().value
+  return undefined
+}
+
+/** Generate the virtual module code for the simulator. */
+export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, game: GameInfo | undefined): string {
+  const { fixturesGlob: fixturesOpt, ...config } = options
+  const fixturesGlob = fixturesOpt === false ? null : (fixturesOpt ?? "/fixtures/puzzles/**/*.json")
+
+  const lines = [`import { createSimulator } from "@puzzmo/sdk/simulator"`]
+
+  if (fixturesGlob) {
+    lines.push(`const fixtures = import.meta.glob(${JSON.stringify(fixturesGlob)}, { eager: true })`)
+  }
+
+  if (game?.appBundlePath) {
+    lines.push(`import(${JSON.stringify(game.appBundlePath)}).then(m => {`)
+    lines.push(`  if (m.renderThumbnail) globalThis.renderThumbnail = m.renderThumbnail`)
+    lines.push(`}).catch(() => {})`)
+  }
+
+  const simConfig = { ...config, ...(game?.slug ? { slug: game.slug } : {}) }
+  const configEntries = Object.entries(simConfig).filter(([, v]) => v !== undefined)
+  const configParts = configEntries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+  if (fixturesGlob) configParts.push("fixtures")
+
+  lines.push(`createSimulator({ ${configParts.join(", ")} })`)
+
+  return lines.join("\n")
+}
 
 /** Vite plugin that injects the Puzzmo simulator in dev mode and handles OAuth callbacks. */
 export function puzzmoSimulator(options: PuzzmoSimulatorPluginOptions = {}): Plugin {
-  function generateCode(): string {
-    const { fixturesGlob, ...config } = options
-
-    const lines = [`import { createSimulator } from "@puzzmo/sdk/simulator"`]
-
-    if (fixturesGlob) {
-      lines.push(`const fixtures = import.meta.glob(${JSON.stringify(fixturesGlob)}, { eager: true })`)
-    }
-
-    const configEntries = Object.entries(config).filter(([, v]) => v !== undefined)
-    const configParts = configEntries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-    if (fixturesGlob) configParts.push("fixtures")
-
-    lines.push(`createSimulator({ ${configParts.join(", ")} })`)
-
-    return lines.join("\n")
-  }
+  let games = new Map<string, GameInfo>()
+  let viteRoot: string
 
   return {
     name: "puzzmo-simulator",
     apply: "serve",
 
-    // Virtual module used internally for code generation and transformation.
-    // Uses \0 prefix so Vite's HTML processor won't try to inline it.
+    configResolved(config: ResolvedConfig) {
+      viteRoot = config.root
+      games = discoverGames(viteRoot)
+
+      if (games.size === 0) {
+        config.logger.info(`\x1b[33m\x1b[1m  PUZZMO \x1b[22m\x1b[39m\x1b[2m no puzzmo.json files found\x1b[22m`)
+      } else {
+        const names = [...games.values()].map((g) => `\x1b[36m${g.slug}\x1b[39m`)
+        const label = games.size === 1 ? "game" : "games"
+        config.logger.info(`\x1b[33m\x1b[1m  PUZZMO \x1b[22m\x1b[39m found ${games.size} ${label}: ${names.join("\x1b[2m, \x1b[22m")}`)
+      }
+    },
+
     resolveId(id) {
-      if (id === VIRTUAL_ID) return RESOLVED_VIRTUAL_ID
+      if (id === virtualID || id.startsWith(virtualID + "?")) return "\0" + id
     },
 
     load(id) {
-      if (id === RESOLVED_VIRTUAL_ID) return generateCode()
+      if (!id.startsWith("\0" + virtualID)) return
+      const params = new URLSearchParams(id.split("?")[1] || "")
+      const gameSlug = params.get("game")
+      const game = gameSlug ? games.get(gameSlug) : games.size === 1 ? games.values().next().value : undefined
+      return generateSimulatorCode(options, game)
     },
 
     configureServer(server) {
@@ -65,26 +141,24 @@ window.location.href = url.toString();
 </script></body></html>`)
       })
 
-      // Serve the simulator init module. Registered before Vite's internal
-      // middleware so the SPA fallback doesn't intercept it.
+      // Serve the simulator init module, resolving the game from the referer
       server.middlewares.use(async (req, res, next) => {
-        if (req.url?.split("?")[0] !== SIMULATOR_URL) return next()
+        if (req.url?.split("?")[0] !== simulatorURL) return next()
 
-        const result = await server.transformRequest(VIRTUAL_ID)
+        const game = resolveGameFromReferer(req.headers.referer, games, viteRoot)
+        const moduleID = virtualID + (game ? `?game=${game.slug}` : "")
+        const result = await server.transformRequest(moduleID)
         if (!result) return next()
         res.setHeader("Content-Type", "application/javascript")
         res.end(result.code)
       })
     },
 
-    // Inject a script tag whose src the browser will fetch.
-    // The URL is NOT resolvable via resolveId (intentionally), so Vite's
-    // HTML processor won't inline it. The middleware above serves it instead.
     transformIndexHtml() {
       return [
         {
           tag: "script",
-          attrs: { type: "module", src: SIMULATOR_URL },
+          attrs: { type: "module", src: simulatorURL },
           injectTo: "head",
         },
       ]
@@ -143,3 +217,24 @@ export type EditorBundlePluginOptions = Partial<BundlePluginOptions>
 
 /** Vite plugin that produces dist/editor-bundle.js after the main build for editor-level integrations. */
 export const editorBundlePlugin = createBundlePlugin("editor-bundle", { entry: "src/editorBundle.js", outputFile: "editor-bundle.js" })
+
+/** Recursively find directories containing puzzmo.json, up to `maxDepth` levels deep. */
+export const findPuzzmoJsonDirs = (root: string, maxDepth: number, depth = 0): string[] => {
+  if (depth >= maxDepth) return []
+  const results: string[] = []
+  let entries: fs.Dirent[]
+  try {
+    entries = fs.readdirSync(root, { withFileTypes: true })
+  } catch {
+    return results
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name === "node_modules") continue
+    const dir = path.join(root, entry.name)
+    if (fs.existsSync(path.join(dir, "puzzmo.json"))) {
+      results.push(dir)
+    }
+    results.push(...findPuzzmoJsonDirs(dir, maxDepth, depth + 1))
+  }
+  return results
+}

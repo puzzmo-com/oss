@@ -92,7 +92,6 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
    export default defineConfig({
      plugins: [
        puzzmoSimulator({
-         slug: "my-game",
          fixturesGlob: "/fixtures/puzzles/**/*.json",
        }),
      ],

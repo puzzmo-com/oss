@@ -18,7 +18,7 @@ Set up the metadata and assets needed for the game to appear on Puzzmo.
    import { puzzmoSimulator, appBundlePlugin } from "@puzzmo/sdk/vite"
 
    export default defineConfig({
-     plugins: [puzzmoSimulator({ slug: "your-game-slug", fixturesGlob: "/fixtures/puzzles/**/*.json" }), appBundlePlugin()],
+     plugins: [puzzmoSimulator({ fixturesGlob: "/fixtures/puzzles/**/*.json" }), appBundlePlugin()],
      build: {
        outDir: "dist",
        assetsDir: "assets",

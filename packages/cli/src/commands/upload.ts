@@ -45,7 +45,7 @@ const formatBytes = (bytes: number): string => {
 }
 
 /** Uploads game build artifacts to Puzzmo */
-export const upload = async (gameSlug: string, dir: string) => {
+export const upload = async (dir: string) => {
   const token = getToken()
   if (!token) {
     console.error("Not logged in. Run `puzzmo login <token>` or set PUZZMO_TOKEN.")
@@ -87,6 +87,7 @@ export const upload = async (gameSlug: string, dir: string) => {
     process.exit(1)
   }
   const puzzmoFile = validation.data
+  const gameSlug = puzzmoFile.game.slug
 
   // Determine SHA
   const sha = getGitSHA() || hashFiles(files)

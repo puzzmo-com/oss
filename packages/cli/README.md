@@ -18,15 +18,15 @@ Save a CLI auth token. Generate one from studio.puzzmo.com.
 puzzmo login pzt-your-token-here
 ```
 
-### `puzzmo upload <slug> <dir>`
+### `puzzmo upload <dir>`
 
-Upload a game build directory to Puzzmo.
+Upload a game build directory to Puzzmo. The game slug is read from `puzzmo.json` in the build directory.
 
 ```bash
-puzzmo upload my-game dist/
+puzzmo upload dist/
 ```
 
-The command collects all files in the directory, computes a SHA from git (or file contents), and uploads them in batches.
+The command collects all files in the directory, validates the `puzzmo.json`, computes a SHA from git (or file contents), and uploads them in batches.
 
 ### `puzzmo game create [token]`
 

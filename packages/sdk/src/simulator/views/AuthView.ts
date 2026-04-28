@@ -1,5 +1,10 @@
 import type { SimulatorContext, SimulatorView } from "../types"
 
+const verbose = false
+const log = (...args: unknown[]) => {
+  if (verbose) console.log("[AuthView]", ...args)
+}
+
 // API mode storage
 const API_MODE_KEY = "puzzmo_sim_api_mode"
 const LOCAL_DEV_URL = "http://localhost:8911"
@@ -64,7 +69,7 @@ const storeAccessToken = (token: string) => localStorage.setItem(TOKEN_KEY, toke
 const storeRefreshToken = (token: string) => localStorage.setItem(REFRESH_TOKEN_KEY, token)
 const getAccessToken = (): string | null => {
   const token = localStorage.getItem(TOKEN_KEY)
-  console.log("[AuthView] getAccessToken:", { TOKEN_KEY, token: token ? `${token.substring(0, 20)}...` : null })
+  log("getAccessToken:", { TOKEN_KEY, token: token ? `${token.substring(0, 20)}...` : null })
   return token
 }
 const getRefreshToken = (): string | null => localStorage.getItem(REFRESH_TOKEN_KEY)
@@ -123,7 +128,7 @@ const isTokenExpired = (token: string): boolean => {
 const refreshAccessToken = async (): Promise<boolean> => {
   const refreshToken = getRefreshToken()
   if (!refreshToken) {
-    console.log("[AuthView] No refresh token available")
+    log("No refresh token available")
     return false
   }
 
@@ -145,14 +150,14 @@ const refreshAccessToken = async (): Promise<boolean> => {
     })
 
     if (!response.ok) {
-      console.error("[AuthView] Failed to refresh token:", response.statusText)
+      log("Failed to refresh token:", response.statusText)
       return false
     }
 
     const tokenResponse: TokenResponse = await response.json()
     const accessToken = tokenResponse.access_token || tokenResponse.accessToken
     if (!accessToken) {
-      console.error("[AuthView] No access token in refresh response")
+      log("No access token in refresh response")
       return false
     }
 
@@ -163,10 +168,10 @@ const refreshAccessToken = async (): Promise<boolean> => {
       storeRefreshToken(newRefreshToken)
     }
 
-    console.log("[AuthView] Successfully refreshed access token")
+    log("Successfully refreshed access token")
     return true
   } catch (error) {
-    console.error("[AuthView] Error refreshing token:", error)
+    log("Error refreshing token:", error)
     return false
   }
 }
@@ -176,7 +181,7 @@ const exchangeCodeForToken = async (code: string, state: string): Promise<TokenR
   const storedState = sessionStorage.getItem("oauth_state")
 
   if (!storedState || storedState !== state) {
-    console.error("OAuth state mismatch - possible CSRF attack")
+    log("OAuth state mismatch - possible CSRF attack")
     return null
   }
 
@@ -199,13 +204,13 @@ const exchangeCodeForToken = async (code: string, state: string): Promise<TokenR
     })
 
     if (!response.ok) {
-      console.error("Failed to exchange code for token:", response.statusText)
+      log("Failed to exchange code for token:", response.statusText)
       return null
     }
 
     return await response.json()
   } catch (error) {
-    console.error("Error exchanging code for token:", error)
+    log("Error exchanging code for token:", error)
     return null
   }
 }
@@ -221,7 +226,7 @@ const makeAuthenticatedRequest = async (query: string, variables: Record<string,
 
   // Check if token is expired and try to refresh
   if (isTokenExpired(token)) {
-    console.log("[AuthView] Access token expired, attempting refresh...")
+    log("Access token expired, attempting refresh...")
     const refreshed = await refreshAccessToken()
     if (refreshed) {
       token = getAccessToken()
@@ -255,15 +260,15 @@ const makeAuthenticatedRequest = async (query: string, variables: Record<string,
 // Decode JWT to get user info (basic decode, no verification)
 const decodeJWT = (token: string): { sub?: string; exp?: number; userID?: string } | null => {
   try {
-    console.log("[AuthView] decodeJWT input:", token)
+    log("decodeJWT input:", token)
     const parts = token.split(".")
-    console.log("[AuthView] JWT parts:", parts.length)
+    log("JWT parts:", parts.length)
     if (parts.length !== 3) return null
     const payload = JSON.parse(atob(parts[1]))
-    console.log("[AuthView] JWT payload:", payload)
+    log("JWT payload:", payload)
     return payload
   } catch (e) {
-    console.error("[AuthView] decodeJWT error:", e)
+    log("decodeJWT error:", e)
     return null
   }
 }
@@ -291,7 +296,7 @@ export function createAuthView(): SimulatorView {
         const hasRefreshToken = !!getRefreshToken()
         const refreshDecoded = hasRefreshToken ? decodeJWT(getRefreshToken()!) : null
         const refreshExpiresAt = refreshDecoded?.exp ? new Date(refreshDecoded.exp * 1000).toLocaleString() : null
-        console.log({ decoded })
+        log("decoded JWT:", decoded)
 
         return `
           <div class="simulator-section">
