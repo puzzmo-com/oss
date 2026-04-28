@@ -22,34 +22,71 @@ type CompleteResponse = { assetsBase: string; versionID: string; error?: string 
 /** Callback for reporting batch upload progress */
 export type UploadProgress = (batch: number, totalBatches: number, uploaded: number) => void
 
-/** Sends a JSON POST request */
-const jsonPost = async (url: string, token: string, body: object) => {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(`Server error (${res.status}): ${(json as any).error || "Unknown error"}`)
+/** Wraps fetch to surface the underlying network cause (DNS, ECONNREFUSED, TLS, etc.) */
+const fetchWithContext = async (url: string, init: RequestInit, step: string): Promise<Response> => {
+  try {
+    return await fetch(url, init)
+  } catch (e) {
+    const cause = (e as { cause?: unknown }).cause
+    const causeMsg = cause instanceof Error ? cause.message : cause ? String(cause) : (e as Error).message
+    throw new Error(`Network error during ${step} (${url}): ${causeMsg}`)
+  }
+}
+
+/** Reads a response body, parsing JSON when possible and including status + body in errors */
+const readResponse = async (res: Response, url: string, step: string) => {
+  const text = await res.text()
+  let json: unknown
+  try {
+    json = text ? JSON.parse(text) : {}
+  } catch {
+    if (!res.ok) {
+      const snippet = text.slice(0, 200).replace(/\s+/g, " ").trim()
+      throw new Error(`Server error during ${step} (${res.status} ${res.statusText} from ${url}): ${snippet || "no body"}`)
+    }
+    throw new Error(`Invalid JSON response during ${step} (${url}): ${text.slice(0, 200)}`)
+  }
+  if (!res.ok) {
+    const serverMsg = (json as { error?: string }).error || res.statusText || "Unknown error"
+    throw new Error(`Server error during ${step} (${res.status} from ${url}): ${serverMsg}`)
+  }
   return json
+}
+
+/** Sends a JSON POST request */
+const jsonPost = async (url: string, token: string, body: object, step: string) => {
+  const res = await fetchWithContext(
+    url,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    step,
+  )
+  return readResponse(res, url, step)
 }
 
 /** Uploads a single file as raw binary with filename in query param */
 const uploadFile = async (url: string, token: string, filePath: string, baseDir: string): Promise<FileResponse> => {
   const relativePath = path.relative(baseDir, filePath)
   const content = fs.readFileSync(filePath)
+  const step = `file upload (${relativePath})`
 
-  const res = await fetch(`${url}?name=${encodeURIComponent(relativePath)}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/octet-stream",
+  const fullURL = `${url}?name=${encodeURIComponent(relativePath)}`
+  const res = await fetchWithContext(
+    fullURL,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/octet-stream",
+      },
+      body: content,
     },
-    body: content,
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(`Server error (${res.status}): ${(json as any).error || "Unknown error"}`)
-  return json as FileResponse
+    step,
+  )
+  return (await readResponse(res, fullURL, step)) as FileResponse
 }
 
 /** Multi-step upload: init -> batched file uploads -> complete */
@@ -65,7 +102,7 @@ export const uploadFiles = async (
   const apiURL = getAPIURL()
 
   // Step 1: Init session (includes puzzmo.json metadata)
-  const init = (await jsonPost(`${apiURL}/cliUpload`, token, { gameSlug, sha, puzzmoFile })) as InitResponse
+  const init = (await jsonPost(`${apiURL}/cliUpload`, token, { gameSlug, sha, puzzmoFile }, "upload init")) as InitResponse
 
   // Step 2: Upload files in concurrent batches
   const fileURL = `${apiURL}/cliUpload/${init.sessionID}/file`
@@ -81,5 +118,5 @@ export const uploadFiles = async (
   }
 
   // Step 3: Complete
-  return (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {})) as CompleteResponse
+  return (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {}, "upload complete")) as CompleteResponse
 }

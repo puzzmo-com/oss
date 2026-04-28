@@ -15,6 +15,7 @@ export type PuzzmoSimulatorPluginOptions = {
 const simulatorURL = "/@puzzmo-simulator-init.js"
 const virtualID = "virtual:puzzmo-simulator"
 
+/** @internal */
 export type GameInfo = {
   /** Directory containing the puzzmo.json */
   dir: string
@@ -24,7 +25,10 @@ export type GameInfo = {
   appBundlePath: string | null
 }
 
-/** Discover all games from puzzmo.json files under a root directory. */
+/**
+ * Discover all games from puzzmo.json files under a root directory.
+ * @internal
+ */
 export function discoverGames(viteRoot: string): Map<string, GameInfo> {
   const games = new Map<string, GameInfo>()
   const candidates = findPuzzmoJsonDirs(viteRoot, 3)
@@ -49,7 +53,10 @@ export function discoverGames(viteRoot: string): Map<string, GameInfo> {
   return games
 }
 
-/** Resolve which game a request belongs to using the referer URL */
+/**
+ * Resolve which game a request belongs to using the referer URL.
+ * @internal
+ */
 export function resolveGameFromReferer(referer: string | undefined, games: Map<string, GameInfo>, viteRoot: string): GameInfo | undefined {
   if (referer) {
     try {
@@ -66,7 +73,10 @@ export function resolveGameFromReferer(referer: string | undefined, games: Map<s
   return undefined
 }
 
-/** Generate the virtual module code for the simulator. */
+/**
+ * Generate the virtual module code for the simulator.
+ * @internal
+ */
 export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, game: GameInfo | undefined): string {
   const { fixturesGlob: fixturesOpt, ...config } = options
   const fixturesGlob = fixturesOpt === false ? null : (fixturesOpt ?? "/fixtures/puzzles/**/*.json")
@@ -218,7 +228,10 @@ export type EditorBundlePluginOptions = Partial<BundlePluginOptions>
 /** Vite plugin that produces dist/editor-bundle.js after the main build for editor-level integrations. */
 export const editorBundlePlugin = createBundlePlugin("editor-bundle", { entry: "src/editorBundle.js", outputFile: "editor-bundle.js" })
 
-/** Recursively find directories containing puzzmo.json, up to `maxDepth` levels deep. */
+/**
+ * Recursively find directories containing puzzmo.json, up to `maxDepth` levels deep.
+ * @internal
+ */
 export const findPuzzmoJsonDirs = (root: string, maxDepth: number, depth = 0): string[] => {
   if (depth >= maxDepth) return []
   const results: string[] = []

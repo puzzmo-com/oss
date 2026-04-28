@@ -64,5 +64,9 @@ const run = async () => {
 
 run().catch((err) => {
   console.error(err.message || err)
+  if (err && err.cause) {
+    const cause = err.cause
+    console.error(`Caused by: ${cause instanceof Error ? cause.message : cause}`)
+  }
   process.exit(1)
 })
