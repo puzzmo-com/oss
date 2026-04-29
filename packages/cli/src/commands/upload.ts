@@ -7,45 +7,13 @@ import { uploadFiles } from "../util/api.js"
 import { getAPIURL, getToken } from "../util/config.js"
 import { validatePuzzmoJson } from "../util/validatePuzzmoFile.js"
 
-/** Collects all files in a directory recursively */
-const collectFiles = (dir: string): string[] => {
-  const entries = fs.readdirSync(dir, { withFileTypes: true })
-  const files: string[] = []
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) files.push(...collectFiles(full))
-    else files.push(full)
-  }
-  return files
-}
-
-/** Tries to get the shortest unique git SHA, returns null if not in a git repo */
-const getGitSHA = (): string | null => {
-  try {
-    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim()
-  } catch {
-    return null
-  }
-}
-
-/** Hashes all file contents to produce a deterministic SHA */
-const hashFiles = (filePaths: string[]): string => {
-  const hash = crypto.createHash("sha256")
-  for (const fp of filePaths.sort()) {
-    hash.update(fs.readFileSync(fp))
-  }
-  return hash.digest("hex").slice(0, 12)
-}
-
-/** Formats a byte count as a human-readable string */
-const formatBytes = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+type UploadOptions = {
+  verbose?: boolean
 }
 
 /** Uploads game build artifacts to Puzzmo */
-export const upload = async (dir: string) => {
+export const upload = async (dir: string, options: UploadOptions = {}) => {
+  const { verbose = false } = options
   const token = getToken()
   if (!token) {
     console.error("Not logged in. Run `puzzmo login <token>` or set PUZZMO_TOKEN.")
@@ -111,10 +79,56 @@ export const upload = async (dir: string) => {
   if (apiURL !== defaultURL) console.log(`Uploading to ${apiURL}...`)
   else console.log("Uploading...")
 
-  const result = await uploadFiles(token, gameSlug, sha, files, distDir, puzzmoFile, (batch, totalBatches, uploaded) => {
-    console.log(`  Batch ${batch}/${totalBatches} done (${uploaded} file(s) uploaded)`)
-  })
+  const result = await uploadFiles(
+    token,
+    gameSlug,
+    sha,
+    files,
+    distDir,
+    puzzmoFile,
+    (batch, totalBatches, uploaded) => {
+      console.log(`  Batch ${batch}/${totalBatches} done (${uploaded} file(s) uploaded)`)
+    },
+    { verbose },
+  )
 
   console.log(`\nDone - ${result.versionID}`)
   console.log(`Assets: ${result.assetsBase}`)
+}
+
+/** Collects all files in a directory recursively */
+const collectFiles = (dir: string): string[] => {
+  const entries = fs.readdirSync(dir, { withFileTypes: true })
+  const files: string[] = []
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) files.push(...collectFiles(full))
+    else files.push(full)
+  }
+  return files
+}
+
+/** Tries to get the shortest unique git SHA, returns null if not in a git repo */
+const getGitSHA = (): string | null => {
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim()
+  } catch {
+    return null
+  }
+}
+
+/** Hashes all file contents to produce a deterministic SHA */
+const hashFiles = (filePaths: string[]): string => {
+  const hash = crypto.createHash("sha256")
+  for (const fp of filePaths.sort()) {
+    hash.update(fs.readFileSync(fp))
+  }
+  return hash.digest("hex").slice(0, 12)
+}
+
+/** Formats a byte count as a human-readable string */
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
