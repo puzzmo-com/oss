@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { agentTest } from "./commands/agent-test.js"
 import { login } from "./commands/login.js"
 import { upload } from "./commands/upload.js"
 import { validate } from "./commands/validate.js"
@@ -55,6 +56,10 @@ const run = async () => {
     }
     case "migrate": {
       await migrate()
+      break
+    }
+    case "agent-test": {
+      await agentTest()
       break
     }
     default:

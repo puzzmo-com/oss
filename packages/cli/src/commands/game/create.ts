@@ -3,6 +3,7 @@ import path from "node:path"
 import { createRequire } from "node:module"
 import * as p from "@clack/prompts"
 
+import { agentNames } from "../../agents/index.js"
 import { detectAgent } from "../../wizard/agent-detect.js"
 import { downloadPage } from "../../download/page-downloader.js"
 import { runCommand, gitCommit } from "../../util/exec.js"
@@ -260,10 +261,11 @@ export const gameCreate = async (args: string[]) => {
     gameDir = setupRepoGame(tmpDir, slug, repo.repoRoot, parentFolder)
   }
 
-  // Step 7: Detect agent and run skills pipeline
-  const agents = detectAgent()
+  // Step 7: Detect agent and run skills pipeline. Only offer CLIs we have an adapter for.
+  const supported = new Set(agentNames())
+  const agents = detectAgent().filter((a) => supported.has(a.id))
   const agentChoices = [
-    ...agents.map((a) => ({ value: a.binary, label: `${a.displayName} (${a.path})` })),
+    ...agents.map((a) => ({ value: a.id, label: `${a.displayName} (${a.path})` })),
     { value: "none", label: "None - I'll run the steps manually" },
   ]
 
@@ -274,7 +276,7 @@ export const gameCreate = async (args: string[]) => {
     selectedAgent = (await p.select({ message: "Which LLM agent do you use?", options: agentChoices })) as string
     if (p.isCancel(selectedAgent)) process.exit(0)
   } else {
-    p.log.info("No LLM agents detected (checked: claude, codex)")
+    p.log.info(`No supported LLM agents detected (checked: ${agentNames().join(", ")})`)
     selectedAgent = "none"
   }
 

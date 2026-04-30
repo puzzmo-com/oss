@@ -1,25 +1,24 @@
-import { spawn, type ChildProcess } from "node:child_process"
+import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
-import { execSync } from "node:child_process"
-
+import { getAgent, type Agent, type AgentEvent } from "../agents/index.js"
 import { skillsPipeline } from "../skills/registry.js"
 import { fetchSkillPrompt } from "../skills/mcp-client.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
 type Phase = "agent" | "build" | "commit" | "idle"
 
-// ANSI escape helpers
 const ESC = "\x1b"
 const CSI = `${ESC}[`
 const moveTo = (row: number, col: number) => `${CSI}${row};${col}H`
 const clearScreen = () => `${CSI}2J`
 const hideCursor = () => `${CSI}?25l`
 const showCursor = () => `${CSI}?25h`
-const bold = (s: string) => `${CSI}1m${s}${CSI}0m`
-const dim = (s: string) => `${CSI}2m${s}${CSI}0m`
-const fg = (code: number, s: string) => `${CSI}${code}m${s}${CSI}0m`
+const reset = () => `${CSI}0m`
+const bold = (s: string) => `${CSI}1m${s}${reset()}`
+const dim = (s: string) => `${CSI}2m${s}${reset()}`
+const fg = (code: number, s: string) => `${CSI}${code}m${s}${reset()}`
 
 const green = (s: string) => fg(32, s)
 const yellow = (s: string) => fg(33, s)
@@ -51,32 +50,43 @@ const phaseColor: Record<Phase, (s: string) => string> = {
   idle: gray,
 }
 
-/** Build agent-specific command for non-interactive mode */
-const buildAgentCmd = (agent: string, prompt: string): { cmd: string; args: string[] } => {
-  if (agent === "claude") return { cmd: "claude", args: ["-p", "--verbose", "--output-format", "stream-json", prompt] }
-  if (agent === "codex") return { cmd: "codex", args: ["--quiet", prompt] }
-  return { cmd: agent, args: [prompt] }
-}
+const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g
+const stripAnsi = (s: string) => s.replace(ANSI_RE, "")
 
-/** Fetches step instructions from the MCP server and wraps them as an agent prompt */
 const buildPrompt = async (stepName: string, gameDir: string, repoContext: string): Promise<string> => {
   const instructions = await fetchSkillPrompt(stepName, gameDir)
   return `Follow these instructions. The game source is in the current directory.\n\n${repoContext}\n\n${instructions}`
 }
 
+/** Format a non-streaming event into discrete lines. text/thinking are handled
+ *  separately by appendText so token deltas merge into one in-progress line. */
+const formatDiscreteEvent = (e: AgentEvent): string[] => {
+  if (e.type === "tool_use") return [`${yellow(e.name)} ${dim(e.summary)}`]
+  if (e.type === "tool_result") return [(e.ok ? green("  ✓ ") : red("  ✗ ")) + dim(e.summary)]
+  if (e.type === "system") return [dim(e.text)]
+  if (e.type === "result") {
+    const cost = e.costUSD != null ? ` ($${e.costUSD.toFixed(4)})` : ""
+    return [(e.ok ? green : red)(`Done${cost}`)]
+  }
+  if (e.type === "error") return [red(`Error: ${e.message}`)]
+  return []
+}
+
 class PipelineTUI {
   private states: StepState[]
   private currentStep = 0
-  private outputLines: string[] = []
-  private chatLines: string[] = []
   private phase: Phase = "idle"
   private done = false
-  private activeProc: ChildProcess | null = null
+  private outputLines: string[] = []
+  private currentLine = ""
+  private chatLines: string[] = []
+  private renderScheduled = false
   private sidebarWidth = 30
   private logsDir: string
+  private abortController: AbortController | null = null
 
   constructor(
-    private agent: string,
+    private agent: Agent,
     private gameDir: string,
     private repoContext: string,
   ) {
@@ -93,7 +103,11 @@ class PipelineTUI {
     return process.stdout.columns || 80
   }
 
-  private get maxOutputLines(): number {
+  private get outputWidth(): number {
+    return Math.max(this.cols - this.sidebarWidth - 1, 20)
+  }
+
+  private get contentRows(): number {
     return Math.max(this.rows - 4, 8)
   }
 
@@ -101,38 +115,75 @@ class PipelineTUI {
     process.stdout.write(s)
   }
 
-  /** Draw the entire screen */
+  private scheduleRender() {
+    if (this.renderScheduled) return
+    this.renderScheduled = true
+    setImmediate(() => {
+      this.renderScheduled = false
+      this.render()
+    })
+  }
+
+  /** Lock the in-progress streaming line as a complete entry. */
+  private lockCurrent() {
+    if (this.currentLine.length === 0) return
+    this.outputLines.push(this.currentLine)
+    this.chatLines.push(stripAnsi(this.currentLine))
+    this.currentLine = ""
+  }
+
+  /** Append streaming text. Newlines lock the in-progress line; the trailing
+   *  fragment continues as the in-progress line. Optional styler wraps each
+   *  fragment in ANSI codes (e.g. gray() for thinking). */
+  private appendText(text: string, styler?: (s: string) => string) {
+    if (text.length === 0) return
+    const parts = text.split("\n")
+    this.currentLine += styler ? styler(parts[0]) : parts[0]
+    for (let i = 1; i < parts.length; i++) {
+      this.lockCurrent()
+      this.currentLine = styler ? styler(parts[i]) : parts[i]
+    }
+    if (this.outputLines.length > 1000) this.outputLines = this.outputLines.slice(-this.contentRows * 4)
+    this.scheduleRender()
+  }
+
+  /** Append discrete pre-formatted lines (each becomes its own row). Locks any
+   *  in-progress streaming line first so token streams don't bleed into a
+   *  following tool_use marker. */
+  private appendLines(lines: string[]) {
+    if (lines.length === 0) return
+    this.lockCurrent()
+    for (const line of lines) {
+      this.outputLines.push(line)
+      this.chatLines.push(stripAnsi(line))
+    }
+    if (this.outputLines.length > 1000) this.outputLines = this.outputLines.slice(-this.contentRows * 4)
+    this.scheduleRender()
+  }
+
   private render() {
-    const { rows, cols, sidebarWidth } = this
-    const outputWidth = cols - sidebarWidth - 1
+    const { rows, sidebarWidth, outputWidth, contentRows } = this
     let buf = ""
 
     buf += clearScreen()
     buf += moveTo(1, 1)
 
-    // Top border
     buf += "╭" + "─".repeat(sidebarWidth - 2) + "┬" + "─".repeat(outputWidth) + "╮"
 
-    // Sidebar header
     buf += moveTo(2, 1)
     buf += "│ " + bold("Migration Steps") + " ".repeat(Math.max(0, sidebarWidth - 18)) + "│"
 
-    // Output panel header
     const headerLabel = this.done ? "Done" : `${skillsPipeline[this.currentStep]?.name ?? ""} ${dim(`(${this.phase})`)}`
-    const headerColor = phaseColor[this.phase]
-    buf += " " + headerColor(bold(headerLabel))
-    buf += " ".repeat(Math.max(0, outputWidth - this.stripAnsi(headerLabel).length - 1)) + "│"
+    const styledHeader = phaseColor[this.phase](bold(headerLabel))
+    const headerVisible = stripAnsi(headerLabel).length
+    buf += " " + styledHeader + " ".repeat(Math.max(0, outputWidth - headerVisible - 1)) + "│"
 
-    // Separator
     buf += moveTo(3, 1)
     buf += "├" + "─".repeat(sidebarWidth - 2) + "┼" + "─".repeat(outputWidth) + "┤"
 
-    // Content rows
-    const contentRows = rows - 4 // top border + header + separator + bottom border
     for (let row = 0; row < contentRows; row++) {
       buf += moveTo(row + 4, 1)
 
-      // Sidebar column
       const skillIndex = row
       if (skillIndex < skillsPipeline.length) {
         const skill = skillsPipeline[skillIndex]
@@ -142,10 +193,9 @@ class PipelineTUI {
         const colorFn = stateColor[state]
         const label = `${icon} ${skill.name}`
         const styled = isActive ? bold(colorFn(label)) : colorFn(label)
-        const rawLen = this.stripAnsi(styled).length
+        const rawLen = stripAnsi(styled).length
         buf += "│ " + styled + " ".repeat(Math.max(0, sidebarWidth - rawLen - 3)) + "│"
       } else if (skillIndex === skillsPipeline.length + 1) {
-        // Status line
         const completedCount = this.states.filter((s) => s === "success").length
         const failedCount = this.states.filter((s) => s === "failed").length
         const status = this.done
@@ -153,248 +203,74 @@ class PipelineTUI {
             ? red(`${failedCount} failure(s)`)
             : green("All complete!")
           : dim(`${completedCount}/${skillsPipeline.length} done`)
-        const rawLen = this.stripAnsi(status).length
+        const rawLen = stripAnsi(status).length
         buf += "│ " + status + " ".repeat(Math.max(0, sidebarWidth - rawLen - 3)) + "│"
       } else {
         buf += "│" + " ".repeat(sidebarWidth - 2) + "│"
       }
 
-      // Output column
-      const lineIndex = this.outputLines.length - contentRows + row
-      const line = lineIndex >= 0 ? (this.outputLines[lineIndex] ?? "") : ""
-      const truncated = this.truncateVisible(line, outputWidth - 2)
-      const visibleLen = this.stripAnsi(truncated).length
+      const visibleCount = this.outputLines.length + (this.currentLine.length > 0 ? 1 : 0)
+      const lineIndex = visibleCount - contentRows + row
+      const rawLine = lineIndex < 0 ? "" : lineIndex < this.outputLines.length ? (this.outputLines[lineIndex] ?? "") : this.currentLine
+      const truncated = truncateVisible(rawLine, outputWidth - 2)
+      const visibleLen = stripAnsi(truncated).length
       buf += " " + truncated + " ".repeat(Math.max(0, outputWidth - visibleLen - 1)) + "│"
     }
 
-    // Bottom border
     buf += moveTo(rows, 1)
     buf += "╰" + "─".repeat(sidebarWidth - 2) + "┴" + "─".repeat(outputWidth) + "╯"
 
     this.write(buf)
   }
 
-  /** Strip ANSI escape codes for length calculation */
-  private stripAnsi(s: string): string {
-    // oxlint-disable-next-line no-control-regex
-    return s.replace(/\x1b\[[0-9;]*m/g, "")
-  }
-
-  /** Truncate a string to a visible width, preserving ANSI codes */
-  private truncateVisible(s: string, maxWidth: number): string {
-    let visible = 0
-    let i = 0
-    while (i < s.length && visible < maxWidth) {
-      if (s[i] === "\x1b" && s[i + 1] === "[") {
-        const end = s.indexOf("m", i)
-        if (end !== -1) {
-          i = end + 1
+  private async runAgent(prompt: string): Promise<boolean> {
+    this.abortController = new AbortController()
+    let sawError = false
+    let resultOk: boolean | null = null
+    try {
+      for await (const event of this.agent.run({ prompt, cwd: this.gameDir, signal: this.abortController.signal })) {
+        if (event.type === "error") sawError = true
+        if (event.type === "result") resultOk = event.ok
+        if (event.type === "text") {
+          this.appendText(event.text)
           continue
         }
-      }
-      visible++
-      i++
-    }
-    // Include any trailing ANSI sequences (like reset codes) right after the cut point
-    while (i < s.length && s[i] === "\x1b" && s[i + 1] === "[") {
-      const end = s.indexOf("m", i)
-      if (end !== -1) {
-        i = end + 1
-      } else break
-    }
-    return s.slice(0, i)
-  }
-
-  /** Parse stream-json output from claude, or plain text from other agents */
-  private appendOutput(text: string) {
-    const rawLines = text.split("\n").filter((l) => l.trim())
-    for (const line of rawLines) {
-      const parsed = this.parseStreamLine(line)
-      if (parsed) {
-        for (const displayLine of parsed.split("\n")) {
-          this.outputLines.push(displayLine)
-          this.chatLines.push(this.stripAnsi(displayLine))
+        if (event.type === "thinking") {
+          this.appendText(event.text, gray)
+          continue
         }
+        const lines = formatDiscreteEvent(event)
+        if (lines.length > 0) this.appendLines(lines)
       }
+    } catch (e: any) {
+      this.appendLines([red(`Error: ${e.message ?? e}`)])
+      return false
+    } finally {
+      this.abortController = null
     }
-    // Keep display buffer bounded, but chatLines grows unbounded per skill
-    if (this.outputLines.length > 500) {
-      this.outputLines = this.outputLines.slice(-this.maxOutputLines)
-    }
-    this.render()
+    this.lockCurrent()
+    if (resultOk != null) return resultOk
+    return !sawError
   }
 
-  /** Format a tool use block into a display line */
-  private formatToolUse(t: any): string {
-    const name = t.name ?? "unknown"
-    if (name === "Edit") return `${yellow("Edit")} ${t.input?.file_path ?? ""}`
-    if (name === "Write") return `${yellow("Write")} ${t.input?.file_path ?? ""}`
-    if (name === "Read") return `${yellow("Read")} ${t.input?.file_path ?? ""}`
-    if (name === "Bash") return `${yellow("Bash")} ${t.input?.command ?? ""}`
-    if (name === "Glob") return `${yellow("Glob")} ${t.input?.pattern ?? ""}`
-    if (name === "Grep") return `${yellow("Grep")} ${t.input?.pattern ?? ""}`
-    return `${yellow(name)}`
-  }
-
-  /** Extract human-readable text from a stream-json line, or pass through raw text */
-  private parseStreamLine(line: string): string | null {
-    try {
-      const obj = JSON.parse(line)
-
-      // Assistant messages - may contain text, tool_use, thinking, or a mix
-      if (obj.type === "assistant" && obj.message?.content) {
-        const content = obj.message.content as any[]
-        const parts: string[] = []
-
-        const texts = content.filter((c) => c.type === "text").map((c) => c.text)
-        if (texts.length > 0) parts.push(texts.join(""))
-
-        const toolUses = content.filter((c) => c.type === "tool_use")
-        if (toolUses.length > 0) parts.push(toolUses.map((t) => this.formatToolUse(t)).join("\n"))
-
-        // Thinking blocks - skip silently, they're just internal reasoning
-        if (parts.length > 0) return parts.join("\n")
-        if (content.some((c) => c.type === "thinking")) return null
-        return null
-      }
-
-      // Content block delta (streaming text chunks)
-      if (obj.type === "content_block_delta" && obj.delta?.text) {
-        return obj.delta.text
-      }
-
-      // Standalone tool use event
-      if (obj.type === "tool_use") {
-        return this.formatToolUse(obj)
-      }
-
-      // User messages (tool results coming back)
-      if (obj.type === "user") {
-        const content = obj.message?.content as any[] | undefined
-        if (!content) return null
-        // Show file create/update results
-        const result = obj.tool_use_result
-        if (result?.type === "create") return dim(`Created ${result.filePath}`)
-        if (result?.type === "update") return dim(`Updated ${result.filePath}`)
-        return null
-      }
-
-      // Rate limit events - suppress
-      if (obj.type === "rate_limit_event") return null
-
-      // Tool results
-      if (obj.type === "result") {
-        const cost = obj.cost_usd ? ` ($${obj.cost_usd.toFixed(4)})` : ""
-        return green(`Done${cost}`)
-      }
-
-      // System messages
-      if (obj.type === "system") {
-        if (obj.subtype === "init") return dim(`Session started`)
-        if (obj.subtype === "hook_started") return null
-        if (obj.subtype === "hook_response") return null
-        if (obj.subtype === "task_started") return dim(`Subagent: ${obj.description ?? "started"}`)
-        if (obj.subtype === "task_progress")
-          return dim(`  ${obj.last_tool_name ?? "working"}${obj.description ? ": " + obj.description : ""}`)
-        if (obj.subtype === "task_notification")
-          return obj.status === "completed"
-            ? dim(`Subagent done: ${obj.summary ?? ""}`)
-            : dim(`Subagent ${obj.status ?? "update"}: ${obj.summary ?? ""}`)
-        return dim(`[system:${obj.subtype}]`)
-      }
-
-      // Show unrecognized types so we can add support
-      return dim(`[${obj.type}${obj.subtype ? ":" + obj.subtype : ""}]`)
-    } catch {
-      // Not JSON - show as-is
-      return line
-    }
-  }
-
-  /** Run a shell command, capturing output into the TUI panel */
   private runCmd(cmd: string): { success: boolean; output: string } {
     try {
       const output = execSync(cmd, { cwd: this.gameDir, encoding: "utf-8", stdio: "pipe" })
-      if (output.trim()) this.appendOutput(output.trim())
+      if (output.trim()) this.appendLines(output.trim().split("\n"))
       return { success: true, output }
     } catch (e: any) {
       const output = (e.stdout || "") + (e.stderr || "") || e.message
-      if (output.trim()) this.appendOutput(output.trim())
+      if (output.trim()) this.appendLines(output.trim().split("\n"))
       return { success: false, output }
     }
   }
 
-  /** Spawn agent and stream output */
-  private runAgent(prompt: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      const { cmd, args } = buildAgentCmd(this.agent, prompt)
-      const env: Record<string, string | undefined> = { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" }
-      // Remove env vars that prevent nested claude sessions
-      delete env.CLAUDECODE
-      const proc = spawn(cmd, args, {
-        cwd: this.gameDir,
-        env,
-        stdio: ["ignore", "pipe", "pipe"],
-      })
-
-      this.activeProc = proc
-      let resolved = false
-      let gotResult = false
-      const debugLog = path.join(this.gameDir, "pipeline-debug.log")
-
-      const finish = (success: boolean) => {
-        if (resolved) return
-        resolved = true
-        this.activeProc = null
-        resolve(success)
-      }
-
-      proc.stdout?.on("data", (data: Buffer) => {
-        const text = data.toString()
-        fs.appendFileSync(debugLog, text)
-        this.appendOutput(text)
-
-        // Detect the result event in stream-json - the agent is done
-        if (!gotResult) {
-          for (const line of text.split("\n")) {
-            try {
-              const obj = JSON.parse(line)
-              if (obj.type === "result") {
-                gotResult = true
-                // Give the process a moment to exit cleanly, then force-resolve
-                setTimeout(() => {
-                  if (!resolved) {
-                    proc.kill()
-                    finish(true)
-                  }
-                }, 3000)
-              }
-            } catch {}
-          }
-        }
-      })
-      proc.stderr?.on("data", (data: Buffer) => {
-        fs.appendFileSync(debugLog, `[stderr] ${data.toString()}`)
-        this.appendOutput(data.toString())
-      })
-
-      proc.on("close", (code) => {
-        fs.appendFileSync(debugLog, `\n[close] code=${code}\n`)
-        finish(gotResult || code === 0)
-      })
-      proc.on("error", (err) => {
-        this.appendOutput(`Error: ${err.message}`)
-        finish(false)
-      })
-    })
-  }
-
-  /** Run one pipeline step */
   private async runStep(stepIndex: number): Promise<boolean> {
     const skill = skillsPipeline[stepIndex]
     this.states[stepIndex] = "running"
     this.currentStep = stepIndex
     this.outputLines = []
+    this.currentLine = ""
     this.chatLines = []
     this.phase = "agent"
     this.render()
@@ -403,54 +279,45 @@ class PipelineTUI {
     try {
       prompt = await buildPrompt(skill.name, this.gameDir, this.repoContext)
     } catch (e: any) {
-      this.appendOutput(`Failed to fetch instructions: ${e.message}`)
+      this.appendLines([red(`Failed to fetch instructions: ${e.message}`)])
       this.writeSkillLog(skill.name)
       this.states[stepIndex] = "failed"
-      this.render()
       return false
     }
 
     let success = await this.runAgent(prompt)
-
     if (!success) {
-      this.appendOutput("\n--- Retrying ---\n")
+      this.appendLines(["", dim("--- Retrying ---")])
       success = await this.runAgent(prompt)
       if (!success) {
         this.writeSkillLog(skill.name)
         this.states[stepIndex] = "failed"
-        this.render()
         return false
       }
     }
 
-    // Verify build
     this.phase = "build"
     this.render()
-    this.appendOutput("Verifying build...")
+    this.appendLines([dim("Verifying build...")])
     const buildResult = this.runCmd("npx vite build")
     if (!buildResult.success) {
-      this.appendOutput("Asking agent to fix...")
+      this.appendLines([dim("Asking agent to fix...")])
       const fixPrompt = `The vite build failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.output}`
       await this.runAgent(fixPrompt)
-
       const retry = this.runCmd("npx vite build")
       if (!retry.success) {
         this.writeSkillLog(skill.name)
         this.states[stepIndex] = "failed"
-        this.render()
         return false
       }
     }
 
-    // Commit
     this.phase = "commit"
     this.render()
     this.runCmd("git add -A")
     const commitResult = this.runCmd(`git commit -m "step: ${skill.name}"`)
-    if (commitResult.success) this.appendOutput("Committed.")
-    else this.appendOutput("No changes to commit.")
+    this.appendLines([dim(commitResult.success ? "Committed." : "No changes to commit.")])
 
-    // Write chat log for this skill
     this.writeSkillLog(skill.name)
 
     this.states[stepIndex] = "success"
@@ -458,22 +325,18 @@ class PipelineTUI {
     return true
   }
 
-  /** Writes the collected chat lines for a skill to a log file */
   private writeSkillLog(skillName: string) {
     const logPath = path.join(this.logsDir, `${skillName}.txt`)
     fs.writeFileSync(logPath, this.chatLines.join("\n") + "\n")
   }
 
-  /** Set up keyboard handling (Ctrl+C to quit) */
   private setupInput() {
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true)
-    }
+    if (process.stdin.isTTY) process.stdin.setRawMode(true)
     process.stdin.resume()
     process.stdin.on("data", (data: Buffer) => {
       // Ctrl+C
       if (data[0] === 3) {
-        if (this.activeProc) this.activeProc.kill()
+        this.abortController?.abort()
         this.cleanup()
         process.exit(0)
       }
@@ -482,25 +345,21 @@ class PipelineTUI {
 
   private cleanup() {
     this.write(showCursor())
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(false)
-    }
+    if (process.stdin.isTTY) process.stdin.setRawMode(false)
     process.stdin.pause()
   }
 
-  /** Run the full pipeline */
   async run() {
     this.write(hideCursor())
     this.setupInput()
     this.render()
 
-    // Redraw on terminal resize
     process.stdout.on("resize", () => this.render())
 
     for (let i = 0; i < skillsPipeline.length; i++) {
       const ok = await this.runStep(i)
       if (!ok) {
-        this.appendOutput("\nPipeline stopped due to failure.")
+        this.appendLines(["", red("Pipeline stopped due to failure.")])
         break
       }
     }
@@ -512,8 +371,32 @@ class PipelineTUI {
   }
 }
 
-/** Render the pipeline TUI and wait for it to complete */
-export const runPipelineTUI = async (agent: string, gameDir: string, repoContext: string): Promise<void> => {
+/** Truncate a string to a visible width, preserving ANSI codes. */
+const truncateVisible = (s: string, maxWidth: number): string => {
+  let visible = 0
+  let i = 0
+  while (i < s.length && visible < maxWidth) {
+    if (s[i] === "\x1b" && s[i + 1] === "[") {
+      const end = s.indexOf("m", i)
+      if (end !== -1) {
+        i = end + 1
+        continue
+      }
+    }
+    visible++
+    i++
+  }
+  while (i < s.length && s[i] === "\x1b" && s[i + 1] === "[") {
+    const end = s.indexOf("m", i)
+    if (end !== -1) i = end + 1
+    else break
+  }
+  return s.slice(0, i)
+}
+
+export const runPipelineTUI = async (agentName: string, gameDir: string, repoContext: string): Promise<void> => {
+  const agent = getAgent(agentName)
+  if (!agent) throw new Error(`Unknown agent: ${agentName}`)
   const tui = new PipelineTUI(agent, gameDir, repoContext)
   await tui.run()
 }
