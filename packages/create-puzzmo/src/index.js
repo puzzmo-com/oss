@@ -2,8 +2,11 @@
 
 import { spawnSync } from "node:child_process"
 import { get } from "node:https"
-// Forward all args to `puzzmo game create`
-const args = process.argv.slice(2)
+// Forward all args to `puzzmo game create`. Users naturally type `npm create puzzmo game`,
+// which would forward as `puzzmo game create game ...` — drop a leading "game" so we don't
+// pass it through redundantly.
+const rawArgs = process.argv.slice(2)
+const args = rawArgs[0] === "game" ? rawArgs.slice(1) : rawArgs
 
 // Detect the package manager that invoked this script
 const pm = detectPackageManager()
