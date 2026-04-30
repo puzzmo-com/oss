@@ -59,9 +59,13 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
 
   // Determine SHA
   const sha = getGitSHA() || hashFiles(files)
+  const description = getGitMessage()
+  const repoURL = getGitRepoURL()
 
   console.log(`\nUploading ${gameSlug} (${sha.slice(0, 8)})`)
   console.log(`Directory: ${distDir}`)
+  if (description) console.log(`Message: ${description}`)
+  if (repoURL) console.log(`Repo: ${repoURL}`)
   console.log("")
 
   let totalBytes = 0
@@ -89,7 +93,7 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     (batch, totalBatches, uploaded) => {
       console.log(`  Batch ${batch}/${totalBatches} done (${uploaded} file(s) uploaded)`)
     },
-    { verbose },
+    { verbose, description, repoURL },
   )
 
   console.log(`\nDone - ${result.versionID}`)
@@ -115,6 +119,38 @@ const getGitSHA = (): string | null => {
   } catch {
     return null
   }
+}
+
+/** Gets the subject line of the latest commit, or null if not in a git repo */
+const getGitMessage = (): string | null => {
+  try {
+    return execSync("git log -1 --pretty=%s", { encoding: "utf-8" }).trim() || null
+  } catch {
+    return null
+  }
+}
+
+/** Gets the origin remote URL normalized to https, or null if unavailable */
+const getGitRepoURL = (): string | null => {
+  try {
+    const raw = execSync("git config --get remote.origin.url", { encoding: "utf-8" }).trim()
+    return raw ? normalizeRepoURL(raw) : null
+  } catch {
+    return null
+  }
+}
+
+/** Converts SSH-style git URLs to https; strips trailing .git */
+const normalizeRepoURL = (url: string): string => {
+  let normalized = url
+  // git@host:owner/repo(.git) -> https://host/owner/repo
+  const sshMatch = normalized.match(/^git@([^:]+):(.+)$/)
+  if (sshMatch) normalized = `https://${sshMatch[1]}/${sshMatch[2]}`
+  // ssh://git@host/owner/repo(.git) -> https://host/owner/repo
+  else if (normalized.startsWith("ssh://")) normalized = normalized.replace(/^ssh:\/\/(?:[^@]+@)?/, "https://")
+  // git://host/owner/repo(.git) -> https://host/owner/repo
+  else if (normalized.startsWith("git://")) normalized = normalized.replace(/^git:\/\//, "https://")
+  return normalized.replace(/\.git$/, "")
 }
 
 /** Hashes all file contents to produce a deterministic SHA */

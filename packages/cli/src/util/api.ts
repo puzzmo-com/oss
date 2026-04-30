@@ -25,6 +25,10 @@ export type UploadProgress = (batch: number, totalBatches: number, uploaded: num
 /** Options for uploadFiles */
 export type UploadFilesOptions = {
   verbose?: boolean
+  /** Commit message subject for the new GameRuntimeVersion */
+  description?: string | null
+  /** HTTPS repo URL to set on the GameRuntime */
+  repoURL?: string | null
 }
 
 /** Wraps fetch to surface the underlying network cause (DNS, ECONNREFUSED, TLS, etc.) */
@@ -112,12 +116,18 @@ export const uploadFiles = async (
   onProgress?: UploadProgress,
   options: UploadFilesOptions = {},
 ): Promise<CompleteResponse> => {
-  const { verbose = false } = options
+  const { verbose = false, description, repoURL } = options
   const apiURL = getAPIURL()
   if (verbose) console.log(`  API URL: ${apiURL}`)
 
   // Step 1: Init session (includes puzzmo.json metadata)
-  const init = (await jsonPost(`${apiURL}/cliUpload`, token, { gameSlug, sha, puzzmoFile }, "upload init", verbose)) as InitResponse
+  const init = (await jsonPost(
+    `${apiURL}/cliUpload`,
+    token,
+    { gameSlug, sha, puzzmoFile, description, repoURL },
+    "upload init",
+    verbose,
+  )) as InitResponse
   if (verbose) console.log(`  session: ${init.sessionID}`)
 
   // Step 2: Upload files in concurrent batches
