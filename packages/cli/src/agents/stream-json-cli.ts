@@ -2,8 +2,10 @@ import { spawn, type ChildProcess } from "node:child_process"
 
 import type { AgentEvent, RunInput } from "./types.js"
 
-/** Shared driver for any CLI that emits NDJSON over stdout when given a prompt
- *  in print/headless mode. Used by both the claude and gemini adapters. */
+/**
+ * Shared driver for any CLI that emits NDJSON over stdout when given a prompt
+ * in print/headless mode. Used by both the claude and gemini adapters.
+ */
 export type StreamJsonCliConfig = {
   cmd: string
   buildArgs: (prompt: string) => string[]

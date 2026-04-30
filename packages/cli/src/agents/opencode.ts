@@ -2,9 +2,11 @@ import { createOpencodeClient, createOpencodeServer } from "@opencode-ai/sdk"
 
 import type { Agent, AgentEvent, RunInput } from "./types.js"
 
-/** OpenCode adapter — spawns a local opencode server, opens an SSE stream
- *  against it, creates a session, and sends a prompt. Auth lives in the
- *  user's `opencode` CLI config / `client.auth.set()`. */
+/**
+ * OpenCode adapter — spawns a local opencode server, opens an SSE stream
+ * against it, creates a session, and sends a prompt. Auth lives in the
+ * user's `opencode` CLI config / `client.auth.set()`.
+ */
 export const opencodeAgent: Agent = {
   name: "opencode",
   run(input) {

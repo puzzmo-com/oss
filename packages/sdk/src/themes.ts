@@ -33,7 +33,7 @@ export const lightTheme: Theme = {
   /** Alt color 3, this one is a cute purple */
   alt3: "#D298FF",
 
-  /** The foreground body text color  */
+  /** The foreground body text color */
   fg: "#000000",
   /** The red for showing errors */
   error: "#FF3C3C",

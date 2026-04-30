@@ -8,7 +8,10 @@ export type PuzzmoSimulatorPluginOptions = {
   autoStart?: boolean
   /** Initial collapsed state (default: true) */
   collapsed?: boolean
-  /** Glob pattern for fixture files, passed to import.meta.glob which is relative to the closest puzzmo.json. Defaults to "/fixtures/puzzles/**\/*.json". Pass false to disable. */
+  /**
+   * Glob pattern for fixture files, passed to import.meta.glob which is relative to the closest puzzmo.json. Defaults to
+   * `"/fixtures/puzzles/**\/*.json"`. Pass false to disable.
+   */
   fixturesGlob?: string | false
 }
 
@@ -27,6 +30,7 @@ export type GameInfo = {
 
 /**
  * Discover all games from puzzmo.json files under a root directory.
+ *
  * @internal
  */
 export function discoverGames(viteRoot: string): Map<string, GameInfo> {
@@ -55,6 +59,7 @@ export function discoverGames(viteRoot: string): Map<string, GameInfo> {
 
 /**
  * Resolve which game a request belongs to using the referer URL.
+ *
  * @internal
  */
 export function resolveGameFromReferer(referer: string | undefined, games: Map<string, GameInfo>, viteRoot: string): GameInfo | undefined {
@@ -75,6 +80,7 @@ export function resolveGameFromReferer(referer: string | undefined, games: Map<s
 
 /**
  * Generate the virtual module code for the simulator.
+ *
  * @internal
  */
 export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, game: GameInfo | undefined): string {
@@ -230,6 +236,7 @@ export const editorBundlePlugin = createBundlePlugin("editor-bundle", { entry: "
 
 /**
  * Recursively find directories containing puzzmo.json, up to `maxDepth` levels deep.
+ *
  * @internal
  */
 export const findPuzzmoJsonDirs = (root: string, maxDepth: number, depth = 0): string[] => {

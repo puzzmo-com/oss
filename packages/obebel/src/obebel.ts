@@ -23,7 +23,7 @@ interface NodeConfig {
   generics?: { name: string }[]
 }
 
-/** Main entrypoint to  */
+/** Main entrypoint to */
 export const createSourceFile = (_opts: {}) => {
   const sourceFile = parse("", { sourceType: "module", plugins: ["jsx", "typescript"] })
 
@@ -288,7 +288,7 @@ export const createSourceFile = (_opts: {}) => {
   return { setImport, getResult, setTypeViaTemplate, parseStatement, updateGraphQLTemplateTag, rootScope }
 }
 
-/** Parses something as though it is in type-space and extracts the subset of the AST that the string represents  */
+/** Parses something as though it is in type-space and extracts the subset of the AST that the string represents */
 const getTypeLevelAST = (type: string) => {
   const typeAST = parse(`type A = ${type}`, { sourceType: "module", plugins: ["jsx", "typescript"] })
   const typeDeclaration = typeAST.program.body.find((s) => t.isTSTypeAliasDeclaration(s))
@@ -298,7 +298,7 @@ const getTypeLevelAST = (type: string) => {
 
 export type ForgeType = ReturnType<typeof createSourceFile>
 
-/** A little helper to handle all the extras   */
+/** A little helper to handle all the extras */
 const nodeFromNodeConfig = <T extends t.Declaration & { typeParameters?: t.TSTypeParameterDeclaration | null }>(
   node: T,
   nodeConfig?: NodeConfig,

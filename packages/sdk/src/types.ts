@@ -15,8 +15,10 @@ export type Theme = {
   keyStrong: string // "#F7868B"
   /** A lighter version of the bright pink */
   keyLight: string // "#FFD2D3"
-  /** A variant of the key which is always above a certain level of brightness so that you
-   * can show dark text on it for games */
+  /**
+   * A variant of the key which is always above a certain level of brightness so that you
+   * can show dark text on it for games
+   */
   g_key: string // "#FFAAAC"
 
   /** A secondary color for the brand, in Puzzmo's case this is the puzzmo yellow */
@@ -38,7 +40,7 @@ export type Theme = {
   /** Alt color 3, this one is a cute purple */
   alt3: string // "#D298FF"
 
-  /** The foreground body text color  */
+  /** The foreground body text color */
   fg: string // "#000000"
   /** The red for showing errors */
   error: string // "#FF3C3C"
@@ -162,7 +164,7 @@ export type BootstrapGameData = {
 }
 
 export type AppBundle = {
-  /** Renders a puzzle and optional state string into an SVG  */
+  /** Renders a puzzle and optional state string into an SVG */
   renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): string
 
   /** Takes an input string, and backtracks to a version somewhere between 0-1 for its completion */
@@ -212,39 +214,39 @@ export type ThumbnailConfig = {
  * with letter input. Map those characters to display labels via `symbols`.
  *
  * @example
- * // Simple QWERTY keyboard — a good starting point for word games
+ *   // Simple QWERTY keyboard — a good starting point for word games
  *
- * const config: KeyboardConfig = {
- *   layout: ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined],
- *   symbols: { "↵": "Enter", "⌫": "bsp" },
- *   highlight: ["↵", "⌫"],
- *   disabled: [],
- *   xl: [],
- *   l: ["↵", "⌫"],
- *   supportsDragCursor: false,
- * }
+ *   const config: KeyboardConfig = {
+ *     layout: ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined],
+ *     symbols: { "↵": "Enter", "⌫": "bsp" },
+ *     highlight: ["↵", "⌫"],
+ *     disabled: [],
+ *     xl: [],
+ *     l: ["↵", "⌫"],
+ *     supportsDragCursor: false,
+ *   }
  *
  * @example
- * // Crossword keyboard — complex layout with two panels, direction controls, and drag cursor.
- * // Special characters are used as action key tokens; symbols maps them to display labels.
- * // The "∂" key flips cursor direction; "≤"/"≥" move between cells; "✱" switches panels.
+ *   // Crossword keyboard — complex layout with two panels, direction controls, and drag cursor.
+ *   // Special characters are used as action key tokens; symbols maps them to display labels.
+ *   // The "∂" key flips cursor direction; "≤"/"≥" move between cells; "✱" switches panels.
  *
- * const crosswordConfig: KeyboardConfig = {
- *   layout: ["qwertyuiop", "∂asdfghjkl⟳", "≤✱zxcvbnm⌫≥"],
- *   symbols: {
- *     "∂": "flip-down",   // switches cursor direction (emitted as key press "∂")
- *     "⟳": "flip-across", // alternate direction flip
- *     "≤": "prev",        // move cursor to previous cell
- *     "≥": "next",        // move cursor to next cell
- *     "✱": "123",         // switch to number/rebus panel
- *     "⌫": "bsp",         // backspace
- *   },
- *   highlight: ["∂", "⟳", "≤", "≥", "✱", "⌫"],
- *   disabled: [],
- *   xl: [],
- *   l: [],
- *   supportsDragCursor: true, // enables the drag-to-position cursor feature
- * }
+ *   const crosswordConfig: KeyboardConfig = {
+ *     layout: ["qwertyuiop", "∂asdfghjkl⟳", "≤✱zxcvbnm⌫≥"],
+ *     symbols: {
+ *       "∂": "flip-down", // switches cursor direction (emitted as key press "∂")
+ *       "⟳": "flip-across", // alternate direction flip
+ *       "≤": "prev", // move cursor to previous cell
+ *       "≥": "next", // move cursor to next cell
+ *       "✱": "123", // switch to number/rebus panel
+ *       "⌫": "bsp", // backspace
+ *     },
+ *     highlight: ["∂", "⟳", "≤", "≥", "✱", "⌫"],
+ *     disabled: [],
+ *     xl: [],
+ *     l: [],
+ *     supportsDragCursor: true, // enables the drag-to-position cursor feature
+ *   }
  */
 export type KeyboardConfig = {
   /**
@@ -255,7 +257,8 @@ export type KeyboardConfig = {
    * Accepts either a 4-tuple `[row1, row2, row3, row4 | undefined]` or a plain array of
    * strings/nulls (null renders an empty row).
    *
-   * @example ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined]
+   * @example
+   *   ;["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined]
    */
   layout: [string, string, string, string | undefined] | (string | null)[]
 
@@ -264,7 +267,8 @@ export type KeyboardConfig = {
    * The token character is what the game receives in a `keyboardKeyPress` event;
    * the label is purely visual.
    *
-   * @example { "⌫": "bsp", "↵": "Enter", "✱": "123" }
+   * @example
+   *   { "⌫": "bsp", "↵": "Enter", "✱": "123" }
    */
   symbols: Record<string, string>
 
@@ -273,7 +277,8 @@ export type KeyboardConfig = {
    * Typically used for action keys (backspace, enter, direction keys) so they
    * stand out from the letter keys.
    *
-   * @example ["↵", "⌫"]
+   * @example
+   *   ;["↵", "⌫"]
    */
   highlight: string[]
 
@@ -282,7 +287,8 @@ export type KeyboardConfig = {
    * Update this array dynamically to disable letters that are no longer valid
    * for the current game state (e.g. letters already placed in a word game).
    *
-   * @example ["q", "z", "x"] // letters unavailable given current board state
+   * @example
+   *   ;["q", "z", "x"] // letters unavailable given current board state
    */
   disabled: string[]
 
@@ -290,7 +296,8 @@ export type KeyboardConfig = {
    * Keys that should render at extra-large width (~17.85% of the keyboard row).
    * Use for high-priority action keys like spacebar or a main confirm key.
    *
-   * @example ["␣"]
+   * @example
+   *   ;["␣"]
    */
   xl: string[]
 
@@ -298,7 +305,8 @@ export type KeyboardConfig = {
    * Keys that should render at large width (~14.7% of the keyboard row).
    * Use for secondary action keys like Enter and Backspace that need more touch area.
    *
-   * @example ["↵", "⌫"]
+   * @example
+   *   ;["↵", "⌫"]
    */
   l: string[]
 
@@ -316,7 +324,8 @@ export type KeyboardConfig = {
    * Controls horizontal alignment for each row. Index matches the `layout` row index.
    * Defaults to `"center"` for any row not listed.
    *
-   * @example ["center", "center", "end", "center"]
+   * @example
+   *   ;["center", "center", "end", "center"]
    */
   rowPositioning?: ("end" | "start" | "center" | undefined)[]
 
@@ -324,7 +333,8 @@ export type KeyboardConfig = {
    * Keys that expand to fill remaining horizontal space in their row (flex-grow).
    * Useful for a spacebar key that should stretch across the bottom row.
    *
-   * @example ["␣"]
+   * @example
+   *   ;["␣"]
    */
   flexGrowSymbols?: string[]
 
@@ -332,7 +342,8 @@ export type KeyboardConfig = {
    * CSS properties applied to every key face. Use for font overrides or color tweaks
    * that apply uniformly across the keyboard.
    *
-   * @example { textTransform: "lowercase", color: "#888" }
+   * @example
+   *   { textTransform: "lowercase", color: "#888" }
    */
   keyStyles?: Record<string, string>
 
@@ -390,7 +401,10 @@ export type MessagesSentFromEmbed = {
    * Sent automatically by the SDK every 10 seconds.
    */
   TIMER_SYNC: number
-  /** Show or update the on-screen keyboard. Pass the full config each time — the host replaces its entire state. To hide, call `sdk.keyboard.hide()`. */
+  /**
+   * Show or update the on-screen keyboard. Pass the full config each time — the host replaces its entire state. To hide, call
+   * `sdk.keyboard.hide()`.
+   */
   KEYBOARD_UPDATE_CONFIG: KeyboardConfig
   /** Notify the host that a named checkpoint was reached (e.g. completing a sub-puzzle or bonus round). */
   HIT_CHECKPOINT: {

@@ -8,7 +8,7 @@ export type AgentCLIDefinition = {
   displayName: string
   /** CLI binary name(s) to search for */
   binaries: string[]
-  /** npm package name, if installed via npm */
+  /** Npm package name, if installed via npm */
   npmPackage?: string
   /** Additional well-known install paths to check beyond PATH */
   knownPaths?: string[]

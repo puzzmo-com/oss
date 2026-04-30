@@ -9,8 +9,10 @@ const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`
 
-/** Undocumented: send "say hello world" to a chosen agent through the meta-library
- *  and stream events to stdout. Use this to verify each adapter end-to-end. */
+/**
+ * Undocumented: send "say hello world" to a chosen agent through the meta-library
+ * and stream events to stdout. Use this to verify each adapter end-to-end.
+ */
 export const agentTest = async () => {
   p.intro("Agent SDK Test")
 

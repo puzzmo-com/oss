@@ -2,15 +2,18 @@
  * Encodes boolean arrays as compact hexadecimal strings.
  *
  * **When to use:**
+ *
  * - Revealed/hidden state of game tiles
  * - Feature flags or settings
  * - Any boolean array where order matters
  *
  * **Encoding:**
+ *
  * - Packs 4 bits per hex character (75% size reduction)
  * - Example: [true, false, false, false, false, true, false, false] → "12"
  *
  * **Decoding:**
+ *
  * - Requires length in context: `{ fieldName: { length: 100 } }`
  */
 export type BitArrayFieldType = {
@@ -21,17 +24,20 @@ export type BitArrayFieldType = {
  * Encodes integer arrays with automatic sparse optimization.
  *
  * **When to use:**
+ *
  * - Arrays of numeric values (scores, counts, experience)
  * - Sparse data (mostly zeros)
  * - Dense data (will auto-fallback to CSV)
  *
  * **Encoding:**
+ *
  * - Uses decimal (base-10) numbers separated by commas
  * - Smart sparse: If >50% zeros, uses `index=value` pairs (e.g., "2=5,4=3")
  * - Dense fallback: If not beneficial, uses CSV (e.g., "1,2,3,4")
  * - Empty arrays encode as empty string
  *
  * **Decoding:**
+ *
  * - Requires length in context for sparse format: `{ fieldName: { length: 100 } }`
  * - CSV format decodes without context
  */
@@ -43,10 +49,12 @@ export type IntArrayFieldType = {
  * Encodes single integer values.
  *
  * **When to use:**
+ *
  * - Single numeric values (score, level, count)
  * - Non-negative integers only
  *
  * **Encoding:**
+ *
  * - Uses decimal (base-10) representation
  * - Example: 42 → "42"
  */
@@ -58,10 +66,12 @@ export type IntFieldType = {
  * Encodes string values as-is.
  *
  * **When to use:**
+ *
  * - Single string values (name, color, mode)
  * - Short identifiers
  *
  * **Warning:**
+ *
  * - Strings containing the schema delimiter (default ':') will break parsing
  * - Consider using a custom delimiter or different encoding for such strings
  */
@@ -73,14 +83,17 @@ export type StringFieldType = {
  * Encodes arrays of strings.
  *
  * **When to use:**
+ *
  * - Lists of tags, categories, or identifiers
  * - Ordered collections of strings
  *
  * **Encoding:**
+ *
  * - Uses comma delimiter by default
  * - Custom delimiter can be specified to avoid conflicts
  *
  * **Warning:**
+ *
  * - Strings containing the delimiter will break parsing
  * - Use custom delimiter to avoid conflicts
  */
@@ -93,27 +106,31 @@ export type StringArrayFieldType = {
  * Encodes sparse key-value maps with custom value encoding.
  *
  * **When to use:**
+ *
  * - Tile annotations, cell metadata
  * - Any sparse mapping where most keys don't have values
  * - Custom object types that need specialized encoding
  *
  * **Encoding:**
+ *
  * - With context keys: Uses numeric indices (e.g., `0=2.1,5=3.0`)
  * - Without context: Uses string keys (e.g., `key1=val1;key2=val2`)
  * - Only stores non-empty entries
  * - Keys are always strings in the data, converted to indices when context provides ordered keys
- * - valueEncoder: Convert your object to a string
- * - valueDecoder: Parse string back to your object
+ * - ValueEncoder: Convert your object to a string
+ * - ValueDecoder: Parse string back to your object
  *
  * **Optimization:**
  * Provide ordered keys in context to use numeric indices instead of string keys:
+ *
  * ```typescript
  * const { encode, decode } = createEncoder(schema, {
- *   annotations: { keys: tileIds }  // Ordered list of possible keys
+ *   annotations: { keys: tileIds }, // Ordered list of possible keys
  * })
  * ```
  *
  * **Example:**
+ *
  * ```typescript
  * annotations: {
  *   type: 'sparseMap',
@@ -136,16 +153,19 @@ export type SparseMapFieldType<TValue = any> = {
  * Encodes arbitrary data as JSON with automatic compression.
  *
  * **When to use:**
+ *
  * - Complex nested structures
  * - Fallback for data that doesn't fit other types
  * - Temporary solution before implementing custom encoding
  *
  * **Encoding:**
+ *
  * - Converts data to JSON string
  * - Automatically compresses with lz-string
  * - Helps reduce size of complex objects
  *
  * **Warning:**
+ *
  * - Still larger than specialized encodings even with compression
  * - Use only when necessary
  * - Consider creating custom sparseMap encoding instead
@@ -154,9 +174,7 @@ export type JsonFieldType = {
   type: "json"
 }
 
-/**
- * Union of all available field types.
- */
+/** Union of all available field types. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic type parameter for field values
 export type FieldType<TValue = any> =
   | BitArrayFieldType
@@ -171,16 +189,19 @@ export type FieldType<TValue = any> =
  * Function that migrates data from one version to another.
  *
  * **When to use:**
+ *
  * - Add new fields with default values
  * - Transform existing field values
  * - Rename or restructure fields
  *
  * **Important:**
+ *
  * - Migrations operate on decoded data objects, not strings
  * - Each migration goes from version N to version N+1
  * - Migrations are applied sequentially
  *
  * **Example:**
+ *
  * ```typescript
  * migrations: {
  *   0: (oldData) => ({
@@ -211,17 +232,19 @@ export type MigrationMap = {
  * Complete schema definition for encoding/decoding data.
  *
  * **Basic usage:**
+ *
  * ```typescript
  * const schema = defineSchema({
  *   version: 1,
  *   fields: {
- *     name: { type: 'string' },
- *     age: { type: 'int' }
- *   }
+ *     name: { type: "string" },
+ *     age: { type: "int" },
+ *   },
  * })
  * ```
  *
  * **With custom delimiter:**
+ *
  * ```typescript
  * const schema = defineSchema({
  *   version: 1,
@@ -231,17 +254,18 @@ export type MigrationMap = {
  * ```
  *
  * **With migrations:**
+ *
  * ```typescript
  * const schema = defineSchema({
  *   version: 2,
  *   fields: {
- *     name: { type: 'string' },
- *     value: { type: 'int' }
+ *     name: { type: "string" },
+ *     value: { type: "int" },
  *   },
  *   migrations: {
  *     0: (old) => ({ ...old, value: 0 }),
- *     1: (old) => ({ ...old, name: old.name.toUpperCase() })
- *   }
+ *     1: (old) => ({ ...old, name: old.name.toUpperCase() }),
+ *   },
  * })
  * ```
  *
@@ -265,6 +289,7 @@ export type Schema<TData = any> = {
  * Result of creating an encoder from a schema.
  *
  * **Usage:**
+ *
  * ```typescript
  * const { encode, decode, migrate } = createEncoder(schema, context)
  *
@@ -288,11 +313,13 @@ export type EncoderResult<TData> = {
  * Define a typed schema for encoding/decoding game state.
  *
  * **Purpose:**
+ *
  * - Provides type inference for encode/decode functions
  * - Documents the structure of your input strings
  * - Enables version migrations
  *
  * **Example:**
+ *
  * ```typescript
  * type GameData = {
  *   revealed: boolean[]
@@ -303,17 +330,17 @@ export type EncoderResult<TData> = {
  * export const schema = defineSchema<GameData>({
  *   version: 1,
  *   fields: {
- *     revealed: { type: 'bitArray' },
- *     score: { type: 'int' },
+ *     revealed: { type: "bitArray" },
+ *     score: { type: "int" },
  *     annotations: {
- *       type: 'sparseMap',
+ *       type: "sparseMap",
  *       valueEncoder: (ann) => `${ann.level}.${ann.color}`,
  *       valueDecoder: (str) => {
- *         const [level, color] = str.split('.').map(Number)
+ *         const [level, color] = str.split(".").map(Number)
  *         return { level, color }
- *       }
- *     }
- *   }
+ *       },
+ *     },
+ *   },
  * })
  * ```
  */

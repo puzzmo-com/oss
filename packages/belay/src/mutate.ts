@@ -4,21 +4,21 @@ import type { GraphQLResponse, OperationType, RequestOptions } from "./types"
  * Execute a GraphQL mutation using fetch with Relay-generated types.
  *
  * @example
- * ```ts
- * import { graphql, mutate } from '@puzzmo-com/belay'
- * import type { UpdateUserMutation } from '@relay/UpdateUserMutation.graphql'
+ *   ```ts
+ *   import { graphql, mutate } from "@puzzmo-com/belay"
+ *   import type { UpdateUserMutation } from "@relay/UpdateUserMutation.graphql"
  *
- * const updateUserMutation = graphql`
+ *   const updateUserMutation = graphql`
  *   mutation UpdateUserMutation($id: ID!, $input: UpdateUserInput!) {
- *     updateUser(id: $id, input: $input) { id name }
+ *   updateUser(id: $id, input: $input) { id name }
  *   }
- * `
+ *   `
  *
- * const { data, errors } = await mutate<UpdateUserMutation>(updateUserMutation, {
- *   variables: { id: '123', input: { name: 'New Name' } },
- *   url: 'https://api.puzzmo.com/graphql'
- * })
- * ```
+ *   const { data, errors } = await mutate<UpdateUserMutation>(updateUserMutation, {
+ *   variables: { id: "123", input: { name: "New Name" } },
+ *   url: "https://api.puzzmo.com/graphql",
+ *   })
+ *   ```
  */
 export const mutate = async <T extends OperationType>(
   mutationString: string,

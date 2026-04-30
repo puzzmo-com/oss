@@ -1,9 +1,11 @@
 import { runStreamJsonCli } from "./stream-json-cli.js"
 import type { Agent, AgentEvent } from "./types.js"
 
-/** Gemini adapter — wraps the local `gemini` CLI in subprocess + stream-json
- *  mode. Auth delegates to the user's `gemini` CLI login (Google account /
- *  Code Assist) or falls back to GEMINI_API_KEY. */
+/**
+ * Gemini adapter — wraps the local `gemini` CLI in subprocess + stream-json
+ * mode. Auth delegates to the user's `gemini` CLI login (Google account /
+ * Code Assist) or falls back to GEMINI_API_KEY.
+ */
 export const geminiAgent: Agent = {
   name: "gemini",
   run: (input) =>
@@ -17,9 +19,11 @@ export const geminiAgent: Agent = {
     ),
 }
 
-/** Map one stream-json line from gemini to an AgentEvent (or null to skip).
- *  Event union per `@google/gemini-cli-core`'s `JsonStreamEvent`:
- *  init / message / tool_use / tool_result / error / result. */
+/**
+ * Map one stream-json line from gemini to an AgentEvent (or null to skip).
+ * Event union per `@google/gemini-cli-core`'s `JsonStreamEvent`:
+ * init / message / tool_use / tool_result / error / result.
+ */
 const parseGeminiLine = (line: string): AgentEvent | null => {
   let obj: any
   try {

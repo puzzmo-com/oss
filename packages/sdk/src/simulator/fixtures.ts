@@ -1,8 +1,6 @@
 import type { FixtureImports } from "./types"
 
-/**
- * Parse fixture imports into a structured format: { category: { filename: data } }
- */
+/** Parse fixture imports into a structured format: { category: { filename: data } } */
 export function parseFixtures(fixtures: FixtureImports): Map<string, Map<string, any>> {
   const result = new Map<string, Map<string, any>>()
 
@@ -37,9 +35,7 @@ export function parseFixtures(fixtures: FixtureImports): Map<string, Map<string,
   return result
 }
 
-/**
- * Render fixture selector HTML
- */
+/** Render fixture selector HTML */
 export function renderFixtureSelector(categories: string[], selectedCategory: string | null): string {
   if (categories.length === 0) return ""
 
@@ -59,9 +55,7 @@ export function renderFixtureSelector(categories: string[], selectedCategory: st
   `
 }
 
-/**
- * Update puzzle select options based on selected category
- */
+/** Update puzzle select options based on selected category */
 export function updatePuzzleOptions(
   puzzleSelect: HTMLSelectElement,
   fixtures: Map<string, Map<string, any>>,
@@ -86,9 +80,7 @@ export function updatePuzzleOptions(
   return actualSelected
 }
 
-/**
- * Get puzzle data from fixtures
- */
+/** Get puzzle data from fixtures */
 export function getFixturePuzzle(fixtures: Map<string, Map<string, any>>, category: string | null, puzzle: string | null): any | null {
   if (!category || !puzzle) return null
   return fixtures.get(category)?.get(puzzle) ?? null

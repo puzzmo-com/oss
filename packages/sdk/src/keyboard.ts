@@ -5,12 +5,12 @@ import type { KeyboardConfig } from "./types"
  * any game that needs text input. Customize from here by spreading and overriding.
  *
  * @example
- * // Use as-is
- * sdk.keyboard.show(defaultKeyboardConfig)
+ *   // Use as-is
+ *   sdk.keyboard.show(defaultKeyboardConfig)
  *
  * @example
- * // Extend with dynamic disabled letters
- * sdk.keyboard.show({ ...defaultKeyboardConfig, disabled: usedLetters })
+ *   // Extend with dynamic disabled letters
+ *   sdk.keyboard.show({ ...defaultKeyboardConfig, disabled: usedLetters })
  */
 export const defaultKeyboardConfig: KeyboardConfig = {
   layout: ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined],

@@ -10,9 +10,9 @@ export interface AppContext {
   basename: (path: string) => string
   /** "service" should be code here */
   codeFacts: Map<string, CodeFacts>
-  /** A global set of facts about resolvers focused from the GQL side  */
+  /** A global set of facts about resolvers focused from the GQL side */
   fieldFacts: Map<string, FieldFacts>
-  /** When we emit .d.ts files, it runs the ts formatter over the file first - you can override the default settings  */
+  /** When we emit .d.ts files, it runs the ts formatter over the file first - you can override the default settings */
   formatCodeSettings?: FormatCodeSettings
   /** So you can override the formatter */
   gql: graphql.GraphQLSchema
@@ -31,11 +31,13 @@ export interface AppContext {
 
   /** A map of prisma models */
   prisma: PrismaMap
-  /** An implementation of the TypeScript system, this can be grabbed pretty
+  /**
+   * An implementation of the TypeScript system, this can be grabbed pretty
    * easily from the typescript import, or you can use your own like tsvfs in browsers.
    */
   sys: System
-  /** ts-morph is used to abstract over the typescript compiler API, this project file
+  /**
+   * Ts-morph is used to abstract over the typescript compiler API, this project file
    * is a slightly augmented version of the typescript Project api.
    */
   tsProject: tsMorph.Project

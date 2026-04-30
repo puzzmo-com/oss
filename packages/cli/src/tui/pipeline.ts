@@ -50,6 +50,7 @@ const phaseColor: Record<Phase, (s: string) => string> = {
   idle: gray,
 }
 
+// oxlint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g
 const stripAnsi = (s: string) => s.replace(ANSI_RE, "")
 
@@ -58,8 +59,10 @@ const buildPrompt = async (stepName: string, gameDir: string, repoContext: strin
   return `Follow these instructions. The game source is in the current directory.\n\n${repoContext}\n\n${instructions}`
 }
 
-/** Format a non-streaming event into discrete lines. text/thinking are handled
- *  separately by appendText so token deltas merge into one in-progress line. */
+/**
+ * Format a non-streaming event into discrete lines. text/thinking are handled
+ * separately by appendText so token deltas merge into one in-progress line.
+ */
 const formatDiscreteEvent = (e: AgentEvent): string[] => {
   if (e.type === "tool_use") return [`${yellow(e.name)} ${dim(e.summary)}`]
   if (e.type === "tool_result") return [(e.ok ? green("  ✓ ") : red("  ✗ ")) + dim(e.summary)]
@@ -132,9 +135,11 @@ class PipelineTUI {
     this.currentLine = ""
   }
 
-  /** Append streaming text. Newlines lock the in-progress line; the trailing
-   *  fragment continues as the in-progress line. Optional styler wraps each
-   *  fragment in ANSI codes (e.g. gray() for thinking). */
+  /**
+   * Append streaming text. Newlines lock the in-progress line; the trailing
+   * fragment continues as the in-progress line. Optional styler wraps each
+   * fragment in ANSI codes (e.g. gray() for thinking).
+   */
   private appendText(text: string, styler?: (s: string) => string) {
     if (text.length === 0) return
     const parts = text.split("\n")
@@ -147,9 +152,11 @@ class PipelineTUI {
     this.scheduleRender()
   }
 
-  /** Append discrete pre-formatted lines (each becomes its own row). Locks any
-   *  in-progress streaming line first so token streams don't bleed into a
-   *  following tool_use marker. */
+  /**
+   * Append discrete pre-formatted lines (each becomes its own row). Locks any
+   * in-progress streaming line first so token streams don't bleed into a
+   * following tool_use marker.
+   */
   private appendLines(lines: string[]) {
     if (lines.length === 0) return
     this.lockCurrent()

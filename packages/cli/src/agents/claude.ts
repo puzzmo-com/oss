@@ -1,9 +1,11 @@
 import { runStreamJsonCli } from "./stream-json-cli.js"
 import type { Agent, AgentEvent } from "./types.js"
 
-/** Claude adapter — wraps the local `claude` CLI in subprocess + stream-json mode
- *  so the user's existing subscription auth keeps working. The Claude Agent SDK
- *  requires an API key, which we explicitly want to avoid here. */
+/**
+ * Claude adapter — wraps the local `claude` CLI in subprocess + stream-json mode
+ * so the user's existing subscription auth keeps working. The Claude Agent SDK
+ * requires an API key, which we explicitly want to avoid here.
+ */
 export const claudeAgent: Agent = {
   name: "claude",
   run: (input) =>

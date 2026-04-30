@@ -32,6 +32,7 @@ let simulatorInstance: SimulatorInstance | null = null
  * Simulator - A development UI for testing games with the Puzzmo Proto SDK.
  *
  * This script simulates the Puzzmo host environment by:
+ *
  * - Listening for READY messages from the game
  * - Sending READY_DATA with puzzle data
  * - Providing UI controls for START_GAME, PAUSE_GAME, RESUME_GAME, RETRY_PUZZLE
@@ -42,7 +43,7 @@ let simulatorInstance: SimulatorInstance | null = null
  * // vite.config.ts
  * import { puzzmoSimulator } from "@puzzmo/sdk/vite"
  * export default defineConfig({
- *   plugins: [puzzmoSimulator({})]
+ *   plugins: [puzzmoSimulator({})],
  * })
  * ```
  *
@@ -51,6 +52,7 @@ let simulatorInstance: SimulatorInstance | null = null
  * The plugin handles making sure it is removed on vite builds.
  *
  * Usage with manual imports:
+ *
  * ```html
  * <script type="module">
  *   import { createSimulator } from "@puzzmo/sdk/simulator"
@@ -58,6 +60,7 @@ let simulatorInstance: SimulatorInstance | null = null
  *   createSimulator({ fixtures })
  * </script>
  * ```
+ *
  * The fixtures folder structure should be: fixtures/puzzles/{category}/{puzzle}.json
  * This will show dropdowns in the Ctrl tab to select category and puzzle.
  */

@@ -287,7 +287,7 @@ export const builder = (priorSource: string, _opts: {}) => {
   return { setImport, getResult, setTypeViaTemplate, parseStatement, updateGraphQLTemplateTag, rootScope }
 }
 
-/** Parses something as though it is in type-space and extracts the subset of the AST that the string represents  */
+/** Parses something as though it is in type-space and extracts the subset of the AST that the string represents */
 const getTypeLevelAST = (type: string) => {
   const typeAST = parser.parse(`type A = ${type}`, { sourceType: "module", plugins: ["jsx", "typescript"] })
   const typeDeclaration = typeAST.program.body.find((s) => t.isTSTypeAliasDeclaration(s))
@@ -297,7 +297,7 @@ const getTypeLevelAST = (type: string) => {
 
 export type TSBuilder = ReturnType<typeof builder>
 
-/** A little helper to handle all the extras for  */
+/** A little helper to handle all the extras for */
 const nodeFromNodeConfig = <T extends Declaration & { typeParameters?: TSTypeParameterDeclaration | null }>(
   node: T,
   nodeConfig?: NodeConfig,

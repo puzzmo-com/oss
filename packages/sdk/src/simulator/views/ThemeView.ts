@@ -3,9 +3,7 @@ import { themes } from "../../themes"
 import type { SimulatorContext, SimulatorView } from "../types"
 import { persistTheme } from "../state"
 
-/**
- * Generate theme preview HTML showing key colors
- */
+/** Generate theme preview HTML showing key colors */
 function generateThemePreview(theme: Theme): string {
   // Show key, subBrand, player, alt1, alt2, alt3 with g_bg as background
   const colors = [theme.key, theme.subBrand, theme.player, theme.alt1, theme.alt2, theme.alt3]

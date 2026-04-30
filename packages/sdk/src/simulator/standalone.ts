@@ -2,6 +2,7 @@
  * Standalone entry point for the simulator.
  *
  * Use as a script tag for non-Vite setups:
+ *
  * ```html
  * <script>
  *   window.SIMULATOR_CONFIG = { slug: "my-game" }

@@ -4,9 +4,7 @@ import type { SimulatorContext, SimulatorView } from "../types"
 // Storage key for saved states (global across all puzzles)
 const SAVED_STATES_KEY = "simulator-saved-states"
 
-/**
- * Find thumbnail function on globalThis (looks for functions ending in "Thumbnail")
- */
+/** Find thumbnail function on globalThis (looks for functions ending in "Thumbnail") */
 function findThumbnailFn(): { name: string; fn: AppBundle["renderThumbnail"] } | null {
   const globalObj = globalThis as Record<string, unknown>
   for (const key of Object.keys(globalObj)) {
@@ -17,9 +15,7 @@ function findThumbnailFn(): { name: string; fn: AppBundle["renderThumbnail"] } |
   return null
 }
 
-/**
- * Generate a small thumbnail SVG for a given input string
- */
+/** Generate a small thumbnail SVG for a given input string */
 function generateMiniThumbnail(ctx: SimulatorContext, inputStr: string): string {
   const thumbFn = findThumbnailFn()
   if (!thumbFn) return ""

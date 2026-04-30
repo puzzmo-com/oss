@@ -1,5 +1,7 @@
-/** Normalized event union emitted by every agent adapter. Keep this small —
- *  adapters fold their richer native event shapes into one of these. */
+/**
+ * Normalized event union emitted by every agent adapter. Keep this small —
+ * adapters fold their richer native event shapes into one of these.
+ */
 export type AgentEvent =
   | { type: "text"; text: string } // assistant text (delta or full chunk)
   | { type: "tool_use"; name: string; summary: string } // tool starting

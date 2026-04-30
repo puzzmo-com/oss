@@ -189,7 +189,7 @@ export const lookAtServiceFile = (file: string, context: AppContext) => {
     )
   }
 
-  /** Ideally, we want to be able to write the type for just the object  */
+  /** Ideally, we want to be able to write the type for just the object */
   function addCustomTypeModel(modelFacts: ModelResolverFacts) {
     const modelName = modelFacts.typeName
     extraPrismaReferences.add(modelName)
@@ -227,12 +227,12 @@ export const lookAtServiceFile = (file: string, context: AppContext) => {
     const parentTypeString = `${suffix}${modelName} ${createParentAdditionallyDefinedFunctions()} ${hasGenerics ? " & Extended" : ""}`
 
     /**
-        type CurrentUserAccountAsParent<Extended> = SCurrentUserAccount & {
-            users: () => PUser[] | Promise<PUser[]> | (() => Promise<PUser[]>);
-            registeredPublishingPartner: () => Promise<PPublishingPartner | null>;
-            subIsViaGift: () => boolean | Promise<boolean> | (() => Promise<boolean>);
-        }
-        */
+     * Type CurrentUserAccountAsParent<Extended> = SCurrentUserAccount & {
+     * users: () => PUser[] | Promise<PUser[]> | (() => Promise<PUser[]>);
+     * registeredPublishingPartner: () => Promise<PPublishingPartner | null>;
+     * subIsViaGift: () => boolean | Promise<boolean> | (() => Promise<boolean>);
+     * }
+     */
 
     dts.rootScope.addTypeAlias(`${modelName}AsParent`, t.tsTypeReference(t.identifier(parentTypeString)), {
       generics: hasGenerics ? [{ name: "Extended" }] : [],

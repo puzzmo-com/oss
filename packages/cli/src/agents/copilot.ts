@@ -2,8 +2,10 @@ import { CopilotClient, approveAll } from "@github/copilot-sdk"
 
 import type { Agent, AgentEvent, RunInput } from "./types.js"
 
-/** Copilot adapter — wraps `@github/copilot-sdk`, which spawns the bundled
- *  `@github/copilot` CLI and reuses its OAuth/Copilot Pro subscription auth. */
+/**
+ * Copilot adapter — wraps `@github/copilot-sdk`, which spawns the bundled
+ * `@github/copilot` CLI and reuses its OAuth/Copilot Pro subscription auth.
+ */
 export const copilotAgent: Agent = {
   name: "copilot",
   run(input) {

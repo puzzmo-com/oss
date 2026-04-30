@@ -12,7 +12,7 @@
  * Note: This configuration does not apply in a serverless deploy.
  */
 
-/** @type {import('fastify').FastifyServerOptions} */
+/** @type {import("fastify").FastifyServerOptions} */
 const config = {
   requestTimeout: 15_000,
   logger: {

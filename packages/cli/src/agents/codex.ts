@@ -2,8 +2,10 @@ import { Codex } from "@openai/codex-sdk"
 
 import type { Agent, AgentEvent, RunInput } from "./types.js"
 
-/** Codex adapter — wraps `@openai/codex-sdk`, which itself shells out to the
- *  user's installed `codex` CLI and reuses its ChatGPT subscription auth. */
+/**
+ * Codex adapter — wraps `@openai/codex-sdk`, which itself shells out to the
+ * user's installed `codex` CLI and reuses its ChatGPT subscription auth.
+ */
 export const codexAgent: Agent = {
   name: "codex",
   run(input) {
