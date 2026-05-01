@@ -1,46 +1,39 @@
 import fs from "node:fs"
 import path from "node:path"
 
-import { validatePuzzmoJson } from "../util/validatePuzzmoFile.js"
+import { discoverGames } from "../util/discoverGames.js"
 
-/** CLI command: puzzmo validate [dir] */
+/** CLI command: puzzmo validate [dir] — discovers every puzzmo.json under dir and validates each */
 export const validate = async (dir: string) => {
-  const resolvedDir = path.resolve(dir)
-  const puzzmoJsonPath = path.join(resolvedDir, "puzzmo.json")
-
-  if (!fs.existsSync(puzzmoJsonPath)) {
-    console.error(`No puzzmo.json found in ${dir}`)
+  const rootDir = path.resolve(dir)
+  if (!fs.existsSync(rootDir)) {
+    console.error(`Directory not found: ${dir}`)
     process.exit(1)
   }
 
-  let raw: string
-  try {
-    raw = fs.readFileSync(puzzmoJsonPath, "utf-8")
-  } catch (e) {
-    console.error(`Could not read puzzmo.json: ${e instanceof Error ? e.message : e}`)
+  const { games, errors } = await discoverGames(rootDir)
+
+  if (!games.length && !errors.length) {
+    console.error(`No puzzmo.json files found under ${rootDir}`)
     process.exit(1)
   }
 
-  let data: unknown
-  try {
-    data = JSON.parse(raw)
-  } catch (e) {
-    console.error(`Invalid JSON in puzzmo.json: ${e instanceof Error ? e.message : e}`)
-    process.exit(1)
+  for (const game of games) {
+    const rel = path.relative(rootDir, game.puzzmoJsonPath) || game.puzzmoJsonPath
+    const integrations = game.puzzmoFile.integrations ? Object.keys(game.puzzmoFile.integrations) : []
+    const distRel = path.relative(rootDir, game.distDir) || game.distDir
+    console.log(`OK   ${game.puzzmoFile.game.slug.padEnd(24)} (${rel})`)
+    console.log(`     dist: ${distRel}`)
+    if (integrations.length) console.log(`     integrations: ${integrations.join(", ")}`)
   }
 
-  const result = await validatePuzzmoJson(data)
-  if (!result.valid) {
-    console.error(`puzzmo.json has ${result.errors.length} error(s):\n`)
-    for (const err of result.errors) console.error(`  ${err}`)
-    process.exit(1)
+  for (const err of errors) {
+    const rel = path.relative(rootDir, err.puzzmoJsonPath) || err.puzzmoJsonPath
+    const label = err.slug ?? rel
+    console.error(`FAIL ${label.padEnd(24)} (${rel})`)
+    for (const e of err.errors) console.error(`     ${e}`)
   }
 
-  const { data: puzzmoFile } = result
-  console.log(`Valid puzzmo.json for "${puzzmoFile.game.displayName}" (${puzzmoFile.game.slug})`)
-
-  if (puzzmoFile.integrations) {
-    const keys = Object.keys(puzzmoFile.integrations)
-    if (keys.length) console.log(`Integrations: ${keys.join(", ")}`)
-  }
+  console.log(`\n${games.length} valid, ${errors.length} invalid`)
+  if (errors.length) process.exit(1)
 }

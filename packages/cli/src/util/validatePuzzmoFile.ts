@@ -32,12 +32,12 @@ const getValidator = async () => {
 
 type ValidationResult = { valid: true; data: PuzzmoFile } | { valid: false; errors: string[] }
 
-/** Validates a parsed object against the puzzmo.json JSON schema */
+/** Validates a parsed object against the puzzmo.json JSON schema. Returned `data` has `$schema` stripped. */
 export const validatePuzzmoJson = async (data: unknown): Promise<ValidationResult> => {
   const validator = await getValidator()
   const toValidate = stripSchemaProperty(data)
   const result = validator.validate(toValidate)
-  if (result.valid) return { valid: true, data: data as PuzzmoFile }
+  if (result.valid) return { valid: true, data: toValidate as PuzzmoFile }
   return {
     valid: false,
     errors: result.errors

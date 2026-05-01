@@ -5,13 +5,30 @@ import path from "node:path"
 
 import { uploadFiles } from "../util/api.js"
 import { getAPIURL, getToken } from "../util/config.js"
-import { validatePuzzmoJson } from "../util/validatePuzzmoFile.js"
+import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
 
 type UploadOptions = {
   verbose?: boolean
 }
 
-/** Uploads game build artifacts to Puzzmo */
+type GameSuccess = {
+  ok: true
+  slug: string
+  fileCount: number
+  totalBytes: number
+  versionID: string
+  assetsBase: string
+}
+
+type GameFailure = {
+  ok: false
+  slug: string
+  error: string
+}
+
+type GameResult = GameSuccess | GameFailure
+
+/** Uploads game build artifacts to Puzzmo by discovering puzzmo.json files in `dir` */
 export const upload = async (dir: string, options: UploadOptions = {}) => {
   const { verbose = false } = options
   const token = getToken()
@@ -20,68 +37,87 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     process.exit(1)
   }
 
-  const distDir = path.resolve(dir)
-  if (!fs.existsSync(distDir)) {
+  const rootDir = path.resolve(dir)
+  if (!fs.existsSync(rootDir)) {
     console.error(`Directory not found: ${dir}`)
     process.exit(1)
   }
 
-  const files = collectFiles(distDir)
-  if (!files.length) {
-    console.error(`Directory is empty: ${dir}`)
+  const { games, errors: discoveryErrors } = await discoverGames(rootDir)
+
+  if (!games.length && !discoveryErrors.length) {
+    console.error(`No puzzmo.json files found under ${rootDir}`)
     process.exit(1)
   }
 
-  // Require and validate puzzmo.json
-  const puzzmoJsonPath = path.join(distDir, "puzzmo.json")
-  if (!fs.existsSync(puzzmoJsonPath)) {
-    console.error(`Missing puzzmo.json in ${dir}`)
-    console.error("Every game upload must include a puzzmo.json file.")
-    process.exit(1)
+  console.log(`Found ${games.length} game(s) under ${rootDir}`)
+  for (const game of games) {
+    console.log(`  - ${game.puzzmoFile.game.slug} (${path.relative(rootDir, game.distDir) || "."})`)
+  }
+  if (discoveryErrors.length) {
+    console.log(`\n${discoveryErrors.length} puzzmo.json file(s) could not be loaded:`)
+    for (const err of discoveryErrors) {
+      console.log(`  - ${err.slug ?? path.relative(rootDir, err.puzzmoJsonPath)}`)
+      for (const e of err.errors) console.log(`      ${e}`)
+    }
   }
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(fs.readFileSync(puzzmoJsonPath, "utf-8"))
-  } catch (e) {
-    console.error(`Invalid puzzmo.json: ${e instanceof Error ? e.message : e}`)
-    process.exit(1)
-  }
-
-  const validation = await validatePuzzmoJson(parsed)
-  if (!validation.valid) {
-    console.error(`Invalid puzzmo.json:\n`)
-    for (const err of validation.errors) console.error(`  ${err}`)
-    process.exit(1)
-  }
-  const puzzmoFile = validation.data
-  const gameSlug = puzzmoFile.game.slug
-
-  // Determine SHA
-  const sha = getGitSHA() || hashFiles(files)
-  const description = getGitMessage()
-  const repoURL = getGitRepoURL()
-
-  console.log(`\nUploading ${gameSlug} (${sha.slice(0, 8)})`)
-  console.log(`Directory: ${distDir}`)
-  if (description) console.log(`Message: ${description}`)
+  const sha = getGitSHA(rootDir) || hashGames(games)
+  const description = getGitMessage(rootDir)
+  const repoURL = getGitRepoURL(rootDir)
+  if (description) console.log(`\nMessage: ${description}`)
   if (repoURL) console.log(`Repo: ${repoURL}`)
-  console.log("")
-
-  let totalBytes = 0
-  for (const file of files) {
-    const size = fs.statSync(file).size
-    totalBytes += size
-    const rel = path.relative(distDir, file)
-    console.log(`  ${rel} (${formatBytes(size)})`)
-  }
 
   const apiURL = getAPIURL()
   const defaultURL = "https://api.puzzmo.com"
+  if (apiURL !== defaultURL) console.log(`API: ${apiURL}`)
 
-  console.log(`\n${files.length} file(s), ${formatBytes(totalBytes)} total`)
-  if (apiURL !== defaultURL) console.log(`Uploading to ${apiURL}...`)
-  else console.log("Uploading...")
+  const results: GameResult[] = []
+  for (const err of discoveryErrors) {
+    results.push({ ok: false, slug: err.slug ?? path.relative(rootDir, err.puzzmoJsonPath), error: err.errors.join("; ") })
+  }
+
+  for (let i = 0; i < games.length; i++) {
+    const game = games[i]
+    console.log(`\n[${i + 1}/${games.length}] Uploading ${game.puzzmoFile.game.slug}`)
+    try {
+      const result = await uploadOneGame(game, { token, sha, description, repoURL, verbose, rootDir })
+      results.push(result)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      console.error(`  Failed: ${message}`)
+      results.push({ ok: false, slug: game.puzzmoFile.game.slug, error: message })
+    }
+  }
+
+  printReport(results)
+
+  const anyFailed = results.some((r) => !r.ok)
+  if (anyFailed) process.exit(1)
+}
+
+type UploadOneOptions = {
+  token: string
+  sha: string
+  description: string | null
+  repoURL: string | null
+  verbose: boolean
+  rootDir: string
+}
+
+/** Uploads a single discovered game; throws on failure */
+const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Promise<GameSuccess> => {
+  const { token, sha, description, repoURL, verbose, rootDir } = opts
+  const { puzzmoFile, distDir } = game
+  const gameSlug = puzzmoFile.game.slug
+
+  const files = collectFiles(distDir)
+  if (!files.length) throw new Error(`Dist folder is empty: ${distDir}`)
+
+  console.log(`  Directory: ${path.relative(rootDir, distDir) || distDir}`)
+  let totalBytes = 0
+  for (const file of files) totalBytes += fs.statSync(file).size
+  console.log(`  ${files.length} file(s), ${formatBytes(totalBytes)} total (sha ${sha.slice(0, 8)})`)
 
   const result = await uploadFiles(
     token,
@@ -91,13 +127,34 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     distDir,
     puzzmoFile,
     (batch, totalBatches, uploaded) => {
-      console.log(`  Batch ${batch}/${totalBatches} done (${uploaded} file(s) uploaded)`)
+      console.log(`    Batch ${batch}/${totalBatches} done (${uploaded} file(s) uploaded)`)
     },
     { verbose, description, repoURL },
   )
 
-  console.log(`\nDone - ${result.versionID}`)
-  console.log(`Assets: ${result.assetsBase}`)
+  console.log(`  Done - ${result.versionID}`)
+  return {
+    ok: true,
+    slug: gameSlug,
+    fileCount: files.length,
+    totalBytes,
+    versionID: result.versionID,
+    assetsBase: result.assetsBase,
+  }
+}
+
+/** Prints a final summary of every game's outcome */
+const printReport = (results: GameResult[]) => {
+  console.log(`\nUpload report (${results.length} game${results.length === 1 ? "" : "s"})`)
+  const successes = results.filter((r): r is GameSuccess => r.ok)
+  const failures = results.filter((r): r is GameFailure => !r.ok)
+  for (const r of successes) {
+    console.log(`  OK   ${r.slug.padEnd(24)} ${formatBytes(r.totalBytes).padStart(8)}  ${r.versionID}`)
+  }
+  for (const r of failures) {
+    console.log(`  FAIL ${r.slug.padEnd(24)} ${r.error}`)
+  }
+  console.log(`\n${successes.length} succeeded, ${failures.length} failed`)
 }
 
 /** Collects all files in a directory recursively */
@@ -113,27 +170,27 @@ const collectFiles = (dir: string): string[] => {
 }
 
 /** Tries to get the shortest unique git SHA, returns null if not in a git repo */
-const getGitSHA = (): string | null => {
+const getGitSHA = (cwd: string): string | null => {
   try {
-    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim()
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8", cwd }).trim()
   } catch {
     return null
   }
 }
 
 /** Gets the subject line of the latest commit, or null if not in a git repo */
-const getGitMessage = (): string | null => {
+const getGitMessage = (cwd: string): string | null => {
   try {
-    return execSync("git log -1 --pretty=%s", { encoding: "utf-8" }).trim() || null
+    return execSync("git log -1 --pretty=%s", { encoding: "utf-8", cwd }).trim() || null
   } catch {
     return null
   }
 }
 
 /** Gets the origin remote URL normalized to https, or null if unavailable */
-const getGitRepoURL = (): string | null => {
+const getGitRepoURL = (cwd: string): string | null => {
   try {
-    const raw = execSync("git config --get remote.origin.url", { encoding: "utf-8" }).trim()
+    const raw = execSync("git config --get remote.origin.url", { encoding: "utf-8", cwd }).trim()
     return raw ? normalizeRepoURL(raw) : null
   } catch {
     return null
@@ -153,11 +210,14 @@ const normalizeRepoURL = (url: string): string => {
   return normalized.replace(/\.git$/, "")
 }
 
-/** Hashes all file contents to produce a deterministic SHA */
-const hashFiles = (filePaths: string[]): string => {
+/** Hashes the dist contents of every game to produce a deterministic SHA across all uploads */
+const hashGames = (games: DiscoveredGame[]): string => {
   const hash = crypto.createHash("sha256")
-  for (const fp of filePaths.sort()) {
-    hash.update(fs.readFileSync(fp))
+  for (const game of games) {
+    for (const file of collectFiles(game.distDir).sort()) {
+      hash.update(file)
+      hash.update(fs.readFileSync(file))
+    }
   }
   return hash.digest("hex").slice(0, 12)
 }

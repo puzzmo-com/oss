@@ -10,7 +10,11 @@ export type PuzzmoFile = {
     slug: string
     teamID: string
   }
+  // This is what we're calling 'augmentations' publicly
   integrations?: Record<string, unknown>
+  output?: {
+    dir: string
+  }
 }
 
 const BATCH_SIZE = 10
@@ -60,9 +64,11 @@ const readResponse = async (res: Response, url: string, step: string, verbose: b
     throw new Error(`Invalid JSON response during ${step} (${url}): ${verbose ? text : text.slice(0, 200)}`)
   }
   if (!res.ok) {
-    const serverMsg = (json as { error?: string }).error || res.statusText || "Unknown error"
+    const body = json as { error?: string; validationErrors?: string[] }
+    const serverMsg = body.error || res.statusText || "Unknown error"
+    const validation = body.validationErrors?.length ? `\n  - ${body.validationErrors.join("\n  - ")}` : ""
     const detail = verbose ? `\n${JSON.stringify(json, null, 2)}` : ""
-    throw new Error(`Server error during ${step} (${res.status} from ${url}): ${serverMsg}${detail}`)
+    throw new Error(`Server error during ${step} (${res.status} from ${url}): ${serverMsg}${validation}${detail}`)
   }
   return json
 }

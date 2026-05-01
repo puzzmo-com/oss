@@ -14,8 +14,8 @@ const printUsage = () => {
   puzzmo login <token>            Save a CLI auth token
   puzzmo game create [token]      Create a new Puzzmo game project
 
-  puzzmo upload <dir> [-v]        Upload game build from <dir> (slug from puzzmo.json). -v/--verbose prints request URLs and full error bodies.
-  puzzmo validate [dir]           Validate puzzmo.json in a directory (default: .)
+  puzzmo upload [dir] [-v]        Discover puzzmo.json files in [dir] (default: .) and upload each game's build. -v/--verbose prints request URLs and full error bodies.
+  puzzmo validate [dir]           Discover and validate every puzzmo.json under [dir] (default: .)
   puzzmo migrate                  List and select migration skills from dev.puzzmo.com`)
 }
 
@@ -32,11 +32,7 @@ const run = async () => {
     }
     case "upload": {
       const verbose = args.includes("--verbose") || args.includes("-v")
-      const dir = args.find((a) => !a.startsWith("-"))
-      if (!dir) {
-        console.error("Usage: puzzmo upload <dir> [-v|--verbose]")
-        process.exit(1)
-      }
+      const dir = args.find((a) => !a.startsWith("-")) ?? "."
       await upload(dir, { verbose })
       break
     }
