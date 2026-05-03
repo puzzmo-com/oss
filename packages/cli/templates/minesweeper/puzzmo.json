@@ -1,0 +1,11 @@
+{
+  "$schema": "https://dev.puzzmo.com/schema/puzzmo-file-schema.json",
+  "game": {
+    "displayName": "__DISPLAY_NAME__",
+    "slug": "__SLUG__",
+    "teamID": "REPLACE_ME"
+  },
+  "output": {
+    "dir": "dist"
+  }
+}

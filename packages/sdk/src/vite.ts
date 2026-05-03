@@ -43,9 +43,9 @@ export function discoverGames(viteRoot: string): Map<string, GameInfo> {
     try {
       const data = JSON.parse(fs.readFileSync(path.join(dir, "puzzmo.json"), "utf-8"))
       if (!data?.game?.slug) continue
-      const bundleEntry = path.join(dir, "src", "appBundle.js")
+      const bundleEntry = resolveBundleEntry(dir, "src/appBundle")
       let appBundle: string | null = null
-      if (fs.existsSync(bundleEntry)) {
+      if (bundleEntry) {
         const relative = path.relative(viteRoot, bundleEntry)
         appBundle = "/" + relative.split(path.sep).join("/")
       }
@@ -196,13 +196,19 @@ function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
       name: pluginName,
       apply: "build",
       async closeBundle() {
+        // If the caller overrode `entry`, honor it as-is. Otherwise try `.js` first, then `.ts`.
+        const resolvedEntry = options.entry
+          ? path.isAbsolute(entry)
+            ? entry
+            : path.resolve(process.cwd(), entry)
+          : (resolveBundleEntry(process.cwd(), stripBundleExt(entry)) ?? path.resolve(process.cwd(), entry))
         try {
           await build({
             configFile: false,
             logLevel: "warn",
             build: {
               lib: {
-                entry: path.isAbsolute(entry) ? entry : path.resolve(process.cwd(), entry),
+                entry: resolvedEntry,
                 formats: ["es"],
                 fileName: () => outputFile,
               },
@@ -217,6 +223,18 @@ function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
       },
     }
   }
+}
+
+/** Strip the trailing extension from a default entry path so we can probe siblings. */
+const stripBundleExt = (p: string) => p.replace(/\.[jt]sx?$/i, "")
+
+/** Returns the absolute path to the first matching extension under `dir`, or null. */
+const resolveBundleEntry = (dir: string, baseRelative: string): string | null => {
+  for (const ext of [".js", ".ts"]) {
+    const candidate = path.join(dir, baseRelative + ext)
+    if (fs.existsSync(candidate)) return candidate
+  }
+  return null
 }
 
 export type AppBundlePluginOptions = Partial<BundlePluginOptions>

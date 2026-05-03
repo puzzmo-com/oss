@@ -2,9 +2,11 @@ import { execSync } from "node:child_process"
 import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
+import * as p from "@clack/prompts"
 
-import { uploadFiles } from "../util/api.js"
+import { GameNotFoundError, uploadFiles } from "../util/api.js"
 import { getAPIURL, getToken } from "../util/config.js"
+import { createUserGame } from "../util/createGame.js"
 import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
 
 type UploadOptions = {
@@ -81,7 +83,15 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     const game = games[i]
     console.log(`\n[${i + 1}/${games.length}] Uploading ${game.puzzmoFile.game.slug}`)
     try {
-      const result = await uploadOneGame(game, { token, sha, description, repoURL, verbose, rootDir })
+      let result: GameSuccess
+      try {
+        result = await uploadOneGame(game, { token, sha, description, repoURL, verbose, rootDir })
+      } catch (e) {
+        if (!(e instanceof GameNotFoundError)) throw e
+        const created = await maybeCreateMissingGame(e, game, { teamAccessToken: token })
+        if (!created) throw e
+        result = await uploadOneGame(game, { token, sha, description, repoURL, verbose, rootDir })
+      }
       results.push(result)
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
@@ -220,6 +230,46 @@ const hashGames = (games: DiscoveredGame[]): string => {
     }
   }
   return hash.digest("hex").slice(0, 12)
+}
+
+/**
+ * When a game can't be uploaded because it doesn't exist on the user's account,
+ * offer to create it interactively. Returns true if the game was created and the
+ * caller can retry the upload. Returns false otherwise (non-interactive shell or
+ * user declined).
+ */
+const maybeCreateMissingGame = async (
+  err: GameNotFoundError,
+  game: DiscoveredGame,
+  opts: { teamAccessToken: string },
+): Promise<boolean> => {
+  const slug = err.slug
+  const displayName = game.puzzmoFile.game.displayName
+
+  if (!process.stdin.isTTY) {
+    console.error(`  Game "${slug}" not found on your account. Re-run interactively to create it.`)
+    return false
+  }
+
+  const consent = await p.confirm({
+    message: `Game "${slug}" doesn't exist on your account. Create it now (displayName: "${displayName}")?`,
+    initialValue: true,
+  })
+  if (p.isCancel(consent) || !consent) return false
+
+  try {
+    const created = await createUserGame({ displayName, teamAccessToken: opts.teamAccessToken })
+    console.log(`  Created game ${created.slug} (${created.id})`)
+    if (created.slug !== slug) {
+      console.warn(`  Server picked slug "${created.slug}" but your puzzmo.json uses "${slug}". Update puzzmo.json before re-uploading.`)
+      return false
+    }
+    return true
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error(`  Could not create game: ${message}`)
+    return false
+  }
 }
 
 /** Formats a byte count as a human-readable string */

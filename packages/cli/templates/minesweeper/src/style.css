@@ -1,0 +1,160 @@
+/* Puzzmo subset fonts. ASCII-only — always pair with a system fallback. */
+@font-face {
+  font-family: "Poppins-SemiBold";
+  src: url("https://www.puzzmo.com/assets/fonts-subset/Poppins-SemiBold-subset.ttf");
+  font-display: swap;
+}
+@font-face {
+  font-family: "RedHatMono-Bold";
+  src: url("https://www.puzzmo.com/assets/fonts-subset/RedHatMono-Bold-subset.ttf");
+  font-display: swap;
+}
+
+/* Defaults are fallbacks for the simulator before the host sends a theme.
+   Real values are set on :root from the Puzzmo Theme object in applyTheme(). */
+:root {
+  --bg: #1a1a1a;
+  --panel: #2a2a2a;
+  --cell: #3a3a3a;
+  --cell-revealed: #1f1f1f;
+  --border: #4a4a4a;
+  --text: #f0f0f0;
+  --text-on-cell: #1b1b28;
+  --accent: #f0c040;
+  --mine: #ff5555;
+  --flag: #ffaa55;
+  --n1: #6cf;
+  --n2: #6f9;
+  --n3: #fc6;
+  --n4: #f96;
+  --n5: #f66;
+  --n6: #c6f;
+  --n7: #fcf;
+  --n8: #fff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Poppins-SemiBold", system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.hud {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  background: var(--panel);
+  padding: 6px 12px;
+  border-radius: 6px;
+  min-width: 200px;
+  justify-content: space-between;
+}
+
+.board {
+  /* Square board: prefer the smaller of (viewport width minus body padding) and
+     (viewport height minus header allowance), clamped to a sane range so the
+     board never disappears on tiny screens nor overwhelms huge ones.
+     Stored as a custom property so `.cell` can reuse the same length expression
+     to size its font without measuring anything in JS. */
+  --board-size: clamp(280px, min(100vw - 32px, 100vh - 200px), 900px);
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 9), 1fr);
+  grid-template-rows: repeat(var(--rows, 9), 1fr);
+  gap: 2px;
+  background: var(--panel);
+  padding: 6px;
+  border-radius: 6px;
+  user-select: none;
+  touch-action: manipulation;
+  width: var(--board-size);
+  aspect-ratio: 1;
+}
+
+.cell {
+  background: var(--cell);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "RedHatMono-Bold", ui-monospace, monospace;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text-on-cell);
+  /* Cell width ≈ board-size / cols. Glyph at ~55% of cell width. CSS variables
+     inherit from `.board`, so no JS measurement needed. */
+  font-size: calc(var(--board-size) * 0.55 / var(--cols, 9));
+  padding: 0;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.cell.revealed {
+  background: var(--cell-revealed);
+  cursor: default;
+}
+
+.cell.flagged {
+  color: var(--flag);
+}
+
+.cell.mine {
+  color: var(--mine);
+}
+
+.cell[data-n="1"] {
+  color: var(--n1);
+}
+.cell[data-n="2"] {
+  color: var(--n2);
+}
+.cell[data-n="3"] {
+  color: var(--n3);
+}
+.cell[data-n="4"] {
+  color: var(--n4);
+}
+.cell[data-n="5"] {
+  color: var(--n5);
+}
+.cell[data-n="6"] {
+  color: var(--n6);
+}
+.cell[data-n="7"] {
+  color: var(--n7);
+}
+.cell[data-n="8"] {
+  color: var(--n8);
+}

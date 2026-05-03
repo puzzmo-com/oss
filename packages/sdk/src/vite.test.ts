@@ -122,6 +122,25 @@ describe("discoverGames", () => {
     expect(games.get("foo")!.appBundlePath).toBe("/games/foo/src/appBundle.js")
   })
 
+  it("detects app bundle when src/appBundle.ts exists", () => {
+    tmpRoot = createTempTree({
+      "puzzmo.json": puzzmoJson("with-ts-bundle"),
+      "src/appBundle.ts": "export function renderThumbnail() { return '' }",
+    })
+    const games = discoverGames(tmpRoot)
+    expect(games.get("with-ts-bundle")!.appBundlePath).toBe("/src/appBundle.ts")
+  })
+
+  it("prefers .js over .ts when both exist", () => {
+    tmpRoot = createTempTree({
+      "puzzmo.json": puzzmoJson("dual"),
+      "src/appBundle.js": "export function renderThumbnail() {}",
+      "src/appBundle.ts": "export function renderThumbnail() { return '' }",
+    })
+    const games = discoverGames(tmpRoot)
+    expect(games.get("dual")!.appBundlePath).toBe("/src/appBundle.js")
+  })
+
   it("skips puzzmo.json without game.slug", () => {
     tmpRoot = createTempTree({
       "bad/puzzmo.json": JSON.stringify({ game: { displayName: "no slug" } }),

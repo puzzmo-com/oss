@@ -82,3 +82,38 @@ export const runSkillsPipeline = async (agent: string, gameDir: string, repoCont
 export const runSkillsPipelineTUI = async (agent: string, gameDir: string, repoContext: string) => {
   await runPipelineTUI(agent, gameDir, repoContext)
 }
+
+/** Runs a single agent invocation, verifies the build, and commits. Used by one-shot prompt-driven flows. */
+export const runAgentWithBuildLoop = (agent: string, prompt: string, gameDir: string, label: string): boolean => {
+  console.log(`Running agent: ${label}`)
+  let result = invokeAgent(agent, prompt, gameDir)
+  if (!result.success) {
+    console.log(`  Agent failed, retrying...`)
+    result = invokeAgent(agent, prompt, gameDir)
+    if (!result.success) {
+      console.error(`  Agent failed after retry. Stopping.`)
+      return false
+    }
+  }
+
+  const buildResult = verifyBuild(gameDir)
+  if (!buildResult.success) {
+    console.log(`  Build failed, asking agent to fix...`)
+    const fixPrompt = `The vite build failed after the "${label}" step. Fix the build errors:\n\n${buildResult.error}`
+    invokeAgent(agent, fixPrompt, gameDir)
+    const retry = verifyBuild(gameDir)
+    if (!retry.success) {
+      console.error(`  Build still failing after fix attempt.`)
+      return false
+    }
+  }
+
+  try {
+    runCommand("git add -A", { cwd: gameDir })
+    gitCommit(`step: ${label}`, { cwd: gameDir })
+    console.log(`  Committed.`)
+  } catch {
+    console.log(`  No changes to commit.`)
+  }
+  return true
+}

@@ -19,6 +19,17 @@ export type PuzzmoFile = {
 
 const BATCH_SIZE = 10
 
+/** Thrown when /cliUpload init returns a 404 because the game slug isn't registered yet. */
+export class GameNotFoundError extends Error {
+  constructor(
+    public readonly slug: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = "GameNotFoundError"
+  }
+}
+
 type InitResponse = { sessionID: string; basePath: string; error?: string }
 type FileResponse = { path: string; error?: string }
 type CompleteResponse = { assetsBase: string; versionID: string; error?: string }
@@ -127,13 +138,19 @@ export const uploadFiles = async (
   if (verbose) console.log(`  API URL: ${apiURL}`)
 
   // Step 1: Init session (includes puzzmo.json metadata)
-  const init = (await jsonPost(
-    `${apiURL}/cliUpload`,
-    token,
-    { gameSlug, sha, puzzmoFile, description, repoURL },
-    "upload init",
-    verbose,
-  )) as InitResponse
+  let init: InitResponse
+  try {
+    init = (await jsonPost(
+      `${apiURL}/cliUpload`,
+      token,
+      { gameSlug, sha, puzzmoFile, description, repoURL },
+      "upload init",
+      verbose,
+    )) as InitResponse
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("Game not found:")) throw new GameNotFoundError(gameSlug, e.message)
+    throw e
+  }
   if (verbose) console.log(`  session: ${init.sessionID}`)
 
   // Step 2: Upload files in concurrent batches
