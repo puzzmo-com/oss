@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@puzzmo/cli": "*",
     "@puzzmo/sdk": "*"
   },
   "devDependencies": {

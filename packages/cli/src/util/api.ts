@@ -119,7 +119,15 @@ const uploadFile = async (url: string, token: string, filePath: string, baseDir:
     step,
     verbose,
   )
+  if (res.status === 413) throw new Error(`File ${relativePath} is too large to upload (${formatBytes(content.length)})`)
   return (await readResponse(res, fullURL, step, verbose)) as FileResponse
+}
+
+/** Formats a byte count as a human-readable string (e.g. "1.6 MB") */
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 /** Multi-step upload: init -> batched file uploads -> complete */
