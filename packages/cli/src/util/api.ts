@@ -1,8 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
 
-import { getAPIURL } from "./config.js"
-
 /** The schema for a puzzmo.json file - mirrors PuzzmoFile from @puzzmo-com/shared/hostAPI */
 export type PuzzmoFile = {
   game: {
@@ -132,6 +130,7 @@ const formatBytes = (bytes: number): string => {
 
 /** Multi-step upload: init -> batched file uploads -> complete */
 export const uploadFiles = async (
+  apiURL: string,
   token: string,
   gameSlug: string,
   sha: string,
@@ -142,7 +141,6 @@ export const uploadFiles = async (
   options: UploadFilesOptions = {},
 ): Promise<CompleteResponse> => {
   const { verbose = false, description, repoURL } = options
-  const apiURL = getAPIURL()
   if (verbose) console.log(`  API URL: ${apiURL}`)
 
   // Step 1: Init session (includes puzzmo.json metadata)

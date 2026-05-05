@@ -10,7 +10,7 @@ import { downloadPage } from "../../download/page-downloader.js"
 import { runCommand, gitCommit } from "../../util/exec.js"
 import { runSkillsPipelineTUI, runAgentWithBuildLoop } from "../../skills/runner.js"
 import { login } from "../login.js"
-import { getToken } from "../../util/config.js"
+import { getDefaultToken } from "../../util/config.js"
 import { detectRepoContext, type RepoType } from "./detectRepo.js"
 
 type Strategy = "import" | "blank" | "prompt"
@@ -62,7 +62,7 @@ const slugify = (text: string) =>
 
 /** Writes .mcp.json with dev server config */
 const writeMcpConfig = (dir: string) => {
-  const token = getToken()
+  const token = getDefaultToken()
   const mcpConfig = {
     mcpServers: {
       "dev.puzzmo.com": {

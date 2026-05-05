@@ -5,7 +5,7 @@ import path from "node:path"
 import * as p from "@clack/prompts"
 
 import { GameNotFoundError, uploadFiles } from "../util/api.js"
-import { getAPIURL, getToken } from "../util/config.js"
+import { type TokenEntry, findTokensForTeam, getTokens, resolveServerForTeam, sourceToURL } from "../util/config.js"
 import { createUserGame } from "../util/createGame.js"
 import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
 
@@ -16,6 +16,7 @@ type UploadOptions = {
 type GameSuccess = {
   ok: true
   slug: string
+  source: string
   fileCount: number
   totalBytes: number
   versionID: string
@@ -33,8 +34,8 @@ type GameResult = GameSuccess | GameFailure
 /** Uploads game build artifacts to Puzzmo by discovering puzzmo.json files in `dir` */
 export const upload = async (dir: string, options: UploadOptions = {}) => {
   const { verbose = false } = options
-  const token = getToken()
-  if (!token) {
+
+  if (getTokens().length === 0) {
     console.error("Not logged in. Run `puzzmo login <token>` or set PUZZMO_TOKEN.")
     process.exit(1)
   }
@@ -70,10 +71,6 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
   if (description) console.log(`\nMessage: ${description}`)
   if (repoURL) console.log(`Repo: ${repoURL}`)
 
-  const apiURL = getAPIURL()
-  const defaultURL = "https://api.puzzmo.com"
-  if (apiURL !== defaultURL) console.log(`API: ${apiURL}`)
-
   const results: GameResult[] = []
   for (const err of discoveryErrors) {
     results.push({ ok: false, slug: err.slug ?? path.relative(rootDir, err.puzzmoJsonPath), error: err.errors.join("; ") })
@@ -81,22 +78,40 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
 
   for (let i = 0; i < games.length; i++) {
     const game = games[i]
-    console.log(`\n[${i + 1}/${games.length}] Uploading ${game.puzzmoFile.game.slug}`)
+    const slug = game.puzzmoFile.game.slug
+    console.log(`\n[${i + 1}/${games.length}] Uploading ${slug}`)
+
+    const teamID = game.puzzmoFile.game.teamID
+    const credential = await resolveServerForTeam(teamID)
+    if (!credential) {
+      const matches = findTokensForTeam(teamID)
+      const message =
+        matches.length === 0
+          ? `No saved token for team ${teamID}. Run \`puzzmo login <token>\` (use \`--source\` if the token is for a non-default server).`
+          : `Token for team ${teamID} is registered against ${matches.map((m) => m.source).join(", ")} but none of those servers are reachable.`
+      console.error(`  ${message}`)
+      results.push({ ok: false, slug, error: message })
+      continue
+    }
+
+    const apiURL = sourceToURL(credential.source)
+    console.log(`  Server: ${credential.source}`)
+
     try {
       let result: GameSuccess
       try {
-        result = await uploadOneGame(game, { token, sha, description, repoURL, verbose, rootDir })
+        result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose, rootDir })
       } catch (e) {
         if (!(e instanceof GameNotFoundError)) throw e
-        const created = await maybeCreateMissingGame(e, game, { teamAccessToken: token })
+        const created = await maybeCreateMissingGame(e, game, { apiURL, teamAccessToken: credential.token })
         if (!created) throw e
-        result = await uploadOneGame(game, { token, sha, description, repoURL, verbose, rootDir })
+        result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose, rootDir })
       }
       results.push(result)
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       console.error(`  Failed: ${message}`)
-      results.push({ ok: false, slug: game.puzzmoFile.game.slug, error: message })
+      results.push({ ok: false, slug, error: message })
     }
   }
 
@@ -107,7 +122,8 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
 }
 
 type UploadOneOptions = {
-  token: string
+  credential: TokenEntry
+  apiURL: string
   sha: string
   description: string | null
   repoURL: string | null
@@ -117,7 +133,7 @@ type UploadOneOptions = {
 
 /** Uploads a single discovered game; throws on failure */
 const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Promise<GameSuccess> => {
-  const { token, sha, description, repoURL, verbose, rootDir } = opts
+  const { credential, apiURL, sha, description, repoURL, verbose, rootDir } = opts
   const { puzzmoFile, distDir } = game
   const gameSlug = puzzmoFile.game.slug
 
@@ -130,7 +146,8 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   console.log(`  ${files.length} file(s), ${formatBytes(totalBytes)} total (sha ${sha.slice(0, 8)})`)
 
   const result = await uploadFiles(
-    token,
+    apiURL,
+    credential.token,
     gameSlug,
     sha,
     files,
@@ -146,6 +163,7 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   return {
     ok: true,
     slug: gameSlug,
+    source: credential.source,
     fileCount: files.length,
     totalBytes,
     versionID: result.versionID,
@@ -159,7 +177,7 @@ const printReport = (results: GameResult[]) => {
   const successes = results.filter((r): r is GameSuccess => r.ok)
   const failures = results.filter((r): r is GameFailure => !r.ok)
   for (const r of successes) {
-    console.log(`  OK   ${r.slug.padEnd(24)} ${formatBytes(r.totalBytes).padStart(8)}  ${r.versionID}`)
+    console.log(`  OK   ${r.slug.padEnd(24)} ${formatBytes(r.totalBytes).padStart(8)}  ${r.source.padEnd(20)} ${r.versionID}`)
   }
   for (const r of failures) {
     console.log(`  FAIL ${r.slug.padEnd(24)} ${r.error}`)
@@ -241,7 +259,7 @@ const hashGames = (games: DiscoveredGame[]): string => {
 const maybeCreateMissingGame = async (
   err: GameNotFoundError,
   game: DiscoveredGame,
-  opts: { teamAccessToken: string },
+  opts: { apiURL: string; teamAccessToken: string },
 ): Promise<boolean> => {
   const slug = err.slug
   const displayName = game.puzzmoFile.game.displayName
@@ -258,7 +276,7 @@ const maybeCreateMissingGame = async (
   if (p.isCancel(consent) || !consent) return false
 
   try {
-    const created = await createUserGame({ displayName, teamAccessToken: opts.teamAccessToken })
+    const created = await createUserGame({ apiURL: opts.apiURL, displayName, teamAccessToken: opts.teamAccessToken })
     console.log(`  Created game ${created.slug} (${created.id})`)
     if (created.slug !== slug) {
       console.warn(`  Server picked slug "${created.slug}" but your puzzmo.json uses "${slug}". Update puzzmo.json before re-uploading.`)

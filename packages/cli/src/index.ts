@@ -11,23 +11,32 @@ const [command, ...args] = process.argv.slice(2)
 
 const printUsage = () => {
   console.log(`Usage:
-  puzzmo login <token>            Save a CLI auth token
-  puzzmo game create [token]      Create a new Puzzmo game project
+  puzzmo login <token> [--source <url>]  Save a CLI auth token. You can have many stored tokens for different teams. 
+                                         --source defaults to https://api.puzzmo.com;
 
-  puzzmo upload [dir] [-v]        Discover puzzmo.json files in [dir] (default: .) and upload each game's build. -v/--verbose prints request URLs and full error bodies. If a game does not exist on your account and stdin is a TTY, you'll be asked whether to create it (using your saved CLI token).
-  puzzmo validate [dir]           Discover and validate every puzzmo.json under [dir] (default: .)
-  puzzmo migrate                  List and select migration skills from dev.puzzmo.com`)
+  puzzmo game create [token]             Create a new Puzzmo game project
+
+  puzzmo upload [dir] [-v]               Discover puzzmo.json files in [dir] (default: .) and upload each game's build.
+  puzzmo validate [dir]                  Discover and validate every puzzmo.json under [dir] (default: .)
+  puzzmo migrate                         List and select migration skills from dev.puzzmo.com`)
 }
 
 const run = async () => {
   switch (command) {
     case "login": {
-      const token = args[0]
-      if (!token) {
-        console.error("Usage: puzzmo login <token>")
+      const sourceIndex = args.findIndex((a) => a === "--source")
+      const source = sourceIndex >= 0 ? args[sourceIndex + 1] : undefined
+      if (sourceIndex >= 0 && !source) {
+        console.error("Usage: puzzmo login <token> [--source <url>]")
         process.exit(1)
       }
-      login(token)
+      const sourceValueIndex = sourceIndex >= 0 ? sourceIndex + 1 : -1
+      const token = args.find((a, i) => !a.startsWith("-") && i !== sourceValueIndex)
+      if (!token) {
+        console.error("Usage: puzzmo login <token> [--source <url>]")
+        process.exit(1)
+      }
+      login(token, source)
       break
     }
     case "upload": {

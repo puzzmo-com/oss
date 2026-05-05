@@ -1,5 +1,3 @@
-import { getAPIURL } from "./config.js"
-
 const createUserGameMutation = `
   mutation cliCreateUserGameMutation($teamAccessToken: String!, $input: CreateUserGameInput!) {
     createUserGame(teamAccessToken: $teamAccessToken, input: $input) {
@@ -22,6 +20,8 @@ type CreateUserGameResponse = {
 }
 
 export type CreateUserGameOptions = {
+  /** Base URL of the API server to call (e.g. "https://api.puzzmo.com") */
+  apiURL: string
   /** A teamAccessToken (the same token saved by `puzzmo login`). The mutation uses it to identify the team. */
   teamAccessToken: string
   displayName: string
@@ -31,7 +31,7 @@ export type CreatedGame = { id: string; slug: string; displayName: string; newAc
 
 /** Calls the createUserGame mutation using a teamAccessToken for auth. */
 export const createUserGame = async (options: CreateUserGameOptions): Promise<CreatedGame> => {
-  const url = `${getAPIURL()}/graphql`
+  const url = `${options.apiURL}/graphql`
 
   const response = await fetch(url, {
     method: "POST",
