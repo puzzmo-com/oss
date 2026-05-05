@@ -1,85 +1,93 @@
 #!/usr/bin/env node
 
+import { defineCommand, runMain } from "citty"
+
 import { agentTest } from "./commands/agent-test.js"
+import { gameCreate } from "./commands/game/create.js"
 import { login } from "./commands/login.js"
+import { migrate } from "./commands/migrate.js"
 import { upload } from "./commands/upload.js"
 import { validate } from "./commands/validate.js"
-import { gameCreate } from "./commands/game/create.js"
-import { migrate } from "./commands/migrate.js"
+import { defaultSource } from "./util/config.js"
 
-const [command, ...args] = process.argv.slice(2)
-
-const printUsage = () => {
-  console.log(`Usage:
-  puzzmo login <token> [--source <url>]  Save a CLI auth token. You can have many stored tokens for different teams. 
-                                         --source defaults to https://api.puzzmo.com;
-
-  puzzmo game create [token]             Create a new Puzzmo game project
-
-  puzzmo upload [dir] [-v]               Discover puzzmo.json files in [dir] (default: .) and upload each game's build.
-  puzzmo validate [dir]                  Discover and validate every puzzmo.json under [dir] (default: .)
-  puzzmo migrate                         List and select migration skills from dev.puzzmo.com`)
-}
-
-const run = async () => {
-  switch (command) {
-    case "login": {
-      const sourceIndex = args.findIndex((a) => a === "--source")
-      const source = sourceIndex >= 0 ? args[sourceIndex + 1] : undefined
-      if (sourceIndex >= 0 && !source) {
-        console.error("Usage: puzzmo login <token> [--source <url>]")
-        process.exit(1)
-      }
-      const sourceValueIndex = sourceIndex >= 0 ? sourceIndex + 1 : -1
-      const token = args.find((a, i) => !a.startsWith("-") && i !== sourceValueIndex)
-      if (!token) {
-        console.error("Usage: puzzmo login <token> [--source <url>]")
-        process.exit(1)
-      }
-      login(token, source)
-      break
-    }
-    case "upload": {
-      const verbose = args.includes("--verbose") || args.includes("-v")
-      const dir = args.find((a) => !a.startsWith("-")) ?? "."
-      await upload(dir, { verbose })
-      break
-    }
-    case "game": {
-      const [subcommand, ...subArgs] = args
-      if (subcommand === "create") {
-        await gameCreate(subArgs)
-      } else {
-        console.error(
-          "Usage: puzzmo game create [--strategy <import|blank|prompt>] [--prompt <text>] [--name <name>] [--url <url>] [--agent <agent>] [--token <token>] [--pm <npm|yarn|pnpm>]",
-        )
-        process.exit(1)
-      }
-      break
-    }
-    case "validate": {
-      validate(args[0] || ".")
-      break
-    }
-    case "migrate": {
-      await migrate()
-      break
-    }
-    case "agent-test": {
-      await agentTest()
-      break
-    }
-    default:
-      printUsage()
-      break
-  }
-}
-
-run().catch((err) => {
-  console.error(err.message || err)
-  if (err && err.cause) {
-    const cause = err.cause
-    console.error(`Caused by: ${cause instanceof Error ? cause.message : cause}`)
-  }
-  process.exit(1)
+const loginCommand = defineCommand({
+  meta: {
+    name: "login",
+    description: "Save a CLI auth token. Multiple tokens can be stored, one per --source server.",
+  },
+  args: {
+    token: { type: "positional", description: "The pzt- token from dev.puzzmo.com", required: true },
+    source: { type: "string", description: "Server this token belongs to", default: defaultSource },
+  },
+  run: ({ args }) => login(args.token, args.source),
 })
+
+const uploadCommand = defineCommand({
+  meta: {
+    name: "upload",
+    description: "Discover puzzmo.json files and upload each game's build and sync the puzzmo.json.",
+  },
+  args: {
+    dir: { type: "positional", description: "Directory to scan", required: false, default: "." },
+    verbose: { type: "boolean", description: "Print request URLs and full error bodies", alias: "v" },
+  },
+  run: ({ args }) => upload(args.dir, { verbose: args.verbose }),
+})
+
+const validateCommand = defineCommand({
+  meta: { name: "validate", description: "Validate every puzzmo.json under [dir]" },
+  args: {
+    dir: { type: "positional", description: "Directory to scan", required: false, default: "." },
+  },
+  run: ({ args }) => validate(args.dir),
+})
+
+const migrateCommand = defineCommand({
+  meta: { name: "migrate", description: "List and select migration skills from dev.puzzmo.com" },
+  run: () => migrate(),
+})
+
+const gameCreateCommand = defineCommand({
+  meta: { name: "create", description: "Scaffold a new Puzzmo game project" },
+  args: {
+    strategy: { type: "enum", options: ["import", "blank", "prompt"], description: "How to seed the new game" },
+    prompt: { type: "string", description: "Game description (used with --strategy prompt)" },
+    name: { type: "string", description: "Game display name" },
+    url: { type: "string", description: "Source URL (used with --strategy import)" },
+    agent: { type: "string", description: "LLM agent id to drive scaffolding" },
+    token: { type: "string", description: "Save this token before creating the game" },
+    pm: { type: "enum", options: ["npm", "yarn", "pnpm"], description: "Package manager to use" },
+  },
+  run: ({ args }) =>
+    gameCreate({
+      strategy: args.strategy,
+      prompt: args.prompt,
+      name: args.name,
+      url: args.url,
+      agent: args.agent,
+      accessToken: args.token,
+      pm: args.pm,
+    }),
+})
+
+const gameCommand = defineCommand({
+  meta: { name: "game", description: "Game project commands" },
+  subCommands: { create: gameCreateCommand },
+})
+
+const main = defineCommand({
+  meta: { name: "puzzmo", description: "Puzzmo CLI" },
+  subCommands: {
+    login: loginCommand,
+    upload: uploadCommand,
+    validate: validateCommand,
+    migrate: migrateCommand,
+    game: gameCommand,
+    "agent-test": defineCommand({
+      meta: { name: "agent-test", description: "Run the agent test harness", hidden: true },
+      run: () => agentTest(),
+    }),
+  },
+})
+
+runMain(main)

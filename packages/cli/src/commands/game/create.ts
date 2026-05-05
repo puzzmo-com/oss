@@ -13,9 +13,9 @@ import { login } from "../login.js"
 import { getDefaultToken } from "../../util/config.js"
 import { detectRepoContext, type RepoType } from "./detectRepo.js"
 
-type Strategy = "import" | "blank" | "prompt"
+export type Strategy = "import" | "blank" | "prompt"
 
-type CreateOptions = {
+export type CreateOptions = {
   name?: string
   url?: string
   agent?: string
@@ -23,29 +23,6 @@ type CreateOptions = {
   pm?: string
   strategy?: Strategy
   prompt?: string
-}
-
-/** Parses CLI args into CreateOptions */
-const parseArgs = (args: string[]): CreateOptions => {
-  const opts: CreateOptions = {}
-  let i = 0
-
-  while (i < args.length) {
-    const arg = args[i]
-    if (arg === "--name" && args[i + 1]) opts.name = args[++i]
-    else if (arg === "--url" && args[i + 1]) opts.url = args[++i]
-    else if (arg === "--agent" && args[i + 1]) opts.agent = args[++i]
-    else if (arg === "--token" && args[i + 1]) opts.accessToken = args[++i]
-    else if (arg === "--pm" && args[i + 1]) opts.pm = args[++i]
-    else if (arg === "--prompt" && args[i + 1]) opts.prompt = args[++i]
-    else if (arg === "--strategy" && args[i + 1]) {
-      const v = args[++i]
-      if (v === "import" || v === "blank" || v === "prompt") opts.strategy = v
-    }
-    i++
-  }
-
-  return opts
 }
 
 /** Converts a string to a URL-friendly slug (matches packages/shared/slugify.ts) */
@@ -227,9 +204,7 @@ const buildPromptStrategyMessage = (userPrompt: string, displayName: string): st
   ].join("\n")
 
 /** Main game create wizard */
-export const gameCreate = async (args: string[]) => {
-  const opts = parseArgs(args)
-
+export const gameCreate = async (opts: CreateOptions) => {
   const require = createRequire(import.meta.url)
   const { version } = require("../../../package.json")
   p.intro(`Puzzmo Game Creator v${version}`)
