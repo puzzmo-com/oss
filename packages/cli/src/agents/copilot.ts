@@ -1,9 +1,11 @@
 import { runStreamJsonCli } from "./stream-json-cli.js"
 import type { Agent, AgentEvent } from "./types.js"
 
-/** Copilot adapter — wraps the local `copilot` CLI (`@github/copilot`) in
- *  `--output-format json` mode so the user's existing OAuth/Copilot Pro
- *  subscription auth keeps working. */
+/**
+ * Copilot adapter — wraps the local `copilot` CLI (`@github/copilot`) in
+ * `--output-format json` mode so the user's existing OAuth/Copilot Pro
+ * subscription auth keeps working.
+ */
 export const copilotAgent: Agent = {
   name: "copilot",
   run: (input) =>
@@ -17,8 +19,10 @@ export const copilotAgent: Agent = {
     ),
 }
 
-/** Map one JSONL event from `copilot --output-format json` to an AgentEvent.
- *  Schema: `node_modules/@github/copilot/schemas/session-events.schema.json`. */
+/**
+ * Map one JSONL event from `copilot --output-format json` to an AgentEvent.
+ * Schema: `node_modules/@github/copilot/schemas/session-events.schema.json`.
+ */
 const parseCopilotLine = (line: string): AgentEvent | null => {
   let event: any
   try {

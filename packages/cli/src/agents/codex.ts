@@ -1,8 +1,10 @@
 import { runStreamJsonCli } from "./stream-json-cli.js"
 import type { AgentEvent, Agent } from "./types.js"
 
-/** Codex adapter — wraps the local `codex` CLI in `exec --json` mode so the
- *  user's existing ChatGPT subscription auth keeps working. */
+/**
+ * Codex adapter — wraps the local `codex` CLI in `exec --json` mode so the
+ * user's existing ChatGPT subscription auth keeps working.
+ */
 export const codexAgent: Agent = {
   name: "codex",
   run: (input) =>
@@ -16,8 +18,10 @@ export const codexAgent: Agent = {
     ),
 }
 
-/** Map one JSONL event from `codex exec --json` to an AgentEvent. Schema matches
- *  the `ThreadEvent` union in `@openai/codex-sdk`. */
+/**
+ * Map one JSONL event from `codex exec --json` to an AgentEvent. Schema matches
+ * the `ThreadEvent` union in `@openai/codex-sdk`.
+ */
 const parseCodexLine = (line: string): AgentEvent | null => {
   let event: any
   try {
