@@ -1,20 +1,25 @@
 ---
 name: setup-augmentations
-description: Create augmentations.json with leaderboard configuration using deeds
+description: Add integrations to puzzmo.json with leaderboard configuration using deeds
 ---
 
 # Setup Augmentations
 
-Create an `augmentations.json` file that configures leaderboards and other meta-game features using the deeds defined in the previous step.
+Add an `integrations` field to `puzzmo.json` that configures leaderboards and other meta-game features using the deeds defined in the previous step.
 
 ## Steps
 
-1. Create `augmentations.json` in the project root:
+1. Add the `integrations` field to the existing `puzzmo.json`:
 
    ```json
    {
-     "_v": 1,
-     "augmentations": {
+     "$schema": "https://dev.puzzmo.com/schema/puzzmo-file-schema.json",
+     "game": {
+       "displayName": "Your Game",
+       "slug": "GAMESLUG",
+       "teamID": "TEAMID"
+     },
+     "integrations": {
        "leaderboards": [
          {
            "displayName": "Fastest Time",
@@ -31,6 +36,9 @@ Create an `augmentations.json` file that configures leaderboards and other meta-
            "formatString": "%@"
          }
        ]
+     },
+     "output": {
+       "dir": "dist"
      }
    }
    ```
@@ -51,7 +59,7 @@ Create an `augmentations.json` file that configures leaderboards and other meta-
 
 ## Success Criteria
 
-- `augmentations.json` exists and is valid JSON
+- `puzzmo.json` has an `integrations` field with valid configuration
 - At least 2 leaderboards are configured
 - All `stableID` values follow the `game-slug:deed-id` format
 - `formatString` values are appropriate for each metric

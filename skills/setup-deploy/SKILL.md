@@ -20,13 +20,13 @@ Configure the project to deploy game builds to Puzzmo using the CLI.
    ```json
    {
      "scripts": {
-       "deploy": "puzzmo upload GAMESLUG dist",
-       "deploy:only": "puzzmo upload GAMESLUG dist"
+       "deploy": "npm run build && puzzmo upload",
+       "deploy:only": "puzzmo upload"
      }
    }
    ```
 
-3. Replace `GAMESLUG` with the actual game slug.
+3. The CLI discovers the game slug from `puzzmo.json` automatically.
 
 4. Create a `.gitignore` if it doesn't exist, including:
 
