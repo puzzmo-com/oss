@@ -21,6 +21,8 @@ type GameSuccess = {
   totalBytes: number
   versionID: string
   assetsBase: string
+  integrationsChanged: boolean
+  versionsURL: string | null
 }
 
 type GameFailure = {
@@ -160,6 +162,10 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   )
 
   console.log(`  Done - ${result.versionID}`)
+  if (result.integrationsChanged && result.versionsURL) {
+    console.log(`  Integrations changed — staged on a new upcoming version:`)
+    console.log(`    ${result.versionsURL}`)
+  }
   return {
     ok: true,
     slug: gameSlug,
@@ -168,6 +174,8 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
     totalBytes,
     versionID: result.versionID,
     assetsBase: result.assetsBase,
+    integrationsChanged: result.integrationsChanged,
+    versionsURL: result.versionsURL,
   }
 }
 

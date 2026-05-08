@@ -28,9 +28,9 @@ export class GameNotFoundError extends Error {
   }
 }
 
-type InitResponse = { sessionID: string; basePath: string; error?: string }
+type InitResponse = { sessionID: string; basePath: string; integrationsChanged?: boolean; versionsURL?: string; error?: string }
 type FileResponse = { path: string; error?: string }
-type CompleteResponse = { assetsBase: string; versionID: string; error?: string }
+type CompleteResponse = { assetsBase: string; versionID: string; integrationsChanged: boolean; versionsURL: string | null; error?: string }
 
 /** Callback for reporting batch upload progress */
 export type UploadProgress = (batch: number, totalBatches: number, uploaded: number) => void
@@ -173,5 +173,13 @@ export const uploadFiles = async (
   }
 
   // Step 3: Complete
-  return (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {}, "upload complete", verbose)) as CompleteResponse
+  const complete = (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {}, "upload complete", verbose)) as Omit<
+    CompleteResponse,
+    "integrationsChanged" | "versionsURL"
+  >
+  return {
+    ...complete,
+    integrationsChanged: !!init.integrationsChanged,
+    versionsURL: init.versionsURL ?? null,
+  }
 }
