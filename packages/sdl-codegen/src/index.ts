@@ -15,9 +15,21 @@ import { makeStep } from "./utils.js"
 
 export * from "./types.js"
 
+export interface SDLCodeGenWatcher {
+  /** Called when a file is changed by the host's file watcher. */
+  fileChanged: (path: string) => void
+  /**
+   * Force a re-read of the generated GraphQL schema and a full re-run of codegen
+   * for all services. Use this when the host writes the schema to a path that the
+   * file watcher does not observe (e.g. it lives outside the watched root), so
+   * that subsequent service file changes are validated against the latest schema.
+   */
+  schemaChanged: () => void
+}
+
 export interface SDLCodeGenReturn {
   // Optional way to start up a watcher mode for the codegen
-  createWatcher: () => { fileChanged: (path: string) => void }
+  createWatcher: () => SDLCodeGenWatcher
   // Paths which were added/changed during the run
   paths: string[]
 }
@@ -122,21 +134,25 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
   const timeTaken = endTime - startTime
   if (verbose) console.log(`[sdl-codegen]: Full run took ${timeTaken}ms`)
 
-  const createWatcher = () => {
+  const createWatcher = (): SDLCodeGenWatcher => {
     let oldSDL = ""
+
+    const schemaChanged = () => {
+      const newSDL = appContext.sys.readFile(appContext.pathSettings.graphQLSchemaPath)
+      if (!newSDL || newSDL === oldSDL) return
+
+      if (verbose) console.log("[sdl-codegen] SDL Schema changed")
+      oldSDL = newSDL
+      step("GraphQL schema changed", () => getGraphQLSDLFromFile(appContext.pathSettings))
+      step("Create all shared schema files", () => createSharedSchemaFiles(appContext, verbose))
+      step("Create all service files", createDTSFilesForAllServices)
+    }
 
     return {
       fileChanged: (path: string) => {
         if (isTypesFile(path)) return
         if (path === appContext.pathSettings.graphQLSchemaPath) {
-          const newSDL = appContext.sys.readFile(path)
-          if (!newSDL || newSDL === oldSDL) return
-
-          if (verbose) console.log("[sdl-codegen] SDL Schema changed")
-          oldSDL = newSDL
-          step("GraphQL schema changed", () => getGraphQLSDLFromFile(appContext.pathSettings))
-          step("Create all shared schema files", () => createSharedSchemaFiles(appContext, verbose))
-          step("Create all service files", createDTSFilesForAllServices)
+          schemaChanged()
         } else if (isPrismaSchemaPath(path, appContext.pathSettings.prismaDSLPath, sys)) {
           step("Prisma schema changed", () => getPrismaSchemaFromFile(appContext.pathSettings))
           step("Create all shared schema files", createDTSFilesForAllServices)
@@ -148,6 +164,7 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
           }
         }
       },
+      schemaChanged,
     }
   }
 
