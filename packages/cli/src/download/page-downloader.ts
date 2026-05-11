@@ -153,13 +153,13 @@ const extractAssetRefs = (html: string): string[] => {
 }
 
 /** Known asset file extensions to look for in JS/CSS string literals */
-const ASSET_EXTENSIONS = "webp|png|jpe?g|gif|svg|ico|mp3|ogg|wav|mp4|webm|woff2?|ttf|eot"
+const assetExtensions = "webp|png|jpe?g|gif|svg|ico|mp3|ogg|wav|mp4|webm|woff2?|ttf|eot"
 
 /** Extracts paths with known asset extensions from JS/CSS string literals */
 const extractAssetFileRefs = (source: string): string[] => {
   const refs: string[] = []
 
-  const regex = new RegExp(`["'\`](/[^"'\`\\s]*\\.(?:${ASSET_EXTENSIONS}))(?:\\?[^"'\`\\s]*)?["'\`]`, "gi")
+  const regex = new RegExp(`["'\`](/[^"'\`\\s]*\\.(?:${assetExtensions}))(?:\\?[^"'\`\\s]*)?["'\`]`, "gi")
   let match
   while ((match = regex.exec(source)) !== null) {
     if (match[1]) refs.push(match[1])

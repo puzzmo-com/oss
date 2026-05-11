@@ -15,7 +15,7 @@ export type PuzzmoFile = {
   }
 }
 
-const BATCH_SIZE = 10
+const batchSize = 10
 
 /** Thrown when /cliUpload init returns a 404 because the game slug isn't registered yet. */
 export class GameNotFoundError extends Error {
@@ -161,12 +161,12 @@ export const uploadFiles = async (
 
   // Step 2: Upload files in concurrent batches
   const fileURL = `${apiURL}/cliUpload/${init.sessionID}/file`
-  const totalBatches = Math.ceil(filePaths.length / BATCH_SIZE)
+  const totalBatches = Math.ceil(filePaths.length / batchSize)
   let totalUploaded = 0
 
-  for (let i = 0; i < filePaths.length; i += BATCH_SIZE) {
-    const batch = filePaths.slice(i, i + BATCH_SIZE)
-    const batchNum = Math.floor(i / BATCH_SIZE) + 1
+  for (let i = 0; i < filePaths.length; i += batchSize) {
+    const batch = filePaths.slice(i, i + batchSize)
+    const batchNum = Math.floor(i / batchSize) + 1
     await Promise.all(batch.map((fp) => uploadFile(fileURL, token, fp, baseDir, verbose)))
     totalUploaded += batch.length
     onProgress?.(batchNum, totalBatches, totalUploaded)

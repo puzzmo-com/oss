@@ -1,28 +1,28 @@
 import type { SimulatorContext, SimulatorView } from "../types"
 
 // API mode storage (shared with AuthView)
-const API_MODE_KEY = "puzzmo_sim_api_mode"
-const LOCAL_DEV_URL = "http://localhost:8911"
-const PROD_URL = "https://api.puzzmo.com"
-const TOKEN_KEY = "puzzmo_sim_oauth_token"
-const REFRESH_TOKEN_KEY = "puzzmo_sim_oauth_refresh_token"
+const apiModeKey = "puzzmo_sim_api_mode"
+const localDevUrl = "http://localhost:8911"
+const prodUrl = "https://api.puzzmo.com"
+const tokenKey = "puzzmo_sim_oauth_token"
+const refreshTokenKey = "puzzmo_sim_oauth_refresh_token"
 
 type ApiMode = "prod" | "dev"
 
 const getApiMode = (): ApiMode => {
-  const stored = localStorage.getItem(API_MODE_KEY)
+  const stored = localStorage.getItem(apiModeKey)
   return stored === "dev" ? "dev" : "prod"
 }
 
-const getAccessToken = (): string | null => localStorage.getItem(TOKEN_KEY)
-const getRefreshToken = (): string | null => localStorage.getItem(REFRESH_TOKEN_KEY)
+const getAccessToken = (): string | null => localStorage.getItem(tokenKey)
+const getRefreshToken = (): string | null => localStorage.getItem(refreshTokenKey)
 
-const storeAccessToken = (token: string) => localStorage.setItem(TOKEN_KEY, token)
-const storeRefreshToken = (token: string) => localStorage.setItem(REFRESH_TOKEN_KEY, token)
+const storeAccessToken = (token: string) => localStorage.setItem(tokenKey, token)
+const storeRefreshToken = (token: string) => localStorage.setItem(refreshTokenKey, token)
 
 const clearTokens = () => {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(REFRESH_TOKEN_KEY)
+  localStorage.removeItem(tokenKey)
+  localStorage.removeItem(refreshTokenKey)
 }
 
 // Check if token is expired or about to expire (within 5 minutes)
@@ -45,7 +45,7 @@ const refreshAccessToken = async (): Promise<boolean> => {
   if (!refreshToken) return false
 
   const mode = getApiMode()
-  const apiURL = mode === "dev" ? LOCAL_DEV_URL : PROD_URL
+  const apiURL = mode === "dev" ? localDevUrl : prodUrl
 
   try {
     const params = new URLSearchParams({
@@ -79,7 +79,7 @@ const refreshAccessToken = async (): Promise<boolean> => {
 // Make authenticated API request with automatic token refresh
 const makeAuthenticatedRequest = async (query: string, variables: Record<string, unknown> = {}) => {
   const mode = getApiMode()
-  const apiURL = mode === "dev" ? LOCAL_DEV_URL : PROD_URL
+  const apiURL = mode === "dev" ? localDevUrl : prodUrl
   let token = getAccessToken()
 
   if (!token) throw new Error("Not authenticated")
@@ -131,7 +131,7 @@ type GameData = {
 }
 
 // GraphQL queries
-const GAME_FEATURES_QUERY = `
+const gameFeaturesQuery = `
   query GameFeaturesQuery($slug: ID!) {
     game(id: $slug) {
       id
@@ -151,7 +151,7 @@ const GAME_FEATURES_QUERY = `
   }
 `
 
-const TOGGLE_FEATURE_MUTATION = `
+const toggleFeatureMutation = `
   mutation ToggleFeatureMutation($gameSlug: ID!, $input: UpdateGameInput!) {
     updateGame(id: $gameSlug, input: $input) {
       id
@@ -197,7 +197,7 @@ export function createFeaturesView(): SimulatorView {
     error = null
 
     try {
-      const result = await makeAuthenticatedRequest(GAME_FEATURES_QUERY, { slug: gameSlug })
+      const result = await makeAuthenticatedRequest(gameFeaturesQuery, { slug: gameSlug })
 
       if (result.errors) {
         error = result.errors[0]?.message || "Unknown error"
@@ -222,7 +222,7 @@ export function createFeaturesView(): SimulatorView {
     const newFeaturesArr = toggleFeatureInArr(gameData.featuresArr, featureID)
 
     try {
-      const result = await makeAuthenticatedRequest(TOGGLE_FEATURE_MUTATION, {
+      const result = await makeAuthenticatedRequest(toggleFeatureMutation, {
         gameSlug: gameData.slug,
         input: { featuresArr: newFeaturesArr },
       })

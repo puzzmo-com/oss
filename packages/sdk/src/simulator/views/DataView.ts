@@ -2,7 +2,7 @@ import type { AppBundle, ThumbnailConfig } from "../../types"
 import type { SimulatorContext, SimulatorView } from "../types"
 
 // Storage key for saved states (global across all puzzles)
-const SAVED_STATES_KEY = "simulator-saved-states"
+const savedStatesKey = "simulator-saved-states"
 
 /** Find thumbnail function on globalThis (looks for functions ending in "Thumbnail") */
 function findThumbnailFn(): { name: string; fn: AppBundle["renderThumbnail"] } | null {
@@ -272,7 +272,7 @@ export function createDataView(): SimulatorView {
           timestamp: Date.now(),
         }
         savedStates.push(newState)
-        localStorage.setItem(SAVED_STATES_KEY, JSON.stringify(savedStates))
+        localStorage.setItem(savedStatesKey, JSON.stringify(savedStates))
         saveNameInput.value = ""
         renderSaves(ctx)
       })
@@ -331,7 +331,7 @@ export function createDataView(): SimulatorView {
 // Helper to get saved states from localStorage
 function getSavedStates(): SavedState[] {
   try {
-    const stored = localStorage.getItem(SAVED_STATES_KEY)
+    const stored = localStorage.getItem(savedStatesKey)
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
@@ -475,7 +475,7 @@ function renderSaves(ctx: SimulatorContext) {
     btn.addEventListener("click", (e) => {
       const idx = parseInt((e.target as HTMLElement).getAttribute("data-save-idx") || "0")
       const updatedStates = savedStates.filter((_, i) => i !== idx)
-      localStorage.setItem(SAVED_STATES_KEY, JSON.stringify(updatedStates))
+      localStorage.setItem(savedStatesKey, JSON.stringify(updatedStates))
       renderSaves(ctx)
     })
   })

@@ -6,19 +6,19 @@ const log = (...args: unknown[]) => {
 }
 
 // API mode storage
-const API_MODE_KEY = "puzzmo_sim_api_mode"
-const LOCAL_DEV_URL = "http://localhost:8911"
-const PROD_URL = "https://api.puzzmo.com"
+const apiModeKey = "puzzmo_sim_api_mode"
+const localDevUrl = "http://localhost:8911"
+const prodUrl = "https://api.puzzmo.com"
 
 type ApiMode = "prod" | "dev"
 
 const getApiMode = (): ApiMode => {
-  const stored = localStorage.getItem(API_MODE_KEY)
+  const stored = localStorage.getItem(apiModeKey)
   return stored === "dev" ? "dev" : "prod"
 }
 
 const setApiMode = (mode: ApiMode) => {
-  localStorage.setItem(API_MODE_KEY, mode)
+  localStorage.setItem(apiModeKey, mode)
 }
 
 // Check if local dev server is available
@@ -30,7 +30,7 @@ const checkLocalDevAvailable = async (): Promise<boolean> => {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 1000)
 
-    const response = await fetch(`${LOCAL_DEV_URL}/healthz`, {
+    const response = await fetch(`${localDevUrl}/healthz`, {
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
@@ -46,7 +46,7 @@ const checkLocalDevAvailable = async (): Promise<boolean> => {
 // OAuth configuration
 const getOAuthConfig = () => {
   const mode = getApiMode()
-  const apiURL = mode === "dev" ? LOCAL_DEV_URL : PROD_URL
+  const apiURL = mode === "dev" ? localDevUrl : prodUrl
   const clientID = "protosdk:oauthclient"
   // Use a fixed callback path that's registered with the OAuth server
   const redirectUri = `${window.location.origin}/oauth/callback`
@@ -62,20 +62,20 @@ const generateState = (): string => {
 }
 
 // Token storage
-const TOKEN_KEY = "puzzmo_sim_oauth_token"
-const REFRESH_TOKEN_KEY = "puzzmo_sim_oauth_refresh_token"
+const tokenKey = "puzzmo_sim_oauth_token"
+const refreshTokenKey = "puzzmo_sim_oauth_refresh_token"
 
-const storeAccessToken = (token: string) => localStorage.setItem(TOKEN_KEY, token)
-const storeRefreshToken = (token: string) => localStorage.setItem(REFRESH_TOKEN_KEY, token)
+const storeAccessToken = (token: string) => localStorage.setItem(tokenKey, token)
+const storeRefreshToken = (token: string) => localStorage.setItem(refreshTokenKey, token)
 const getAccessToken = (): string | null => {
-  const token = localStorage.getItem(TOKEN_KEY)
-  log("getAccessToken:", { TOKEN_KEY, token: token ? `${token.substring(0, 20)}...` : null })
+  const token = localStorage.getItem(tokenKey)
+  log("getAccessToken:", { tokenKey, token: token ? `${token.substring(0, 20)}...` : null })
   return token
 }
-const getRefreshToken = (): string | null => localStorage.getItem(REFRESH_TOKEN_KEY)
+const getRefreshToken = (): string | null => localStorage.getItem(refreshTokenKey)
 const clearTokens = () => {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(REFRESH_TOKEN_KEY)
+  localStorage.removeItem(tokenKey)
+  localStorage.removeItem(refreshTokenKey)
 }
 
 // Initiate OAuth login flow
@@ -285,7 +285,7 @@ export function createAuthView(): SimulatorView {
       const token = getAccessToken()
       const isAuthenticated = !!token
       const currentMode = getApiMode()
-      const apiURL = currentMode === "dev" ? LOCAL_DEV_URL : PROD_URL
+      const apiURL = currentMode === "dev" ? localDevUrl : prodUrl
 
       // Dev toggle button - hidden by default, shown via JS if local dev is available
       const devToggle = `<button class="simulator-btn tiny" id="auth-dev-toggle" style="display: none;">${currentMode === "dev" ? "Using Dev" : "Dev"}</button>`
@@ -339,7 +339,7 @@ export function createAuthView(): SimulatorView {
           </div>
           <p class="auth-description">
             Login with your Puzzmo account to make authenticated API requests.
-            ${currentMode === "dev" ? `<br><strong>Using local dev server:</strong> ${LOCAL_DEV_URL}` : ""}
+            ${currentMode === "dev" ? `<br><strong>Using local dev server:</strong> ${localDevUrl}` : ""}
           </p>
           <div class="simulator-row">
             <button class="simulator-btn primary" id="auth-login">Login with Puzzmo</button>

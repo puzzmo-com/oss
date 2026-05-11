@@ -2,7 +2,7 @@ import type { Theme, ThumbnailConfig } from "../types"
 import { themes } from "../themes"
 import type { SimulatorConfig, SimulatorState, TabName } from "./types"
 
-const STORAGE_KEYS = {
+const storageKeys = {
   collapsed: "simulator-collapsed",
   tab: "simulator-tab",
   theme: "simulator-theme",
@@ -13,7 +13,7 @@ const STORAGE_KEYS = {
 } as const
 
 function getStoredTheme(): Theme {
-  const storedThemeName = localStorage.getItem(STORAGE_KEYS.theme)
+  const storedThemeName = localStorage.getItem(storageKeys.theme)
   if (storedThemeName) {
     const found = themes.find((t) => t.name === storedThemeName)
     if (found) return found
@@ -22,7 +22,7 @@ function getStoredTheme(): Theme {
 }
 
 function getStoredTab(validTabIds: string[]): TabName {
-  const storedTab = localStorage.getItem(STORAGE_KEYS.tab)
+  const storedTab = localStorage.getItem(storageKeys.tab)
   if (storedTab && validTabIds.includes(storedTab)) {
     return storedTab
   }
@@ -30,7 +30,7 @@ function getStoredTab(validTabIds: string[]): TabName {
 }
 
 function getStoredCollapsed(configDefault: boolean): boolean {
-  const storedCollapsed = localStorage.getItem(STORAGE_KEYS.collapsed)
+  const storedCollapsed = localStorage.getItem(storageKeys.collapsed)
   if (storedCollapsed !== null) {
     return storedCollapsed === "true"
   }
@@ -38,7 +38,7 @@ function getStoredCollapsed(configDefault: boolean): boolean {
 }
 
 function getStoredRenderHost(): ThumbnailConfig["renderHost"] {
-  const stored = localStorage.getItem(STORAGE_KEYS.renderHost)
+  const stored = localStorage.getItem(storageKeys.renderHost)
   if (stored && ["game", "app", "opengraph"].includes(stored)) {
     return stored as ThumbnailConfig["renderHost"]
   }
@@ -46,7 +46,7 @@ function getStoredRenderHost(): ThumbnailConfig["renderHost"] {
 }
 
 function getStoredRenderContext(): ThumbnailConfig["renderContext"] {
-  const stored = localStorage.getItem(STORAGE_KEYS.renderContext)
+  const stored = localStorage.getItem(storageKeys.renderContext)
   if (stored && ["preview", "share", "completed", "timeline"].includes(stored)) {
     return stored as ThumbnailConfig["renderContext"]
   }
@@ -54,8 +54,8 @@ function getStoredRenderContext(): ThumbnailConfig["renderContext"] {
 }
 
 export function createInitialState(config: SimulatorConfig, fixtureCategories: string[], validTabIds: string[]): SimulatorState {
-  const storedFixtureCategory = localStorage.getItem(STORAGE_KEYS.fixtureCategory)
-  const storedFixturePuzzle = localStorage.getItem(STORAGE_KEYS.fixturePuzzle)
+  const storedFixtureCategory = localStorage.getItem(storageKeys.fixtureCategory)
+  const storedFixturePuzzle = localStorage.getItem(storageKeys.fixturePuzzle)
 
   return {
     isCollapsed: getStoredCollapsed(config.collapsed ?? true),
@@ -76,41 +76,41 @@ export function createInitialState(config: SimulatorConfig, fixtureCategories: s
 }
 
 export function persistCollapsed(collapsed: boolean): void {
-  localStorage.setItem(STORAGE_KEYS.collapsed, String(collapsed))
+  localStorage.setItem(storageKeys.collapsed, String(collapsed))
 }
 
 export function persistTab(tab: TabName): void {
-  localStorage.setItem(STORAGE_KEYS.tab, tab)
+  localStorage.setItem(storageKeys.tab, tab)
 }
 
 export function persistTheme(themeName: string): void {
-  localStorage.setItem(STORAGE_KEYS.theme, themeName)
+  localStorage.setItem(storageKeys.theme, themeName)
 }
 
 export function persistFixtureCategory(category: string): void {
-  localStorage.setItem(STORAGE_KEYS.fixtureCategory, category)
+  localStorage.setItem(storageKeys.fixtureCategory, category)
 }
 
 export function persistFixturePuzzle(puzzle: string): void {
-  localStorage.setItem(STORAGE_KEYS.fixturePuzzle, puzzle)
+  localStorage.setItem(storageKeys.fixturePuzzle, puzzle)
 }
 
 export function clearFixturePuzzle(): void {
-  localStorage.removeItem(STORAGE_KEYS.fixturePuzzle)
+  localStorage.removeItem(storageKeys.fixturePuzzle)
 }
 
 export function persistRenderHost(host: ThumbnailConfig["renderHost"]): void {
   if (host) {
-    localStorage.setItem(STORAGE_KEYS.renderHost, host)
+    localStorage.setItem(storageKeys.renderHost, host)
   } else {
-    localStorage.removeItem(STORAGE_KEYS.renderHost)
+    localStorage.removeItem(storageKeys.renderHost)
   }
 }
 
 export function persistRenderContext(context: ThumbnailConfig["renderContext"]): void {
   if (context) {
-    localStorage.setItem(STORAGE_KEYS.renderContext, context)
+    localStorage.setItem(storageKeys.renderContext, context)
   } else {
-    localStorage.removeItem(STORAGE_KEYS.renderContext)
+    localStorage.removeItem(storageKeys.renderContext)
   }
 }

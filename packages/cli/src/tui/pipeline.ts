@@ -51,8 +51,8 @@ const phaseColor: Record<Phase, (s: string) => string> = {
 }
 
 // oxlint-disable-next-line no-control-regex
-const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g
-const stripAnsi = (s: string) => s.replace(ANSI_RE, "")
+const ansiRe = /\x1b\[[0-9;]*[A-Za-z]/g
+const stripAnsi = (s: string) => s.replace(ansiRe, "")
 
 const buildPrompt = async (stepName: string, gameDir: string, repoContext: string): Promise<string> => {
   const instructions = await fetchSkillPrompt(stepName, gameDir)
