@@ -13,6 +13,7 @@ export type {
   BootstrapGameData,
   MessagesReceived,
   MessagesSentFromEmbed,
+  AppBundle,
   ThumbnailConfig,
   KeyboardConfig,
 } from "./types"
