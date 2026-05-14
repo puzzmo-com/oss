@@ -110,12 +110,6 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
   // All changed files
   const filepaths = [] as string[]
 
-  // Create the two shared schema files
-  step("Create shared schema files", () => {
-    const sharedDTSes = createSharedSchemaFiles(appContext, verbose)
-    filepaths.push(...sharedDTSes)
-  })
-
   let knownServiceFiles: string[] = []
   const createDTSFilesForAllServices = () => {
     const serviceFiles = appContext.sys.readDirectory(appContext.pathSettings.apiServicesPath)
@@ -127,8 +121,19 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
     }
   }
 
-  // Initial run
+  // Scan service files first so that appContext.fieldFacts is populated before the
+  // shared schema gen reads it to decide field optionality. Without this ordering,
+  // a fresh codegen run writes shared types with fieldFacts empty (resolver-backed
+  // fields appear required), while watcher re-runs see populated fieldFacts and
+  // write the same fields as optional - producing flapping diffs in the generated
+  // shared-schema-types.d.ts / shared-return-types.d.ts files.
   step("Create DTS files for all services", createDTSFilesForAllServices)
+
+  // Create the two shared schema files
+  step("Create shared schema files", () => {
+    const sharedDTSes = createSharedSchemaFiles(appContext, verbose)
+    filepaths.push(...sharedDTSes)
+  })
 
   const endTime = Date.now()
   const timeTaken = endTime - startTime
@@ -144,8 +149,11 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
       if (verbose) console.log("[sdl-codegen] SDL Schema changed")
       oldSDL = newSDL
       step("GraphQL schema changed", () => getGraphQLSDLFromFile(appContext.pathSettings))
-      step("Create all shared schema files", () => createSharedSchemaFiles(appContext, verbose))
+      // Service files must be processed before the shared schema is regenerated so
+      // that appContext.fieldFacts is up to date for the shared schema's
+      // optionality decisions. See the comment in the initial run above.
       step("Create all service files", createDTSFilesForAllServices)
+      step("Create all shared schema files", () => createSharedSchemaFiles(appContext, verbose))
     }
 
     return {
