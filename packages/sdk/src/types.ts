@@ -202,7 +202,7 @@ export type ThumbnailConfig = {
   completed?: boolean
   gameplay?: Partial<GamePlay>
   renderHost?: "game" | "app" | "opengraph"
-  renderContext?: "preview" | "share" | "completed" | "timeline"
+  renderContext?: "preview" | "share" | "completed" | "timeline" | "print"
   viewerMetadata?: any | null
 }
 
