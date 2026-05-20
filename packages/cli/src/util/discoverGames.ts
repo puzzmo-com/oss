@@ -1,6 +1,8 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { type ParseError, parse as parseJsonc, printParseErrorCode } from "jsonc-parser"
+
 import type { PuzzmoFile } from "./api.js"
 import { validatePuzzmoJson } from "./validatePuzzmoFile.js"
 
@@ -45,11 +47,11 @@ export const discoverGames = async (rootDir: string): Promise<DiscoveryResult> =
 
   for (const puzzmoJsonPath of puzzmoJsonPaths) {
     const fileErrors: string[] = []
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(fs.readFileSync(puzzmoJsonPath, "utf-8"))
-    } catch (e) {
-      errors.push({ puzzmoJsonPath, errors: [`Invalid JSON: ${e instanceof Error ? e.message : e}`] })
+    const parseErrors: ParseError[] = []
+    const parsed: unknown = parseJsonc(fs.readFileSync(puzzmoJsonPath, "utf-8"), parseErrors, { allowTrailingComma: true })
+    if (parseErrors.length) {
+      const messages = parseErrors.map((err) => `${printParseErrorCode(err.error)} at offset ${err.offset}`)
+      errors.push({ puzzmoJsonPath, errors: [`Invalid JSONC: ${messages.join("; ")}`] })
       continue
     }
 
