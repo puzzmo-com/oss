@@ -45,11 +45,59 @@ export interface EditorBundleSettings<TComponent = unknown> {
   defaults: Record<string, unknown>
 }
 
-/** Main interface for a Workshop bundle */
+/** A preceding/following phrase for a word, returned by the getRelatedWords editor callback */
+export interface RelatedWord {
+  word: string
+  frequency: number
+  position: "preceding" | "following"
+}
+
+/** Result of fetching a URL from within the editor */
+export interface EditorFetchURLResult {
+  status: number
+  body: string
+}
+
+/** Config passed to an editor bundle's mount() */
+export interface EditorMountConfig {
+  puzzleString: string
+  onChange: (puzzleString: string) => void
+  theme: "light" | "dark"
+  width: number
+  height: number
+  /**
+   * Optional function for making chat completions from the editor (e.g. for AI-assisted puzzle
+   * editing). This needs to be enabled for a team explicitly.
+   */
+  chatCompletion?: (prompt: string) => Promise<string>
+  /**
+   * Optional function for fetching URLs from the editor (e.g. for fetching article content).
+   * This needs to be enabled for a team explicitly.
+   */
+  fetchURL?: (url: string) => Promise<EditorFetchURLResult>
+  /** Optional function for looking up a word's preceding/following phrases from wordvault. */
+  getRelatedWords?: (word: string, limit?: number) => Promise<RelatedWord[]>
+  /** Pre-configured editor settings values from the queue's editorSettings. */
+  settings?: Record<string, unknown>
+}
+
+/** Handle returned by an editor bundle's mount() */
+export interface EditorMountHandle {
+  unmount: () => void
+  /**
+   * Called whenever the puzzle string is updated in the editor from the outside, or when the theme
+   * or dimensions update. Workshop will rely on the validator to reject / accept updates.
+   */
+  update: (config: { puzzleString?: string; theme?: "light" | "dark"; width?: number; height?: number }) => void
+}
+
+/** Main interface for a Workshop editor bundle */
 export interface EditorBundle<TSettingsComponent = unknown> {
+  /** Required validator for puzzle data validation */
   validator: {
     validate(data: string): Promise<ValidationReport> | ValidationReport
   }
+  /** Optional importer for converting external puzzle file formats */
   importer?: {
     onImport(filename: string, contents: string | ArrayBuffer): Promise<ImportResult> | ImportResult
   }
@@ -59,6 +107,7 @@ export interface EditorBundle<TSettingsComponent = unknown> {
   editorSettings?: EditorBundleSettings<TSettingsComponent>
   /** Custom puzzle editor, if provided by the bundle */
   editor?: {
-    mount(...args: unknown[]): unknown
+    /** Called when first visiting a puzzle page. */
+    mount(element: HTMLElement, config: EditorMountConfig): Promise<EditorMountHandle>
   }
 }

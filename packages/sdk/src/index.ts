@@ -18,6 +18,18 @@ export type {
   KeyboardConfig,
 } from "./types"
 
-export type { ValidationIssue, ValidationReport, ImportErrorType, ImportResult, EditorBundle } from "./editor"
+export type {
+  ValidationLevel,
+  ValidationIssue,
+  ValidationReport,
+  ImportErrorType,
+  ImportResult,
+  EditorBundle,
+  EditorBundleSettings,
+  EditorMountConfig,
+  EditorMountHandle,
+  EditorFetchURLResult,
+  RelatedWord,
+} from "./editor"
 
 export { EditorImportError } from "./editor"
