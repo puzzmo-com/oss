@@ -3,7 +3,7 @@
   "game": {
     "displayName": "__DISPLAY_NAME__",
     "slug": "__SLUG__",
-    "teamID": "REPLACE_ME"
+    "teamID": "__TEAM_ID__"
   },
   "output": {
     "dir": "dist"

@@ -1,4 +1,4 @@
-# __DISPLAY_NAME__
+# **DISPLAY_NAME**
 
 A Minesweeper-style Puzzmo game scaffold.
 
@@ -11,3 +11,9 @@ yarn build
 ```
 
 Edit puzzles in `fixtures/puzzles/`. Game logic is in `src/main.ts`.
+
+## Deployment
+
+```
+yarn puzzmo upload
+```

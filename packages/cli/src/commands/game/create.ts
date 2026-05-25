@@ -17,6 +17,8 @@ export type Strategy = "import" | "blank" | "prompt"
 
 export type CreateOptions = {
   name?: string
+  slug?: string
+  teamID?: string
   url?: string
   agent?: string
   accessToken?: string
@@ -289,7 +291,7 @@ export const gameCreate = async (opts: CreateOptions) => {
     name = result
   }
 
-  const slug = slugify(name)
+  const slug = opts.slug ?? slugify(name)
 
   // Materialize template content for blank/prompt strategies (after we know the slug/name)
   if (strategy !== "import") {
@@ -298,7 +300,7 @@ export const gameCreate = async (opts: CreateOptions) => {
       p.log.error(`Bundled template not found at ${templateDir}`)
       process.exit(1)
     }
-    copyTemplate(templateDir, tmpDir, { __SLUG__: slug, __DISPLAY_NAME__: name })
+    copyTemplate(templateDir, tmpDir, { __SLUG__: slug, __DISPLAY_NAME__: name, __TEAM_ID__: opts.teamID ?? "REPLACE_ME" })
   }
 
   // Step 5: Login if token provided
