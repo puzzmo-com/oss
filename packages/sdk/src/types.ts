@@ -117,51 +117,105 @@ export type GameOverMessageUIComponent =
   | { type: "augmentation"; value: string | number; display: string }
 
 export type BootstrapGameData = {
+  /** Per-user state scoped to this game (settings, identity, multiplayer login). */
   userState: {
+    /** Player's game-specific settings blob; shape is owned by the game. */
     gameSettings: any
+    /** ID of the UserState record. */
     id: string
-    nakamaLogin: string
+    /** ID of the user who owns this UserState record. */
     ownerID: string
   }
-  currentUser: any
+  /** The currently signed-in Puzzmo user, or null when the viewer is anonymous. */
+  currentUser: BootstrapCurrentUser | null
+  /** Result of starting a new GamePlay or resuming the player's existing one. */
   startOrFindGameplay: {
-    failed?: boolean | null
-    gamePlayed?: {
-      additionalTimeAddedSecs: number
+    /** The GamePlay record to bootstrap the game with. */
+    gamePlayed: {
+      /** Serialized game-specific board state. */
       boardState: string
-      cheatsUsed: number
-      combinedTimeSecs: number
-      completed: boolean
-      createdAt: any
-      elapsedTimeSecs: number
-      hintsUsed: number
-      id: string
+      /** ID of the user who owns this gameplay. */
       ownerID: string
-      pointsAwarded: number
-      resetsUsed: number
-      slug: string
+      /** True when the viewer owns the underlying puzzle (vs. viewing someone else's). */
       viewerOwnsPuzzle: boolean
+      /** Whether the player has finished the puzzle. */
+      completed: boolean
+      /** When this GamePlay was created. */
+      createdAt: string
+
+      /** Points awarded for this gameplay (0 until completion). */
+      pointsAwarded: number
+      /** Seconds added to the clock (e.g. from hint penalties or time bonuses). */
+      additionalTimeAddedSecs: number
+      /** ElapsedTimeSecs + additionalTimeAddedSecs, precomputed for convenience. */
+      combinedTimeSecs: number
+      /** Seconds the player has spent solving (clock time, excluding penalties/bonuses). */
+      elapsedTimeSecs: number
+
+      /** GamePlay db row ID. */
+      id: string
+      /** URL-safe identifier for this gameplay. */
+      slug: string
+
+      /** The puzzle being played. */
       puzzle: {
+        /** Puzzle row ID. */
         id: string
+        /** Editor-assigned name; null for untitled puzzles. */
         name?: string | null
+        /** Serialized puzzle definition; opaque to the host and parsed by the game bundle. */
         puzzle: string
-        seriesNumber: number
-        game: {
-          assetsPath: string
-          assetsSha: string
-          displayName: string
-          exposedGlobalFunction: string
-          jsPath: string
-          slug: string
-        }
+        /** Metadata for the game bundle that renders this puzzle. */
+        game: any
+        /** Most recent daily schedule entry that uses this puzzle, if any. */
+        mostRecentDaily?: {
+          daily?: {
+            /** A date key like "2023-04-01" */
+            dateKey?: string
+            /** Whether this daily is for today. If not true then its an archived game of some sort. */
+            isToday?: boolean
+          }
+        } | null
       }
     }
   }
+  /** Color scheme and design tokens the game should render with. */
   theme: Theme
-  hostFlags: ("sandbox" | "embed" | "desktop" | "native-ios")[]
-  hostContext: any[]
+  /** Structured context the host provides to the game. */
+  hostContext: HostContext[]
+  /** Version string for the host<->game runtime contract; bumped on breaking changes. */
   appRuntimeContract: string
 }
+
+/** The subset of the Puzzmo user that's exposed to games at bootstrap. */
+export type BootstrapCurrentUser = {
+  /** Stable user ID; safe to log and correlate across systems. */
+  id: string
+  /** Display name chosen by the user; null when the user hasn't set one. */
+  name: string | null
+  /** Handle, e.g. "ortatherox". */
+  username: string
+  /** Disambiguator appended to username (e.g. "puz" in "orta#puz"). */
+  usernameID: string
+  /** Subscription tier — games may gate cosmetic/bonus features by this. */
+  type: "Paid" | "Unverified" | "User"
+  /** Comma-separated internal roles (e.g. "admin,moderator"); empty string for normal users. */
+  roles: string
+  /** Nakama account id for multiplayer matching; null when the user isn't logged into Nakama. */
+  nakamaID: string | null
+}
+
+/** The "app" variant of hostContext — describes the runtime layout/host that's rendering the game. */
+export type AppHostContext = {
+  type: "app"
+  /** "mobile" when the game is being rendered at a phone-sized layout, otherwise "desktop". */
+  layout: "desktop" | "mobile"
+  /** Which host is rendering the game; null = puzzmo.com on web. */
+  host: null | string
+}
+
+/** Subset of host-provided context the SDK surfaces to games. Extend as more variants are needed. */
+export type HostContext = AppHostContext
 
 export type AppBundle = {
   /** Renders a puzzle and optional state string into an SVG */

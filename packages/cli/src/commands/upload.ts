@@ -230,6 +230,7 @@ const puzzmonautLines = [
   ` ${yellow("▝▀▀▀▀▘")}`,
 ]
 
+// oxlint-disable-next-line no-control-regex
 const visualWidth = (s: string): number => s.replace(/\u001b\[[0-9;]*m/g, "").length
 
 /** Renders the puzzmonaut with message lines vertically centered to its right. */
