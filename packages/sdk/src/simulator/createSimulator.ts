@@ -186,9 +186,14 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   const updateStatus = (text: string, className: string) => {
     const statusText = getElement<HTMLElement>("#simulator-status .text")
     const statusIndicator = getElement<HTMLElement>("#simulator-status .indicator")
+    const indicatorContent = className === "complete" ? "✓" : ""
     if (statusText) statusText.textContent = text
-    if (statusIndicator) statusIndicator.className = `indicator ${className}`
+    if (statusIndicator) {
+      statusIndicator.className = `indicator ${className}`
+      statusIndicator.textContent = indicatorContent
+    }
     headerIndicator.className = className
+    headerIndicator.textContent = indicatorContent
     headerStatusText.textContent = text
   }
 
@@ -519,11 +524,6 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
       return
     }
 
-    if (type === "SHOW_GAME_COMPLETE_SCREEN") {
-      console.log("Simulator: Show completion screen", data)
-      return
-    }
-
     if (type === "SIDEBAR_UPDATE") {
       console.log("Simulator: Sidebar update", data)
       return
@@ -547,7 +547,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
       console.log("Simulator: Game completed!", data)
       headerPauseBtn.disabled = true
       state.hasStarted = false
-      updateStatus("Completed!", "ready")
+      updateStatus("Completed!", "complete")
     }
   }, messageLogger)
 

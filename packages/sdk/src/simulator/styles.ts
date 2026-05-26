@@ -119,6 +119,16 @@ export const simulatorStyles = `
     background: var(--sim-error);
     box-shadow: 0 0 4px var(--sim-error);
   }
+  #simulator-header-indicator.complete {
+    background: transparent;
+    box-shadow: none;
+    color: var(--sim-success);
+    width: auto;
+    height: auto;
+    font-size: 11px;
+    line-height: 1;
+    font-weight: bold;
+  }
   #simulator-timer {
     font-size: 11px;
     color: var(--sim-text);
@@ -307,6 +317,16 @@ export const simulatorStyles = `
   #simulator-status .indicator.paused {
     background: var(--sim-error);
     box-shadow: 0 0 6px var(--sim-error);
+  }
+  #simulator-status .indicator.complete {
+    background: transparent;
+    box-shadow: none;
+    color: var(--sim-success);
+    width: auto;
+    height: auto;
+    font-size: 12px;
+    line-height: 1;
+    font-weight: bold;
   }
   .simulator-row {
     display: flex;

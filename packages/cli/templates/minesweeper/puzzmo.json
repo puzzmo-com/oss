@@ -1,5 +1,5 @@
 {
-  "$schema": "https://dev.puzzmo.com/schema/puzzmo-file-schema.json",
+  "$schema": "./node_modules/@puzzmo/cli/schemas/puzzmo-file-schema.json",
   "game": {
     "displayName": "__DISPLAY_NAME__",
     "slug": "__SLUG__",

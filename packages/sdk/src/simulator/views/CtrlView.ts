@@ -138,7 +138,7 @@ export function createCtrlView(): SimulatorView {
         ctx.state.hasStarted = false
         if (pauseBtn) pauseBtn.disabled = true
         if (startBtn) startBtn.disabled = true
-        ctx.updateStatus("Completed!", "ready")
+        ctx.updateStatus("Completed!", "complete")
       }
     },
   }

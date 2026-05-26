@@ -37,6 +37,12 @@ export function createDoneView(): SimulatorView {
     },
 
     onMessage(type: string, data: any, ctx: SimulatorContext) {
+      if (type === "SHOW_GAME_COMPLETE_SCREEN") {
+        ctx.setCollapsed(false)
+        ctx.switchTab("done")
+        return
+      }
+
       if (type !== "GAME_COMPLETED") return
 
       ctx.state.completionData = data
@@ -80,10 +86,6 @@ export function createDoneView(): SimulatorView {
 
       // Raw data
       if (rawEl) rawEl.value = JSON.stringify(data, null, 2)
-
-      // Switch to done tab
-      ctx.setCollapsed(false)
-      ctx.switchTab("done")
     },
   }
 }

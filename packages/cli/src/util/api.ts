@@ -28,9 +28,23 @@ export class GameNotFoundError extends Error {
   }
 }
 
-type InitResponse = { sessionID: string; basePath: string; integrationsChanged?: boolean; versionsURL?: string; error?: string }
+type InitResponse = {
+  sessionID: string
+  basePath: string
+  integrationsChanged?: boolean
+  gameURL?: string
+  versionsURL?: string
+  error?: string
+}
 type FileResponse = { path: string; error?: string }
-type CompleteResponse = { assetsBase: string; versionID: string; integrationsChanged: boolean; versionsURL: string | null; error?: string }
+type CompleteResponse = {
+  assetsBase: string
+  versionID: string
+  integrationsChanged: boolean
+  gameURL: string | null
+  versionsURL: string | null
+  error?: string
+}
 
 /** Callback for reporting batch upload progress */
 export type UploadProgress = (batch: number, totalBatches: number, uploaded: number) => void
@@ -157,7 +171,6 @@ export const uploadFiles = async (
     if (e instanceof Error && e.message.includes("Game not found:")) throw new GameNotFoundError(gameSlug, e.message)
     throw e
   }
-  if (verbose) console.log(`  session: ${init.sessionID}`)
 
   // Step 2: Upload files in concurrent batches
   const fileURL = `${apiURL}/cliUpload/${init.sessionID}/file`
@@ -175,11 +188,12 @@ export const uploadFiles = async (
   // Step 3: Complete
   const complete = (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {}, "upload complete", verbose)) as Omit<
     CompleteResponse,
-    "integrationsChanged" | "versionsURL"
+    "integrationsChanged" | "gameURL" | "versionsURL"
   >
   return {
     ...complete,
     integrationsChanged: !!init.integrationsChanged,
+    gameURL: init.gameURL ?? null,
     versionsURL: init.versionsURL ?? null,
   }
 }

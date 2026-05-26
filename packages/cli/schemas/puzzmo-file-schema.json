@@ -1,0 +1,338 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/PuzzmoFile",
+  "definitions": {
+    "PuzzmoFile": {
+      "type": "object",
+      "properties": {
+        "game": {
+          "type": "object",
+          "properties": {
+            "displayName": {
+              "type": "string",
+              "description": "Display name shown in the UI, use | to indicate where a line break should go"
+            },
+            "slug": {
+              "type": "string",
+              "description": "URL-friendly identifier for the game"
+            },
+            "teamID": {
+              "type": "string",
+              "description": "The team ID that owns this game"
+            }
+          },
+          "required": ["displayName", "slug", "teamID"],
+          "additionalProperties": false,
+          "description": "Metadata about the game"
+        },
+        "integrations": {
+          "$ref": "#/definitions/Augmentations",
+          "description": "Game integrations with Puzzmo platform systems (leaderboards, stats, completion UI, etc.)"
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "dir": {
+              "type": "string",
+              "description": "Path to the built artifacts. Resolved relative to the puzzmo.json's directory. Can be shared across games (e.g. `../../dist/<slug>`) or per-game (e.g. `./build`)."
+            }
+          },
+          "required": ["dir"],
+          "additionalProperties": false,
+          "description": "Where the built game artifacts live for this game. Used by `puzzmo upload` and `puzzmo validate` to find the dist folder when running from a repo root. If omitted, the CLI looks for a `dist`, `build`, or `built` folder — first next to puzzmo.json, then walking up to the repo root, optionally with `<slug>` as a sub-folder for shared output dirs."
+        }
+      },
+      "required": ["game"],
+      "additionalProperties": false,
+      "description": "The schema for a puzzmo.json file that lives alongside a game's build artifacts"
+    },
+    "Augmentations": {
+      "type": "object",
+      "properties": {
+        "leaderboards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LeaderboardExpressionSetup"
+          },
+          "description": "Dynamic leaderboards for this game"
+        },
+        "puzzleAggregateStats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "deedID": {
+                "$ref": "#/definitions/DeedKeys",
+                "description": "Sometimes, instead of an expression, you may need to hook up to a deed"
+              },
+              "stableID": {
+                "type": ["string", "null"],
+                "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+              },
+              "filterExp": {
+                "type": "string",
+                "description": "An expression string which can stop something from happening. A concrete example: Whether to post to a leaderboard or not. If the expression returns true or > 0 then the entry is considered allowed for the leaderboard."
+              },
+              "valueExp": {
+                "type": "string",
+                "description": "An expression string which can be used to generate the value for whatever your config is based on. The API will provide a set of appropriate variables for you to use in this JS-like expression string. They are based on \"AngularJS Expressions\" which you can read about here: https://docs.angularjs.org/guide/expression"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Puzzle-specific aggregate stats that track data across all completions of a specific puzzle (e.g. \"how many perfect scores on this puzzle\"). Unlike `userAggregateStats` which are per-user, these accumulate data across all players for a single puzzle instance.\n\nEvaluated at game completion. Expression scope includes:\n\n- All deed values from the gameplay (camelCase keys, e.g. `excessMoves` from `excess-moves` deed)\n- `prior`: The previous value of this stat for the puzzle\n- `wallClockComplete`: Seconds since daily start when completed (if today's daily)\n\nTwo ways to define stats:\n\n1. Via `deedID`: Looks up the deed value and adds it to prior (simple accumulation) 2. Via `valueExp`: Full expression control, e.g. `prior + 1` to count occurrences\n\nUse `filterExp` to conditionally update, e.g. `excessMoves === 0` to only count perfect games. The `stableID` is required and used as the storage key for this stat.\n\nExample: Count perfect completions\n\n```json { \"stableID\": \"perfects\", \"filterExp\": \"excessMoves === 0\", \"valueExp\": \"prior + 1\" } ```"
+        },
+        "userAggregateStats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "deedID": {
+                "$ref": "#/definitions/DeedKeys",
+                "description": "Sometimes, instead of an expression, you may need to hook up to a deed"
+              },
+              "stableID": {
+                "type": ["string", "null"],
+                "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+              },
+              "filterExp": {
+                "type": "string",
+                "description": "An expression string which can stop something from happening. A concrete example: Whether to post to a leaderboard or not. If the expression returns true or > 0 then the entry is considered allowed for the leaderboard."
+              },
+              "valueExp": {
+                "type": "string",
+                "description": "An expression string which can be used to generate the value for whatever your config is based on. The API will provide a set of appropriate variables for you to use in this JS-like expression string. They are based on \"AngularJS Expressions\" which you can read about here: https://docs.angularjs.org/guide/expression"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "User-specific aggregate stats stored per-user, tied to the game or remix. These track lifetime stats for individual players (e.g. \"total points earned\", \"best score\"). Stats are keyed by game symbol, or `{symbol}-{remixSlug}` if the remix has the uniqueStats flag.\n\nEvaluated at game completion. Expression scope includes:\n\n- `deeds`: All deed values from the gameplay (camelCase keys, e.g. `deeds.tilesCleared`)\n- `prior`: The previous value of this stat for the user (for running totals/max/min)\n- `uas`: The user's existing aggregate stats object\n- Game symbol keys containing prior deed stats\n\nTwo ways to define stats:\n\n1. Via `deedID`: Looks up the deed value and adds it to prior (simple accumulation) 2. Via `valueExp`: Full expression control, e.g. `prior > deeds.score ? prior : deeds.score` for max\n\nUse `filterExp` to conditionally update (e.g. only count completed games). The `stableID` is required and used as the storage key for this stat.\n\nExample: Track the user's best score\n\n```json { \"stableID\": \"best-score\", \"valueExp\": \"prior > deeds.score ? prior : deeds.score\" } ```"
+        },
+        "userStatDisplays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userAggregateStatStableID": {
+                "type": "string",
+                "description": "The stableID from userAggregateStats to display. Converted to camelCase for lookup (e.g. \"best-score\" -> \"bestScore\")."
+              },
+              "formatString": {
+                "type": "string",
+                "description": "Format string. Use `%@` as placeholder for the value (e.g., \"Best score: %@\" -> \"Best score: 1234\")."
+              },
+              "displayID": {
+                "type": "number",
+                "description": "Unique ID for this stat within the game section. Used for user selection persistence. Negative IDs are reserved for system stats."
+              },
+              "hideExp": {
+                "type": "string",
+                "description": "Optional expression to determine visibility. Receives `{ value }` in scope. Return truthy to hide."
+              },
+              "order": {
+                "type": "number",
+                "description": "Display order within section (default: 0). Negative numbers are reserved for system prefix stats."
+              }
+            },
+            "required": ["userAggregateStatStableID", "formatString", "displayID"],
+            "additionalProperties": false
+          },
+          "description": "Configuration for how user aggregate stats are displayed on user profiles. Maps stats from `userAggregateStats` to formatted display strings shown in the profile stats section.\n\nThe profile section automatically includes prefix stats (games played, hours played, best streak) before any custom stats defined here.\n\nThe `hideExp` expression receives `{ value }` in scope where `value` is the stat's current value. Common pattern: `\"!value\"` to hide when zero/undefined."
+        },
+        "persistedDeeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExpressionSetup"
+          },
+          "description": "Converts temporary (pipeline) deeds into persisted deeds at game completion time. Use this to persist computed values derived from temporary deed data.\n\nFor each config, the `valueExp` is evaluated against the deed scope, and the result is stored as a permanent deed using `stableID` (or `deedID`) as the storage key.\n\nExpression scope includes all deeds from the gameplay (camelCase keys, e.g. `points` from `points` deed). Values are floored to integers before storage.\n\nUse `filterExp` to conditionally persist (e.g. only persist if a threshold is met). Either `stableID` or `deedID` is required as the storage key.\n\nExample: Persist a computed score only when player achieves a threshold\n\n```json {   \"stableID\": \"computed-bonus\",   \"filterExp\": \"points > 100\",   \"valueExp\": \"points * 2\" } ```\n\nCommon use case: Take a temporary deed and persist it for use in completion tables or sidebars."
+        },
+        "completionTable": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Label shown on the left side of the table row"
+              },
+              "persistedDeedID": {
+                "type": "string",
+                "description": "ID of the persisted deed to look up (must match a deed stored on the gameplay)"
+              },
+              "formatString": {
+                "type": "string",
+                "description": "Format string. Use `%@` as placeholder for the value."
+              }
+            },
+            "required": ["title", "persistedDeedID", "formatString"],
+            "additionalProperties": false
+          },
+          "description": "Additional rows to display in the Today page completion table for a completed game. Shows custom stats alongside the default game stats (time, score, hints, etc.).\n\nEach entry looks up a persisted deed by `persistedDeedID` and formats its value using `formatString`. Custom entries appear before the default game stats. The table is rendered as title/value pairs.\n\nNote: Only works with persisted deeds. Use `persistedDeeds` augmentation first if you need to convert temporary deeds into persisted ones for display here.\n\nExample: Show a custom \"Bonus Points\" stat\n\n```json { \"title\": \"Bonus Points\", \"persistedDeedID\": \"bonus-points\", \"formatString\": \"%@ pts\" } ```"
+        },
+        "completionSidebar": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExpressionSetup"
+          },
+          "description": "Additional stats to display in the game completion sidebar/popover on the Today page. Use this to show deed values that don't have an associated leaderboard.\n\nThese items are merged with leaderboard entries, sorted by `sortValue`, and displayed as a list of stats after game completion. Each entry looks up a deed by `deedID` and formats its value using `formatString`.\n\nItems can include:\n\n- `display` or `secondaryName`: Label shown for the stat\n- `deedID`: Which deed to look up for the value\n- `formatString`: How to format the value (e.g. \"%@ pts\")\n- `sortValue`: Order relative to other sidebar items (lower = earlier)\n- `order`: \"Lower=better\" or default (higher=better) for directional indicators\n\nExample: Show a custom \"Combos\" stat\n\n```json {   \"completionSidebar\": [     { \"deedID\": \"combo-count\", \"displayName\": \"Combos\", \"formatString\": \"%@\", \"sortValue\": 10 }   ] } ```"
+        },
+        "completionNotables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "valueExp": {
+                "type": "string",
+                "description": "Expression evaluated against deed scope. If truthy, the notable is awarded."
+              },
+              "notableIndex": {
+                "type": "number",
+                "description": "For code-based notables: 0 for UserAwardsBitmapKeys, 1 for UserAwardsBitmap1Keys. Not needed for system notables."
+              },
+              "notableName": {
+                "type": "string",
+                "description": "Notable identifier. For code-based: the enum key name (Puzzmo team games only). For system notables: \"{index}-{bitmapValue}\" format."
+              }
+            },
+            "required": ["valueExp", "notableName"],
+            "additionalProperties": false
+          },
+          "description": "Awards notables (achievements/badges) to users when conditions are met at game completion. When a notable is awarded, it appears on the user's profile and creates a social news item.\n\nThe `valueExp` is evaluated against the game's deed scope. If it returns truthy, the notable is awarded. Expression scope includes all deed values from the gameplay (camelCase keys).\n\nTwo types of notables:\n\n1. **Code-based notables**: Use `notableName` (e.g. \"jokinAround\") with `notableIndex` (0 or 1). These reference predefined notables in    UserAwardsBitmapKeys (index 0) or UserAwardsBitmap1Keys (index 1). **Restricted to games owned by the Puzzmo team.** 2. **System notables**: Use `notableName` as \"{index}-{bitmapValue}\" format (e.g. \"2-4\"). These reference dynamic notables stored in the    SystemNotable database table. Available to all games.\n\nExample: Award a notable when player scores over 100 points\n\n```json {   \"completionNotables\": [     { \"valueExp\": \"score > 100\", \"notableIndex\": 0, \"notableName\": \"jokinAround\" },     { \"valueExp\": \"perfect === true\", \"notableName\": \"2-4\" }   ] } ```"
+        },
+        "forceGameSettings": {
+          "type": "object",
+          "description": "Forces specific game settings for this puzzle, overriding user preferences. Only applies when set via puzzle front-matter (not from game-level augmentations).\n\nWhen a puzzle has forced settings, those settings are locked in the UI and displayed as read-only with a note that the setting is specific to this puzzle. Users cannot change forced settings.\n\nThe settings object keys/values are game-specific. To find valid settings for a game, set the setting yourself in the game and check your user profile in the admin to see the stored format.\n\nExample: Force monochrome grid mode for a crossword puzzle\n\n```json { \"forceGameSettings\": { \"monoGrid\": true } } ```"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Site-wide hooks which are sent at puzzle creation, (via front-matter), via the game, and gameplay completion messages.\n\nGames/Variants/FrontMatter: Supports All Fields. Game Completion: Just \"leaderboards\" and \"completionNotables\""
+    },
+    "LeaderboardExpressionSetup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stableID": {
+          "type": ["string", "null"],
+          "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+        },
+        "scoreTechnique": {
+          "type": ["string", "null"],
+          "enum": ["AggregateOfBest", "AggregateOfAll", null],
+          "description": "Provides a way to control how we handle different scoring algorithms, right now you have the default (overwrite on best) and \"AggregateOfBest\" which aggregates based on the"
+        },
+        "rotation": {
+          "type": "string",
+          "enum": ["Weekly", "Monthly"],
+          "description": "How often does this leaderboard rotate? Leaving empty is means daily"
+        },
+        "icons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What icons should show above the leaderboard? These want to be game slugs"
+        },
+        "rules": {
+          "type": "string",
+          "description": "A \\n separated list of rules to put under a leaderboard"
+        },
+        "subscoreExp": {
+          "type": "string",
+          "description": "An expression to grab a subscore"
+        },
+        "championsLeague": {
+          "type": "boolean",
+          "const": true,
+          "description": "Support having a champion's league, where we extract the top players from the game and move them into a new league. Only available for use on the Game augmentations (and not at puzzles/variants/runtime etc) and on leaderboards with a rotation of null (daily.)"
+        },
+        "postCompletion": {
+          "type": "boolean",
+          "const": true,
+          "description": "This leaderboard is only submitted to via a post-completion checkpoint, not during the normal completion pipeline. We use this for games which have secret metagames which occur after the game has been completed."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "What do we call this datum"
+        },
+        "secondaryName": {
+          "type": "string",
+          "description": "An optional secondary name for this config. For example, on a leaderboard this is used in the completion sidebar"
+        },
+        "order": {
+          "type": "string",
+          "enum": ["Higher=better", "Lower=better"],
+          "description": "Just saying it how it is, for some augmentations, this isn't necessary"
+        },
+        "deedID": {
+          "$ref": "#/definitions/DeedKeys",
+          "description": "Sometimes, instead of an expression, you may need to hook up to a deed"
+        },
+        "formatString": {
+          "type": "string",
+          "description": "A custom string formatter, slightly based on printf.\n\n- `%+`: Adds a plus sign _only_ to positive numbers\n- `%@`: Takes the value and replaces the token with the value. If a number it is 'toLocaleString(\"en-US\")'ed\n- `%TD`: Takes the text definition for a deed and replaces the token with the value\n- `\"[time]\"`: Converts a number of seconds to a colon-separated time string (must be exact match)"
+        },
+        "filterExp": {
+          "type": "string",
+          "description": "An expression string which can stop something from happening. A concrete example: Whether to post to a leaderboard or not. If the expression returns true or > 0 then the entry is considered allowed for the leaderboard."
+        },
+        "valueExp": {
+          "type": "string",
+          "description": "An expression string which can be used to generate the value for whatever your config is based on. The API will provide a set of appropriate variables for you to use in this JS-like expression string. They are based on \"AngularJS Expressions\" which you can read about here: https://docs.angularjs.org/guide/expression"
+        },
+        "sortValue": {
+          "type": "number",
+          "description": "Different augmentations would do different things with this sort value. Leaderboards for example use this when displaying on a page."
+        }
+      },
+      "required": ["displayName", "formatString", "stableID"]
+    },
+    "DeedKeys": {
+      "type": "string"
+    },
+    "ExpressionSetup": {
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "description": "What do we call this datum"
+        },
+        "secondaryName": {
+          "type": "string",
+          "description": "An optional secondary name for this config. For example, on a leaderboard this is used in the completion sidebar"
+        },
+        "stableID": {
+          "type": ["string", "null"],
+          "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+        },
+        "order": {
+          "type": "string",
+          "enum": ["Higher=better", "Lower=better"],
+          "description": "Just saying it how it is, for some augmentations, this isn't necessary"
+        },
+        "deedID": {
+          "$ref": "#/definitions/DeedKeys",
+          "description": "Sometimes, instead of an expression, you may need to hook up to a deed"
+        },
+        "formatString": {
+          "type": "string",
+          "description": "A custom string formatter, slightly based on printf.\n\n- `%+`: Adds a plus sign _only_ to positive numbers\n- `%@`: Takes the value and replaces the token with the value. If a number it is 'toLocaleString(\"en-US\")'ed\n- `%TD`: Takes the text definition for a deed and replaces the token with the value\n- `\"[time]\"`: Converts a number of seconds to a colon-separated time string (must be exact match)"
+        },
+        "filterExp": {
+          "type": "string",
+          "description": "An expression string which can stop something from happening. A concrete example: Whether to post to a leaderboard or not. If the expression returns true or > 0 then the entry is considered allowed for the leaderboard."
+        },
+        "valueExp": {
+          "type": "string",
+          "description": "An expression string which can be used to generate the value for whatever your config is based on. The API will provide a set of appropriate variables for you to use in this JS-like expression string. They are based on \"AngularJS Expressions\" which you can read about here: https://docs.angularjs.org/guide/expression"
+        },
+        "sortValue": {
+          "type": "number",
+          "description": "Different augmentations would do different things with this sort value. Leaderboards for example use this when displaying on a page."
+        }
+      },
+      "required": ["displayName", "formatString"],
+      "additionalProperties": false,
+      "description": "Data given by either via a puzzle in front-matter, or a game in completion. A general unit of data which can be used to represent a lot of configuration points from the game to the API."
+    }
+  }
+}

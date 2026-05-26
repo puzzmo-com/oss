@@ -5,7 +5,15 @@ import path from "node:path"
 import * as p from "@clack/prompts"
 
 import { GameNotFoundError, uploadFiles } from "../util/api.js"
-import { type TokenEntry, findTokensForTeam, getTokens, resolveServerForTeam, sourceToURL } from "../util/config.js"
+import {
+  defaultSource,
+  findTokensForTeam,
+  getTokens,
+  normalizeSource,
+  resolveServerForTeam,
+  sourceToURL,
+  type TokenEntry,
+} from "../util/config.js"
 import { createUserGame } from "../util/createGame.js"
 import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
 
@@ -22,6 +30,7 @@ type GameSuccess = {
   versionID: string
   assetsBase: string
   integrationsChanged: boolean
+  gameURL: string | null
   versionsURL: string | null
 }
 
@@ -55,23 +64,26 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     process.exit(1)
   }
 
-  console.log(`Found ${games.length} game(s) under ${rootDir}`)
-  for (const game of games) {
-    console.log(`  - ${game.puzzmoFile.game.slug} (${path.relative(rootDir, game.distDir) || "."})`)
-  }
-  if (discoveryErrors.length) {
-    console.log(`\n${discoveryErrors.length} puzzmo.json file(s) could not be loaded:`)
-    for (const err of discoveryErrors) {
-      console.log(`  - ${err.slug ?? path.relative(rootDir, err.puzzmoJsonPath)}`)
-      for (const e of err.errors) console.log(`      ${e}`)
+  const multi = games.length + discoveryErrors.length > 1
+
+  if (multi) {
+    console.log(`Found ${plural(games.length, "game")} under ${rootDir}`)
+    for (const game of games) {
+      console.log(`  - ${game.puzzmoFile.game.slug} (${path.relative(rootDir, game.distDir) || "."})`)
+    }
+    if (discoveryErrors.length) {
+      console.log(`\n${plural(discoveryErrors.length, "puzzmo.json file")} could not be loaded:`)
+      for (const err of discoveryErrors) {
+        console.log(`  - ${err.slug ?? path.relative(rootDir, err.puzzmoJsonPath)}`)
+        for (const e of err.errors) console.log(`      ${e}`)
+      }
     }
   }
 
   const sha = getGitSHA(rootDir) || hashGames(games)
   const description = getGitMessage(rootDir)
   const repoURL = getGitRepoURL(rootDir)
-  if (description) console.log(`\nMessage: ${description}`)
-  if (repoURL) console.log(`Repo: ${repoURL}`)
+  if (description && multi) console.log(`\nMessage: ${description}`)
 
   const results: GameResult[] = []
   for (const err of discoveryErrors) {
@@ -81,7 +93,8 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
   for (let i = 0; i < games.length; i++) {
     const game = games[i]
     const slug = game.puzzmoFile.game.slug
-    console.log(`\n[${i + 1}/${games.length}] Uploading ${slug}`)
+    const prefix = multi ? `[${i + 1}/${games.length}] ` : ""
+    const distLabel = path.relative(rootDir, game.distDir) || "."
 
     const teamID = game.puzzmoFile.game.teamID
     const credential = await resolveServerForTeam(teamID)
@@ -91,23 +104,25 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
         matches.length === 0
           ? `No saved token for team ${teamID}. Run \`puzzmo login <token>\` (use \`--source\` if the token is for a non-default server).`
           : `Token for team ${teamID} is registered against ${matches.map((m) => m.source).join(", ")} but none of those servers are reachable.`
-      console.error(`  ${message}`)
+      console.error(`\n${prefix}Uploading ${slug} from ${distLabel}\n  ${message}`)
       results.push({ ok: false, slug, error: message })
       continue
     }
 
     const apiURL = sourceToURL(credential.source)
-    console.log(`  Server: ${credential.source}`)
+    console.log(`\n${prefix}Uploading ${slug} from ${distLabel}`)
+    if (!isDefaultServer(credential.source)) console.log(`  Server: ${credential.source}`)
+    if (description && !multi) console.log(`  Message: ${description}`)
 
     try {
       let result: GameSuccess
       try {
-        result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose, rootDir })
+        result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose })
       } catch (e) {
         if (!(e instanceof GameNotFoundError)) throw e
         const created = await maybeCreateMissingGame(e, game, { apiURL, teamAccessToken: credential.token })
         if (!created) throw e
-        result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose, rootDir })
+        result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose })
       }
       results.push(result)
     } catch (e) {
@@ -117,7 +132,7 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     }
   }
 
-  printReport(results)
+  printSummary(results, multi)
 
   const anyFailed = results.some((r) => !r.ok)
   if (anyFailed) process.exit(1)
@@ -130,22 +145,20 @@ type UploadOneOptions = {
   description: string | null
   repoURL: string | null
   verbose: boolean
-  rootDir: string
 }
 
 /** Uploads a single discovered game; throws on failure */
 const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Promise<GameSuccess> => {
-  const { credential, apiURL, sha, description, repoURL, verbose, rootDir } = opts
+  const { credential, apiURL, sha, description, repoURL, verbose } = opts
   const { puzzmoFile, distDir } = game
   const gameSlug = puzzmoFile.game.slug
 
   const files = collectFiles(distDir)
   if (!files.length) throw new Error(`Dist folder is empty: ${distDir}`)
 
-  console.log(`  Directory: ${path.relative(rootDir, distDir) || distDir}`)
   let totalBytes = 0
   for (const file of files) totalBytes += fs.statSync(file).size
-  console.log(`  ${files.length} file(s), ${formatBytes(totalBytes)} total (sha ${sha.slice(0, 8)})`)
+  console.log(`  ${plural(files.length, "file")}, ${formatBytes(totalBytes)} (sha ${sha.slice(0, 8)})`)
 
   const result = await uploadFiles(
     apiURL,
@@ -156,15 +169,19 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
     distDir,
     puzzmoFile,
     (batch, totalBatches, uploaded) => {
-      console.log(`    Batch ${batch}/${totalBatches} done (${uploaded} file(s) uploaded)`)
+      console.log(`    Batch ${batch}/${totalBatches} done (${plural(uploaded, "file")} uploaded)`)
     },
     { verbose, description, repoURL },
   )
 
-  console.log(`  Done - ${result.versionID}`)
   if (result.integrationsChanged && result.versionsURL) {
-    console.log(`  Integrations changed — staged on a new upcoming version:`)
+    console.log(`  Uploaded. Integrations changed — a new version has been staged for your team:`)
     console.log(`    ${result.versionsURL}`)
+  } else if (result.gameURL) {
+    console.log(`  Uploaded — live now for your team at:`)
+    console.log(`    ${result.gameURL}`)
+  } else {
+    console.log(`  Uploaded.`)
   }
   return {
     ok: true,
@@ -175,22 +192,57 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
     versionID: result.versionID,
     assetsBase: result.assetsBase,
     integrationsChanged: result.integrationsChanged,
+    gameURL: result.gameURL,
     versionsURL: result.versionsURL,
   }
 }
 
-/** Prints a final summary of every game's outcome */
-const printReport = (results: GameResult[]) => {
-  console.log(`\nUpload report (${results.length} game${results.length === 1 ? "" : "s"})`)
+/** Prints the closing summary: failure count for all-fail, otherwise the puzzmonaut delivering the success line. */
+const printSummary = (results: GameResult[], multi: boolean) => {
   const successes = results.filter((r): r is GameSuccess => r.ok)
   const failures = results.filter((r): r is GameFailure => !r.ok)
-  for (const r of successes) {
-    console.log(`  OK   ${r.slug.padEnd(24)} ${formatBytes(r.totalBytes).padStart(8)}  ${r.source.padEnd(20)} ${r.versionID}`)
+
+  if (successes.length === 0) {
+    if (multi) console.log(`\n${plural(failures.length, "game")} failed.`)
+    return
   }
-  for (const r of failures) {
-    console.log(`  FAIL ${r.slug.padEnd(24)} ${r.error}`)
-  }
-  console.log(`\n${successes.length} succeeded, ${failures.length} failed`)
+
+  const lines: string[] = []
+  if (multi && failures.length === 0) lines.push(`${plural(successes.length, "game")} uploaded!`)
+  else if (multi) lines.push(`${successes.length} of ${results.length} uploaded, ${failures.length} failed.`)
+  else lines.push("Uploaded!")
+
+  console.log("")
+  console.log(puzzmonautSays(lines))
+}
+
+const plural = (n: number, singular: string, pluralForm?: string): string => `${n} ${n === 1 ? singular : (pluralForm ?? `${singular}s`)}`
+
+const isDefaultServer = (source: string): boolean => normalizeSource(source) === normalizeSource(defaultSource)
+
+const yellow = (s: string): string => (process.stdout.isTTY ? `\x1b[33m${s}\x1b[0m` : s)
+const blackOnYellow = (s: string): string => (process.stdout.isTTY ? `\x1b[30;43m${s}\x1b[0m` : s)
+
+const puzzmonautLines = [
+  ` ${yellow("▟████▙")}`,
+  ` ${yellow("██")}${blackOnYellow("▝ ▘ ")} ${yellow("██")}`,
+  `${yellow(" ██")}${blackOnYellow(" ▄▖")}${yellow("██")}`,
+  ` ${yellow("▝▀▀▀▀▘")}`,
+]
+
+const visualWidth = (s: string): number => s.replace(/\u001b\[[0-9;]*m/g, "").length
+
+/** Renders the puzzmonaut with message lines vertically centered to its right. */
+const puzzmonautSays = (messages: string[]): string => {
+  const iconWidth = Math.max(...puzzmonautLines.map(visualWidth))
+  const startRow = Math.max(0, Math.floor((puzzmonautLines.length - messages.length) / 2))
+  return puzzmonautLines
+    .map((line, i) => {
+      const pad = " ".repeat(iconWidth - visualWidth(line))
+      const msg = messages[i - startRow] ?? ""
+      return `${line}${pad}  ${msg}`.trimEnd()
+    })
+    .join("\n")
 }
 
 /** Collects all files in a directory recursively */
@@ -285,7 +337,7 @@ const maybeCreateMissingGame = async (
 
   try {
     const created = await createUserGame({ apiURL: opts.apiURL, displayName, teamAccessToken: opts.teamAccessToken })
-    console.log(`  Created game ${created.slug} (${created.id})`)
+    console.log(`  Created game ${created.slug}`)
     if (created.slug !== slug) {
       console.warn(`  Server picked slug "${created.slug}" but your puzzmo.json uses "${slug}". Update puzzmo.json before re-uploading.`)
       return false
