@@ -7,9 +7,9 @@ export function parseFixtures(fixtures: FixtureImports): Map<string, Map<string,
   console.log("Simulator: Parsing fixtures", Object.keys(fixtures))
 
   for (const [path, module] of Object.entries(fixtures)) {
-    // Extract category and filename from path like "./fixtures/puzzles/3x3/puzzle_1.json"
+    // Extract category and filename from path like "./fixtures/puzzles/3x3/puzzle_1.json" or "...puzzle_1.toml"
     const parts = path.split("/")
-    const filename = parts.pop()?.replace(".json", "") ?? ""
+    const filename = parts.pop()?.replace(/\.[^.]+$/, "") ?? ""
     const category = parts.pop() ?? "default"
 
     if (!result.has(category)) {

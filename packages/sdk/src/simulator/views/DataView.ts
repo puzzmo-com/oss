@@ -21,7 +21,7 @@ function generateMiniThumbnail(ctx: SimulatorContext, inputStr: string): string 
   if (!thumbFn) return ""
 
   try {
-    const puzzleStr = ctx.state.puzzleData ? JSON.stringify(ctx.state.puzzleData) : ""
+    const puzzleStr = ctx.state.puzzleData ?? ""
     const thumbnailConfig: ThumbnailConfig = {
       viewerIsOwner: true,
       theme: ctx.state.selectedTheme,
@@ -205,29 +205,23 @@ export function createDataView(): SimulatorView {
         }
       })
 
-      // Puzzle apply
+      // Puzzle apply - the puzzle is an opaque string; the game parses it, so no validation here
       puzzleApplyBtn?.addEventListener("click", () => {
         if (!puzzleTextarea) return
-        try {
-          const newPuzzle = JSON.parse(puzzleTextarea.value)
-          ctx.state.puzzleData = newPuzzle
-          ctx.state.originalPuzzle = puzzleTextarea.value
-          originalPuzzleValue = puzzleTextarea.value
-          // Trigger a retry with the new puzzle
-          ctx.sendToGame("RETRY_PUZZLE", {})
-          ctx.state.hasStarted = false
-          ctx.state.isPaused = false
-          if (pauseBtn) {
-            pauseBtn.disabled = true
-            pauseBtn.textContent = "Pause"
-          }
-          if (startBtn) startBtn.textContent = "Start"
-          ctx.updateStatus("Puzzle updated", "ready")
-          puzzleApplyBtn.disabled = true
-        } catch (e) {
-          console.error("Simulator: Invalid puzzle JSON", e)
-          ctx.updateStatus("Invalid JSON", "paused")
+        ctx.state.puzzleData = puzzleTextarea.value
+        ctx.state.originalPuzzle = puzzleTextarea.value
+        originalPuzzleValue = puzzleTextarea.value
+        // Trigger a retry with the new puzzle
+        ctx.sendToGame("RETRY_PUZZLE", {})
+        ctx.state.hasStarted = false
+        ctx.state.isPaused = false
+        if (pauseBtn) {
+          pauseBtn.disabled = true
+          pauseBtn.textContent = "Pause"
         }
+        if (startBtn) startBtn.textContent = "Start"
+        ctx.updateStatus("Puzzle updated", "ready")
+        puzzleApplyBtn.disabled = true
       })
 
       // Input reset
@@ -437,14 +431,9 @@ function renderSaves(ctx: SimulatorContext) {
       const idx = parseInt((e.target as HTMLElement).getAttribute("data-save-idx") || "0")
       const state = savedStates[idx]
       if (state) {
-        // Update puzzle
-        try {
-          ctx.state.puzzleData = JSON.parse(state.puzzleStr)
-          ctx.state.originalPuzzle = state.puzzleStr
-        } catch {
-          // If invalid JSON, just set the string
-          ctx.state.originalPuzzle = state.puzzleStr
-        }
+        // Update puzzle - stored as a raw string, passed to the game verbatim
+        ctx.state.puzzleData = state.puzzleStr
+        ctx.state.originalPuzzle = state.puzzleStr
 
         // Update input
         ctx.state.currentInputStr = state.inputStr

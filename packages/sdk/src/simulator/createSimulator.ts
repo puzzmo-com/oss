@@ -56,12 +56,13 @@ let simulatorInstance: SimulatorInstance | null = null
  * ```html
  * <script type="module">
  *   import { createSimulator } from "@puzzmo/sdk/simulator"
- *   const fixtures = import.meta.glob("./fixtures/puzzles/**\/*.json", { eager: true })
+ *   const fixtures = import.meta.glob("./fixtures/puzzles/**\/*.{json,toml}", { query: "?raw", import: "default", eager: true })
  *   createSimulator({ fixtures })
  * </script>
  * ```
  *
- * The fixtures folder structure should be: fixtures/puzzles/{category}/{puzzle}.json
+ * The fixtures folder structure should be: fixtures/puzzles/{category}/{puzzle}.{json,toml,...}
+ * Fixtures are loaded as raw strings and passed to the game verbatim (any text format works; the game parses it).
  * This will show dropdowns in the Ctrl tab to select category and puzzle.
  */
 
@@ -254,7 +255,9 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     if (state.puzzleData) return state.puzzleData
 
     if (!fixtures || fixtures.size === 0) {
-      throw new Error("No fixtures configured. Add puzzle JSON files to a fixtures directory and pass fixturesGlob to the simulator.")
+      throw new Error(
+        "No fixtures configured. Add puzzle fixture files (.json or .toml) to a fixtures directory and pass fixturesGlob to the simulator.",
+      )
     }
 
     // Pick the selected fixture, or the first one available
@@ -272,7 +275,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
 
     state.puzzleData = puzzleData
     console.log("Simulator: Puzzle loaded from fixtures", { category, puzzle: puzzleName })
-    state.originalPuzzle = JSON.stringify(state.puzzleData, null, 2)
+    state.originalPuzzle = puzzleData
 
     const puzzleTextarea = getElement<HTMLTextAreaElement>("#simulator-puzzle")
     if (puzzleTextarea) puzzleTextarea.value = state.originalPuzzle
@@ -405,7 +408,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   }
 
   // Create READY_DATA payload
-  const createReadyData = (puzzle: any): BootstrapGameData => {
+  const createReadyData = (puzzle: string): BootstrapGameData => {
     return {
       userState: {
         gameSettings: {},
@@ -437,7 +440,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
           puzzle: {
             id: "simulator-puzzle",
             name: "Proto Jig Puzzle",
-            puzzle: JSON.stringify(puzzle),
+            puzzle,
             game: {
               displayName: "Proto Game",
               jsPath: "",

@@ -9,8 +9,9 @@ export type PuzzmoSimulatorPluginOptions = {
   /** Initial collapsed state (default: true) */
   collapsed?: boolean
   /**
-   * Glob pattern for fixture files, passed to import.meta.glob which is relative to the closest puzzmo.json. Defaults to
-   * `"/fixtures/puzzles/**\/*.json"`. Pass false to disable.
+   * Glob pattern for fixture files, passed to import.meta.glob which is relative to the closest puzzmo.json. Defaults
+   * to `"/fixtures/puzzles/**\/*.{json,toml}"`. Fixtures are loaded as raw strings (any text format works — JSON,
+   * TOML, or a custom format) and delivered to the game verbatim, so the game parses them itself. Pass false to disable.
    */
   fixturesGlob?: string | false
 }
@@ -85,12 +86,13 @@ export function resolveGameFromReferer(referer: string | undefined, games: Map<s
  */
 export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, game: GameInfo | undefined): string {
   const { fixturesGlob: fixturesOpt, ...config } = options
-  const fixturesGlob = fixturesOpt === false ? null : (fixturesOpt ?? "/fixtures/puzzles/**/*.json")
+  const fixturesGlob = fixturesOpt === false ? null : (fixturesOpt ?? "/fixtures/puzzles/**/*.{json,toml}")
 
   const lines = [`import { createSimulator } from "@puzzmo/sdk/simulator"`]
 
+  // Load fixtures as raw strings so any text format reaches the game verbatim; the game does its own parsing.
   if (fixturesGlob) {
-    lines.push(`const fixtures = import.meta.glob(${JSON.stringify(fixturesGlob)}, { eager: true })`)
+    lines.push(`const fixtures = import.meta.glob(${JSON.stringify(fixturesGlob)}, { query: "?raw", import: "default", eager: true })`)
   }
 
   if (game?.appBundlePath) {

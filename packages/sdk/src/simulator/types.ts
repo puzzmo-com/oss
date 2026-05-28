@@ -1,14 +1,14 @@
 import type { MessagesReceived, Theme, ThumbnailConfig } from "../types"
 
-/** Type for Vite's glob import with eager loading - supports both Vite 5 and 6 formats */
-export type FixtureImports = Record<string, { default?: any }>
+/** Raw fixture strings keyed by path from Vite's import.meta.glob (eager, ?raw). Each value is the file's text. */
+export type FixtureImports = Record<string, string | { default?: string }>
 
 export interface SimulatorConfig {
   /** Whether to auto-start the game after READY (default: true) */
   autoStart?: boolean
   /** Initial collapsed state (default: true) */
   collapsed?: boolean
-  /** Fixture imports from Vite's import.meta.glob - supports { default: data } (Vite 5) or { json: data } (Vite 6) */
+  /** Raw fixture strings from Vite's import.meta.glob (loaded with `?raw`); the game parses them itself */
   fixtures?: FixtureImports
   /** Game slug for API features (e.g. "crossword", "ribbit") */
   slug?: string
@@ -21,7 +21,8 @@ export interface SimulatorState {
   isPaused: boolean
   hasStarted: boolean
   activeTab: TabName
-  puzzleData: any
+  /** The active puzzle as a raw string (file contents), sent to the game verbatim for it to parse */
+  puzzleData: string | null
   originalPuzzle: string
   currentInputStr: string
   completionData: any

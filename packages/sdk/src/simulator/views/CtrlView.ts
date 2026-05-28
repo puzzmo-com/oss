@@ -58,7 +58,7 @@ export function createCtrlView(): SimulatorView {
           })
           if (puzzleData) {
             ctx.state.puzzleData = puzzleData
-            ctx.state.originalPuzzle = JSON.stringify(puzzleData, null, 2)
+            ctx.state.originalPuzzle = puzzleData
             if (ctx.state.selectedCategory) persistFixtureCategory(ctx.state.selectedCategory)
             if (ctx.state.selectedPuzzle) persistFixturePuzzle(ctx.state.selectedPuzzle)
           }

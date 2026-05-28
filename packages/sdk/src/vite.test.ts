@@ -215,7 +215,10 @@ describe("generateSimulatorCode", () => {
     const code = generateSimulatorCode({}, undefined)
     expect(code).toContain('import { createSimulator } from "@puzzmo/sdk/simulator"')
     expect(code).toContain("import.meta.glob")
-    expect(code).toContain("/fixtures/puzzles/**/*.json")
+    expect(code).toContain("/fixtures/puzzles/**/*.{json,toml}")
+    // fixtures load as raw strings so any text format reaches the game verbatim
+    expect(code).toContain('query: "?raw"')
+    expect(code).toContain('import: "default"')
     expect(code).toContain("createSimulator({ fixtures })")
     expect(code).not.toContain("slug")
     expect(code).not.toContain("appBundle")

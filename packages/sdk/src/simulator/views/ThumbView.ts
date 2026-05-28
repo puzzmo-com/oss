@@ -35,7 +35,7 @@ export function createThumbView(): ThumbViewExtended {
     if (fnEl) fnEl.textContent = `Using: ${thumbFn.name}()`
 
     try {
-      const puzzleStr = ctx.state.puzzleData ? JSON.stringify(ctx.state.puzzleData) : ""
+      const puzzleStr = ctx.state.puzzleData ?? ""
 
       const thumbnailConfig: ThumbnailConfig = {
         viewerIsOwner: true,
