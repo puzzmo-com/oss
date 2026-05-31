@@ -44,7 +44,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
-    "@types/node": "^20.19.0",
+    "@types/node": "^25.0.0",
     "@typescript/native-preview": "*",
     "typescript": "catalog:"
   }
