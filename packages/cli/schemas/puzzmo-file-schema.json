@@ -10,7 +10,7 @@
           "properties": {
             "displayName": {
               "type": "string",
-              "description": "Display name shown in the UI, use | to indicate where a line break should go"
+              "description": "Display name shown in the UI, use | to indicate where a line break should go. Synced to the game on every upload; seeds a newly created game."
             },
             "slug": {
               "type": "string",
@@ -19,6 +19,18 @@
             "teamID": {
               "type": "string",
               "description": "The team ID that owns this game"
+            },
+            "oneliner": {
+              "type": "string",
+              "description": "Short tagline for the game. Synced to the game on every upload when present; seeds a newly created game."
+            },
+            "description": {
+              "type": "string",
+              "description": "Longer description of the game. Synced to the game on every upload when present; seeds a newly created game."
+            },
+            "highlightColor": {
+              "type": "string",
+              "description": "Hex highlight color (e.g. \"#FF8800\"). Synced to the game on every upload when present; seeds a newly created game."
             }
           },
           "required": ["displayName", "slug", "teamID"],

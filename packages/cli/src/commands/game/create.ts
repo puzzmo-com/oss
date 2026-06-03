@@ -11,6 +11,7 @@ import { runCommand, gitCommit } from "../../util/exec.js"
 import { runSkillsPipelineTUI, runAgentWithBuildLoop } from "../../skills/runner.js"
 import { login } from "../login.js"
 import { getDefaultToken } from "../../util/config.js"
+import { slugify } from "../../util/slugify.js"
 import { detectRepoContext, type RepoType } from "./detectRepo.js"
 
 export type Strategy = "import" | "blank" | "prompt"
@@ -26,18 +27,6 @@ export type CreateOptions = {
   strategy?: Strategy
   prompt?: string
 }
-
-/** Converts a string to a URL-friendly slug (matches packages/shared/slugify.ts) */
-const slugify = (text: string) =>
-  text
-    .toString()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^\w-]+/g, "")
-    .replace(/--+/g, "-")
 
 /** Writes .mcp.json with dev server config */
 const writeMcpConfig = (dir: string) => {

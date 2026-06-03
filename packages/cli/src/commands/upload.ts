@@ -16,9 +16,12 @@ import {
 } from "../util/config.js"
 import { createUserGame } from "../util/createGame.js"
 import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
+import { slugify } from "../util/slugify.js"
 
 type UploadOptions = {
   verbose?: boolean
+  /** Create games that don't exist yet without prompting (for CI). */
+  createMissing?: boolean
 }
 
 type GameSuccess = {
@@ -45,6 +48,7 @@ type GameResult = GameSuccess | GameFailure
 /** Uploads game build artifacts to Puzzmo by discovering puzzmo.json files in `dir` */
 export const upload = async (dir: string, options: UploadOptions = {}) => {
   const { verbose = false } = options
+  const autoCreate = options.createMissing ?? false
 
   if (getTokens().length === 0) {
     console.error("Not logged in. Run `puzzmo login <token>` or set PUZZMO_TOKEN.")
@@ -120,7 +124,7 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
         result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose })
       } catch (e) {
         if (!(e instanceof GameNotFoundError)) throw e
-        const created = await maybeCreateMissingGame(e, game, { apiURL, teamAccessToken: credential.token })
+        const created = await maybeCreateMissingGame(e, game, { apiURL, teamAccessToken: credential.token, autoCreate })
         if (!created) throw e
         result = await uploadOneGame(game, { credential, apiURL, sha, description, repoURL, verbose })
       }
@@ -313,31 +317,53 @@ const hashGames = (games: DiscoveredGame[]): string => {
 
 /**
  * When a game can't be uploaded because it doesn't exist on the user's account,
- * offer to create it interactively. Returns true if the game was created and the
- * caller can retry the upload. Returns false otherwise (non-interactive shell or
- * user declined).
+ * create it. With `autoCreate` (CI: --create-missing) it
+ * creates without prompting; otherwise it asks for confirmation in an interactive
+ * shell. Returns true if the game was created and the caller can retry the upload.
+ * Returns false otherwise (non-interactive without autoCreate, or user declined).
  */
 const maybeCreateMissingGame = async (
   err: GameNotFoundError,
   game: DiscoveredGame,
-  opts: { apiURL: string; teamAccessToken: string },
+  opts: { apiURL: string; teamAccessToken: string; autoCreate: boolean },
 ): Promise<boolean> => {
   const slug = err.slug
-  const displayName = game.puzzmoFile.game.displayName
+  const { displayName, oneliner, description, highlightColor } = game.puzzmoFile.game
 
-  if (!process.stdin.isTTY) {
-    console.error(`  Game "${slug}" not found on your account. Re-run interactively to create it.`)
+  // Creation derives the slug from displayName server-side; if it wouldn't match the
+  // puzzmo.json slug, creating would mint an orphan game under the wrong slug and the
+  // retried upload would still 404. Refuse up front so nothing is created.
+  const expectedSlug = slugify(displayName)
+  if (expectedSlug !== slug) {
+    console.error(
+      `  Game "${slug}" not found, and cannot be auto-created: displayName "${displayName}" slugifies to "${expectedSlug}", not "${slug}". ` +
+        `Set puzzmo.json game.slug to "${expectedSlug}" (or adjust game.displayName), or create the game manually.`,
+    )
     return false
   }
 
-  const consent = await p.confirm({
-    message: `Game "${slug}" doesn't exist on your account. Create it now (displayName: "${displayName}")?`,
-    initialValue: true,
-  })
-  if (p.isCancel(consent) || !consent) return false
+  if (opts.autoCreate) {
+    console.log(`  Game "${slug}" not found — creating it (displayName: "${displayName}")...`)
+  } else if (!process.stdin.isTTY) {
+    console.error(`  Game "${slug}" not found on your account. Re-run interactively, or pass --create-missing to create it automatically.`)
+    return false
+  } else {
+    const consent = await p.confirm({
+      message: `Game "${slug}" doesn't exist on your account. Create it now (displayName: "${displayName}")?`,
+      initialValue: true,
+    })
+    if (p.isCancel(consent) || !consent) return false
+  }
 
   try {
-    const created = await createUserGame({ apiURL: opts.apiURL, displayName, teamAccessToken: opts.teamAccessToken })
+    const created = await createUserGame({
+      apiURL: opts.apiURL,
+      displayName,
+      oneliner,
+      description,
+      highlightColor,
+      teamAccessToken: opts.teamAccessToken,
+    })
     console.log(`  Created game ${created.slug}`)
     if (created.slug !== slug) {
       console.warn(`  Server picked slug "${created.slug}" but your puzzmo.json uses "${slug}". Update puzzmo.json before re-uploading.`)

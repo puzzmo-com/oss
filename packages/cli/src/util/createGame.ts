@@ -25,6 +25,9 @@ export type CreateUserGameOptions = {
   /** A teamAccessToken (the same token saved by `puzzmo login`). The mutation uses it to identify the team. */
   teamAccessToken: string
   displayName: string
+  oneliner?: string
+  description?: string
+  highlightColor?: string
 }
 
 export type CreatedGame = { id: string; slug: string; displayName: string; newAccessToken: string | null }
@@ -40,7 +43,12 @@ export const createUserGame = async (options: CreateUserGameOptions): Promise<Cr
       query: createUserGameMutation,
       variables: {
         teamAccessToken: options.teamAccessToken,
-        input: { displayName: options.displayName },
+        input: {
+          displayName: options.displayName,
+          oneliner: options.oneliner,
+          description: options.description,
+          highlightColor: options.highlightColor,
+        },
       },
     }),
   })

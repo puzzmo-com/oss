@@ -6,7 +6,7 @@ LLMs have changed this, and we're finding that the 'prototype in HTML' phase is 
 
 So, after shipping two full games with this pipeline, we've knocked enough kinks out that it's ready for a more public space.
 
-So, how do you make a game? Well first, you need a game - we can't help there! However, once you do, then you can start migrating it to run on Puzzmo by: `yarn create puzzmo game`.
+So, how do you make a game? Well first, you need a game idea - we can't help there! However, once you do, then you can start migrating it to run on Puzzmo by: `yarn create puzzmo game`.
 
 ## @puzzmo/sdk
 

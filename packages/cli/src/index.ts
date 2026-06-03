@@ -30,8 +30,12 @@ const uploadCommand = defineCommand({
   args: {
     dir: { type: "positional", description: "Directory to scan", required: false, default: "." },
     verbose: { type: "boolean", description: "Print request URLs and full error bodies", alias: "v" },
+    "create-missing": {
+      type: "boolean",
+      description: "Create games that don't exist yet without an interactive prompt (for CI).",
+    },
   },
-  run: ({ args }) => upload(args.dir, { verbose: args.verbose }),
+  run: ({ args }) => upload(args.dir, { verbose: args.verbose, createMissing: args["create-missing"] }),
 })
 
 const validateCommand = defineCommand({

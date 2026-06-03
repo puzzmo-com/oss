@@ -7,6 +7,9 @@ export type PuzzmoFile = {
     displayName: string
     slug: string
     teamID: string
+    oneliner?: string
+    description?: string
+    highlightColor?: string
   }
   // This is what we're calling 'augmentations' publicly
   integrations?: Record<string, unknown>
