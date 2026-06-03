@@ -1,3 +1,5 @@
+// For now, we will keep these types in here but not mark them as something which should appear in the public SDK docs
+
 /** Severity level for validation issues */
 export type ValidationLevel = "error" | "warning" | "info"
 
