@@ -51,7 +51,7 @@
           },
           "required": ["dir"],
           "additionalProperties": false,
-          "description": "Where the built game artifacts live for this game. Used by `puzzmo upload` and `puzzmo validate` to find the dist folder when running from a repo root. If omitted, the CLI looks for a `dist`, `build`, or `built` folder — first next to puzzmo.json, then walking up to the repo root, optionally with `<slug>` as a sub-folder for shared output dirs."
+          "description": "Where the built game artifacts live for this game. Used by `puzzmo games upload` and `puzzmo games validate` to find the dist folder when running from a repo root. If omitted, the CLI looks for a `dist`, `build`, or `built` folder — first next to puzzmo.json, then walking up to the repo root, optionally with `<slug>` as a sub-folder for shared output dirs."
         }
       },
       "required": ["game"],

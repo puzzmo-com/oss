@@ -15,5 +15,5 @@ Edit puzzles in `fixtures/puzzles/`. Game logic is in `src/main.ts`.
 ## Deployment
 
 ```
-yarn puzzmo upload
+yarn puzzmo games upload
 ```

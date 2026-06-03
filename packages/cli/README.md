@@ -18,15 +18,25 @@ Save a CLI auth token. Generate one from studio.puzzmo.com.
 puzzmo login pzt-your-token-here
 ```
 
-### `puzzmo upload <dir>`
+### `puzzmo games upload <dir>`
 
 Upload a game build directory to Puzzmo. The game slug is read from `puzzmo.json` in the build directory.
 
 ```bash
-puzzmo upload dist/
+puzzmo games upload dist/
 ```
 
 The command collects all files in the directory, validates the `puzzmo.json`, computes a SHA from git (or file contents), and uploads them in batches.
+
+### `puzzmo games validate [dir]`
+
+Validate every `puzzmo.json` under `dir` (defaults to the current directory) against the schema, without uploading anything.
+
+```bash
+puzzmo games validate
+```
+
+> The older `puzzmo upload` and `puzzmo validate` (without `games`) still work as aliases, but the `puzzmo games …` forms are preferred.
 
 ### `puzzmo game create [token]`
 

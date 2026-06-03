@@ -20,7 +20,10 @@ export type DiscoveredGame = {
   puzzmoJsonDir: string
   /** Validated puzzmo.json contents */
   puzzmoFile: PuzzmoFile
-  /** Absolute path to the dist directory containing the build artifacts */
+  /**
+   * Absolute path to the dist directory containing the build artifacts (empty string when discovered with requireDist: false and none was
+   * found)
+   */
   distDir: string
 }
 
@@ -37,8 +40,15 @@ export type DiscoveryResult = {
   errors: DiscoveryError[]
 }
 
+/** Options for {@link discoverGames} */
+export type DiscoverOptions = {
+  /** Require each game to have a non-empty dist folder (default true). Set false for commands that run before a build. */
+  requireDist?: boolean
+}
+
 /** Walks `rootDir` looking for puzzmo.json files, validates each, and resolves their dist directory */
-export const discoverGames = async (rootDir: string): Promise<DiscoveryResult> => {
+export const discoverGames = async (rootDir: string, options: DiscoverOptions = {}): Promise<DiscoveryResult> => {
+  const { requireDist = true } = options
   const root = path.resolve(rootDir)
   const puzzmoJsonPaths = findPuzzmoJsonFiles(root)
 
@@ -66,18 +76,20 @@ export const discoverGames = async (rootDir: string): Promise<DiscoveryResult> =
     const puzzmoJsonDir = path.dirname(puzzmoJsonPath)
     const distDir = resolveDistDir(puzzmoFile, puzzmoJsonDir, root)
 
-    if (!distDir) {
-      fileErrors.push(`Could not find a dist/build folder for ${puzzmoFile.game.slug}. Set "output.dir" in puzzmo.json.`)
-    } else if (!hasFiles(distDir)) {
-      fileErrors.push(`Dist folder is empty: ${distDir}`)
+    if (requireDist) {
+      if (!distDir) {
+        fileErrors.push(`Could not find a dist/build folder for ${puzzmoFile.game.slug}. Set "output.dir" in puzzmo.json.`)
+      } else if (!hasFiles(distDir)) {
+        fileErrors.push(`Dist folder is empty: ${distDir}`)
+      }
+
+      if (fileErrors.length) {
+        errors.push({ puzzmoJsonPath, slug: puzzmoFile.game.slug, errors: fileErrors })
+        continue
+      }
     }
 
-    if (fileErrors.length) {
-      errors.push({ puzzmoJsonPath, slug: puzzmoFile.game.slug, errors: fileErrors })
-      continue
-    }
-
-    games.push({ puzzmoJsonPath, puzzmoJsonDir, puzzmoFile, distDir: distDir as string })
+    games.push({ puzzmoJsonPath, puzzmoJsonDir, puzzmoFile, distDir: distDir ?? "" })
   }
 
   return { games, errors }

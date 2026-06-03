@@ -3,6 +3,7 @@
 import { defineCommand, runMain } from "citty"
 
 import { agentTest } from "./commands/agent-test.js"
+import { type ChangedAgainst, changed } from "./commands/changed.js"
 import { gameCreate } from "./commands/game/create.js"
 import { login } from "./commands/login.js"
 import { migrate } from "./commands/migrate.js"
@@ -46,6 +47,38 @@ const validateCommand = defineCommand({
   run: ({ args }) => validate(args.dir),
 })
 
+const changedCommand = defineCommand({
+  meta: { name: "changed", description: "Report which games changed since their last deployed build (for CI)." },
+  args: {
+    dir: { type: "positional", description: "Directory to scan", required: false, default: "." },
+    json: { type: "boolean", description: "Output a JSON report for every discovered game" },
+    list: { type: "boolean", description: "Output only the changed game folders, one per line" },
+    matrix: { type: "boolean", description: "Output a GitHub Actions matrix of the changed games" },
+    ref: { type: "string", description: "Git ref to compare against (default HEAD)" },
+    against: {
+      type: "enum",
+      options: ["latest", "next", "previous"],
+      description: "Which deployed build to use as the baseline (default latest)",
+    },
+    "include-uncommitted": { type: "boolean", description: "Also count uncommitted working-tree changes" },
+  },
+  run: ({ args }) =>
+    changed(args.dir, {
+      json: args.json,
+      list: args.list,
+      matrix: args.matrix,
+      ref: args.ref,
+      against: args.against as ChangedAgainst | undefined,
+      includeUncommitted: args["include-uncommitted"],
+    }),
+})
+
+// Commands that operate across every puzzmo.json in a repo live under `puzzmo games`.
+const gamesCommand = defineCommand({
+  meta: { name: "games", description: "Commands that run across all the games in your repo" },
+  subCommands: { changed: changedCommand, upload: uploadCommand, validate: validateCommand },
+})
+
 const migrateCommand = defineCommand({
   meta: { name: "migrate", description: "List and select migration skills from dev.puzzmo.com" },
   run: () => migrate(),
@@ -83,14 +116,37 @@ const gameCommand = defineCommand({
   subCommands: { create: gameCreateCommand },
 })
 
+/** Warn that a top-level command moved under `puzzmo games`, then run it anyway. */
+const movedToGames = (name: string) => console.warn(`"puzzmo ${name}" is now "puzzmo games ${name}". The old form still works for now.`)
+
+// Deprecated top-level aliases, kept hidden so existing scripts (e.g. `puzzmo upload`) keep working.
+const uploadAlias = defineCommand({
+  meta: { ...uploadCommand.meta, hidden: true },
+  args: uploadCommand.args,
+  run: ({ args }) => {
+    movedToGames("upload")
+    return upload(args.dir, { verbose: args.verbose })
+  },
+})
+
+const validateAlias = defineCommand({
+  meta: { ...validateCommand.meta, hidden: true },
+  args: validateCommand.args,
+  run: ({ args }) => {
+    movedToGames("validate")
+    return validate(args.dir)
+  },
+})
+
 const main = defineCommand({
   meta: { name: "puzzmo", description: "Puzzmo CLI" },
   subCommands: {
     login: loginCommand,
-    upload: uploadCommand,
-    validate: validateCommand,
+    games: gamesCommand,
     migrate: migrateCommand,
     game: gameCommand,
+    upload: uploadAlias,
+    validate: validateAlias,
     "agent-test": defineCommand({
       meta: { name: "agent-test", description: "Run the agent test harness", hidden: true },
       run: () => agentTest(),

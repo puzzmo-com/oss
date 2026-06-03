@@ -20,8 +20,8 @@ Configure the project to deploy game builds to Puzzmo using the CLI.
    ```json
    {
      "scripts": {
-       "deploy": "npm run build && puzzmo upload",
-       "deploy:only": "puzzmo upload"
+       "deploy": "npm run build && puzzmo games upload",
+       "deploy:only": "puzzmo games upload"
      }
    }
    ```
@@ -64,6 +64,6 @@ Configure the project to deploy game builds to Puzzmo using the CLI.
 ## Success Criteria
 
 - The `build` script completes without errors
-- `puzzmo upload` command is configured in package.json
+- `puzzmo games upload` command is configured in package.json
 - `.gitignore` excludes node_modules and dist
 - Game slug matches across all config files

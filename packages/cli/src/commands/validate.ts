@@ -3,7 +3,7 @@ import path from "node:path"
 
 import { discoverGames } from "../util/discoverGames.js"
 
-/** CLI command: puzzmo validate [dir] — discovers every puzzmo.json under dir and validates each */
+/** CLI command: puzzmo games validate [dir] — discovers every puzzmo.json under dir and validates each */
 export const validate = async (dir: string) => {
   const rootDir = path.resolve(dir)
   if (!fs.existsSync(rootDir)) {
