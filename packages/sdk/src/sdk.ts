@@ -1,3 +1,4 @@
+import { createGameAnalytics, setupLinkTracking, type GameAnalyticsTracker } from "./analytics"
 import type {
   MessagesSentFromEmbed,
   MessagesReceived,
@@ -230,6 +231,17 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
 
   const eventListeners = new Map<SDKEventType, Set<(data?: any) => void>>()
 
+  // ClickHouse game analytics — sends the same lifecycle events the runtime tracks
+  // (page_view, gameplay_active, active_30s, completed, link_click). Disabled on localhost.
+  let analytics: GameAnalyticsTracker | null = null
+  let analyticsCompletedAtStart = false
+
+  const trackAnalyticsEvent = (type: string, json?: any) => {
+    // Don't re-send progression events for a game that was already completed when loaded
+    if (analyticsCompletedAtStart) return
+    analytics?.trackEvent(type, json)
+  }
+
   const internalTimer = createTimer()
   let timerTickInterval: ReturnType<typeof setInterval> | null = null
   let timerSyncInterval: ReturnType<typeof setInterval> | null = null
@@ -302,6 +314,14 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
       const existingTime = (gamePlayed.elapsedTimeSecs ?? 0) * 1000
       const existingAddedTime = (gamePlayed.additionalTimeAddedSecs ?? 0) * 1000
       internalTimer._reset(existingTime, existingAddedTime)
+    }
+
+    // Wire up analytics once, from the first bootstrap payload
+    if (!analytics) {
+      analytics = createGameAnalytics(bootstrapData)
+      analyticsCompletedAtStart = gamePlayed?.completed ?? false
+      // Link clicks are tracked even for already-completed games, matching the runtime
+      if (analytics) setupLinkTracking((info) => analytics!.trackLinkClick(info))
     }
 
     if (readyDataResolve) {
@@ -381,6 +401,7 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
         gameRuntimeContract: "1.0",
         embedRuntimeContract: "1.0",
       })
+      trackAnalyticsEvent("READY_GAME_LOADED")
     },
 
     on: <T extends SDKEventType>(event: T, listener: (data?: SDKEventMap[T]) => void): (() => void) => {
@@ -408,6 +429,7 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
           collabUserReferences: [],
         },
       })
+      trackAnalyticsEvent("UPLOAD_NEW_GAME_STATE")
     },
 
     gameCompleted: (play: Partial<GamePlay>, config?: AugmentationConfig) => {
@@ -434,6 +456,7 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
           input: finalPlay,
           config,
         })
+        trackAnalyticsEvent("GAME_COMPLETED", { input: finalPlay })
       }
     },
 
