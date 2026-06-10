@@ -333,7 +333,7 @@ export const themes: Theme[] = [
     a_infoBG: "#C6C6C6",
   },
   {
-    name: "Outlook Hayesy (beta)",
+    name: "Outlook Hayesy",
     type: "light" as "light" | "dark",
     key: "#DAB98C",
     keyFG: "#000000",
