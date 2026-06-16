@@ -15,6 +15,7 @@ import {
   createAuthView,
   createFeaturesView,
   createKeyboardView,
+  createSettingsView,
 } from "./views"
 
 // Re-export types for consumers
@@ -98,6 +99,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     createAuthView(),
     createFeaturesView(),
     createKeyboardView(),
+    createSettingsView(),
   ] satisfies SimulatorView[]
 
   const validTabIds = views.map((v) => v.id)
@@ -411,7 +413,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   const createReadyData = (puzzle: string): BootstrapGameData => {
     return {
       userState: {
-        gameSettings: {},
+        gameSettings: state.gameSettings,
         id: "simulator-user",
         ownerID: "simulator-owner",
       },
@@ -508,11 +510,6 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     if (type === "READY") {
       console.log("Simulator: Received READY from game")
       handleReady()
-      return
-    }
-
-    if (type === "INITIALIZE_SETTINGS") {
-      console.log("Simulator: Game initialized settings", data)
       return
     }
 

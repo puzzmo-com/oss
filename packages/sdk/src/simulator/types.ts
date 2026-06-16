@@ -1,4 +1,4 @@
-import type { MessagesReceived, Theme, ThumbnailConfig } from "../types"
+import type { GameSettingsUIComponents, MessagesReceived, Theme, ThumbnailConfig } from "../types"
 
 /** Raw fixture strings keyed by path from Vite's import.meta.glob (eager, ?raw). Each value is the file's text. */
 export type FixtureImports = Record<string, string | { default?: string }>
@@ -31,6 +31,10 @@ export interface SimulatorState {
   selectedPuzzle: string | null
   renderHost: ThumbnailConfig["renderHost"]
   renderContext: ThumbnailConfig["renderContext"]
+  /** The player's settings for this game, persisted to localStorage and sent in READY_DATA */
+  gameSettings: Record<string, any>
+  /** The settings UI description from the game's INITIALIZE_SETTINGS, null until received */
+  settingsComponents: GameSettingsUIComponents[] | null
 }
 
 export interface MessageLogEntry {

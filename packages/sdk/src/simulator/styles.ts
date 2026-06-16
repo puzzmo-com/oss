@@ -1166,4 +1166,71 @@ export const simulatorStyles = `
     opacity: 0.3;
     cursor: default;
   }
+  /* Settings view styles */
+  .settings-view-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .sim-settings-empty {
+    color: var(--sim-text-dim);
+    font-size: 10px;
+    text-align: center;
+    padding: 20px;
+    line-height: 1.5;
+  }
+  .sim-settings-heading {
+    color: var(--sim-text);
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 6px 0 4px;
+  }
+  .sim-settings-subheading {
+    color: var(--sim-text);
+    font-size: 10px;
+    font-weight: bold;
+    margin: 4px 0 2px;
+  }
+  .sim-settings-paragraph {
+    color: var(--sim-text-dim);
+    font-size: 10px;
+    margin: 2px 0 6px;
+    line-height: 1.4;
+  }
+  .sim-settings-subtitle {
+    color: var(--sim-text-dim);
+    font-size: 9px;
+    margin: -2px 0 3px;
+    line-height: 1.3;
+  }
+  .sim-settings-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .sim-settings-row .simulator-label {
+    margin-bottom: 0;
+  }
+  .sim-settings-split {
+    display: flex;
+    gap: 8px;
+  }
+  .sim-settings-split > * {
+    flex: 1;
+  }
+  .sim-settings-unsupported {
+    color: var(--sim-text-dim);
+    font-size: 9px;
+    font-style: italic;
+    margin: 4px 0;
+  }
+  .sim-settings-actions {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 2px solid var(--sim-border);
+  }
 `

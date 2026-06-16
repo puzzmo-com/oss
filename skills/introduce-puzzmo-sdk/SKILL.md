@@ -119,6 +119,11 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 - `sdk.on(event, handler)` - Listen for lifecycle events: `start`, `pause`, `resume`, `retry`, `settingsUpdate`.
 - `sdk.updateGameState(stateString)` - Save current game state.
 - `sdk.timer` - Auto-managed timer with `.timeMs()`, `.timeSecs()`, `.display()`, `.addPenalty(ms)`.
+- `sdk.settings` - User settings, persisted per-game by the host:
+  - `sdk.settings.initialize(components)` - Call after `gameReady()` with `GameSettingsUIComponents[]` describing the settings UI (boolean/enum/number/text fields plus titles/paragraphs). Returns the resolved settings (component defaults merged with the player's saved values). The host renders the components in its settings panel.
+  - `sdk.settings.get()` - The current resolved settings object.
+  - `sdk.settings.update(changes)` - Merge changes from in-game UI into the settings and persist them to the host.
+  - `sdk.on("settingsUpdate", handler)` - Fires with the full settings object when the player changes a value in the host settings panel (the simulator's Set tab during development).
 
 ## Success Criteria
 

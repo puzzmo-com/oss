@@ -1,5 +1,17 @@
 // For now, we will keep these types in here but not mark them as something which should appear in the public SDK docs
 
+import type { Theme } from "./types"
+
+/**
+ * The theme passed to an editor bundle. The host sends its full {@link Theme} so editors derive
+ * their colors from it rather than making their own theme decisions. Use `theme.type` for
+ * light/dark bucketing.
+ *
+ * The bare `"light" | "dark"` string form is deprecated and will be removed in a future SDK
+ * release — editors should handle the full `Theme` object.
+ */
+export type EditorTheme = Theme | "light" | "dark"
+
 /** Severity level for validation issues */
 export type ValidationLevel = "error" | "warning" | "info"
 
@@ -64,7 +76,7 @@ export interface EditorFetchURLResult {
 export interface EditorMountConfig {
   puzzleString: string
   onChange: (puzzleString: string) => void
-  theme: "light" | "dark"
+  theme: EditorTheme
   width: number
   height: number
   /**
@@ -90,7 +102,7 @@ export interface EditorMountHandle {
    * Called whenever the puzzle string is updated in the editor from the outside, or when the theme
    * or dimensions update. Workshop will rely on the validator to reject / accept updates.
    */
-  update: (config: { puzzleString?: string; theme?: "light" | "dark"; width?: number; height?: number }) => void
+  update: (config: { puzzleString?: string; theme?: EditorTheme; width?: number; height?: number }) => void
 }
 
 /** Main interface for a Workshop editor bundle */

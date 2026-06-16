@@ -16,6 +16,7 @@ export type {
   AppBundle,
   ThumbnailConfig,
   KeyboardConfig,
+  GameSettingsUIComponents,
 } from "./types"
 
 export type {
@@ -28,6 +29,7 @@ export type {
   EditorBundleSettings,
   EditorMountConfig,
   EditorMountHandle,
+  EditorTheme,
   EditorFetchURLResult,
   RelatedWord,
 } from "./editor"

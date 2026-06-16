@@ -10,7 +10,20 @@ const storageKeys = {
   fixturePuzzle: "simulator-fixture-puzzle",
   renderHost: "simulator-render-host",
   renderContext: "simulator-render-context",
+  gameSettings: "simulator-game-settings",
 } as const
+
+function getStoredGameSettings(): Record<string, any> {
+  const stored = localStorage.getItem(storageKeys.gameSettings)
+  if (!stored) return {}
+  try {
+    const parsed = JSON.parse(stored)
+    if (parsed && typeof parsed === "object") return parsed
+  } catch {
+    // Corrupt JSON — fall through to empty settings
+  }
+  return {}
+}
 
 function getStoredTheme(): Theme {
   const storedThemeName = localStorage.getItem(storageKeys.theme)
@@ -72,7 +85,17 @@ export function createInitialState(config: SimulatorConfig, fixtureCategories: s
     selectedPuzzle: storedFixturePuzzle ?? null,
     renderHost: getStoredRenderHost(),
     renderContext: getStoredRenderContext(),
+    gameSettings: getStoredGameSettings(),
+    settingsComponents: null,
   }
+}
+
+export function persistGameSettings(settings: Record<string, any>): void {
+  localStorage.setItem(storageKeys.gameSettings, JSON.stringify(settings))
+}
+
+export function clearGameSettings(): void {
+  localStorage.removeItem(storageKeys.gameSettings)
 }
 
 export function persistCollapsed(collapsed: boolean): void {

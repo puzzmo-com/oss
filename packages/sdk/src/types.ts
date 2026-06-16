@@ -89,6 +89,7 @@ export type Theme = {
 
 /** Gameplay metrics sent to the host */
 export type GamePlay = {
+  boardState: string
   elapsedTimeSecs: number
   additionalTimeAddedSecs: number
   pointsAwarded: number
@@ -408,6 +409,40 @@ export type KeyboardConfig = {
   kbdStyles?: Record<string, string>
 }
 
+/**
+ * Declarative description of a game's settings UI. The game sends these to the host via
+ * `sdk.settings.initialize` and the host renders them in its settings panel. Components with a
+ * `name` are value-producing (their `defaultValue` seeds the settings object); the rest are
+ * presentational (titles, paragraphs, separators).
+ */
+export type GameSettingsUIComponents =
+  | { id: string; type: "title"; value: string }
+  | { id: string; type: "subtitle"; value: string }
+  | { id: string; type: "paragraph"; value: string }
+  | {
+      id: string
+      type: "text"
+      name: string
+      defaultValue: string
+      title: string
+      subtitle?: string
+      textarea?: true
+    }
+  | { id: string; type: "number"; name: string; defaultValue: number; values: number[]; title: string; subtitle?: string }
+  | { id: string; type: "boolean"; name: string; defaultValue: boolean; title: string; subtitle?: string }
+  | {
+      id: string
+      type: "enum"
+      name: string
+      defaultValue: string
+      values: string[]
+      displays: string[]
+      title: string
+      subtitle?: string
+    }
+  | { id: string; type: "separator"; key: string }
+  | { id: string; type: "split"; content: GameSettingsUIComponents[] }
+
 /** Messages from the SDK to the host */
 export type MessagesSentFromEmbed = {
   /** Tells the host to send back the bootstrap data (puzzle, theme, gameplay state). Send once on startup via `sdk.gameReady()`. */
@@ -460,6 +495,22 @@ export type MessagesSentFromEmbed = {
    * `sdk.keyboard.hide()`.
    */
   KEYBOARD_UPDATE_CONFIG: KeyboardConfig
+  /**
+   * Register the game's settings UI with the host. The host renders `components` in its settings
+   * panel and replies with `SETTINGS_UPDATE` whenever the player changes a value.
+   */
+  INITIALIZE_SETTINGS: {
+    /** The current resolved settings values (component defaults merged with the player's saved values). */
+    settings: any
+    /** The declarative description of the settings UI. */
+    components: GameSettingsUIComponents[]
+    /** Settings forced by the host/puzzle which the player cannot change. */
+    forceSettings?: any | null
+  }
+  /** The game changed settings itself (e.g. an in-game settings screen). The host persists them for the player. */
+  UPDATE_SETTINGS_FROM_EMBED: {
+    settings: any
+  }
   /** Notify the host that a named checkpoint was reached (e.g. completing a sub-puzzle or bonus round). */
   HIT_CHECKPOINT: {
     checkpointName: string

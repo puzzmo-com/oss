@@ -8,6 +8,7 @@ import type {
   Theme,
   Deed,
   KeyboardConfig,
+  GameSettingsUIComponents,
 } from "./types"
 
 export type SDK = ReturnType<typeof createPuzzmoSDK>
@@ -28,6 +29,8 @@ type SupportedOutgoingMessages = Pick<
   | "UPLOAD_NEW_GAME_STATE"
   | "HIT_CHECKPOINT"
   | "KEYBOARD_UPDATE_CONFIG"
+  | "INITIALIZE_SETTINGS"
+  | "UPDATE_SETTINGS_FROM_EMBED"
 >
 
 type SupportedIncomingMessages = Pick<
@@ -50,6 +53,7 @@ export type SDKEventMap = {
   pause: void
   resume: void
   retry: void
+  /** The player changed a setting in the host UI. The payload is the full resolved settings object. */
   settingsUpdate: any
   /** A key on the on-screen keyboard was tapped. */
   keyboardKeyPress: { key: string }
@@ -231,6 +235,10 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
 
   const eventListeners = new Map<SDKEventType, Set<(data?: any) => void>>()
 
+  // The resolved settings object — seeded from READY_DATA's saved values, then component
+  // defaults are merged underneath when the game calls settings.initialize
+  let currentSettings: any | null = null
+
   // ClickHouse game analytics — sends the same lifecycle events the runtime tracks
   // (page_view, gameplay_active, active_30s, completed, link_click). Disabled on localhost.
   let analytics: GameAnalyticsTracker | null = null
@@ -293,7 +301,10 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
     emit("resume")
   })
 
-  hostAPI.onMessage("SETTINGS_UPDATE", (data) => emit("settingsUpdate", data))
+  hostAPI.onMessage("SETTINGS_UPDATE", (data) => {
+    currentSettings = { ...currentSettings, ...data }
+    emit("settingsUpdate", currentSettings)
+  })
 
   hostAPI.onMessage("KEYBOARD_KEY_PRESS", (data) => emit("keyboardKeyPress", data))
   hostAPI.onMessage("KEYBOARD_CURSOR_CHANGE", (data) => emit("keyboardCursorChange", data))
@@ -308,6 +319,8 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
   hostAPI.onMessage("READY_DATA", (data) => {
     const bootstrapData = data as MessagesReceived["READY_DATA"]
     readyData = bootstrapData
+
+    if (currentSettings === null) currentSettings = bootstrapData.userState?.gameSettings ?? {}
 
     const gamePlayed = bootstrapData.startOrFindGameplay?.gamePlayed
     if (gamePlayed) {
@@ -432,7 +445,11 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
       trackAnalyticsEvent("UPLOAD_NEW_GAME_STATE")
     },
 
-    gameCompleted: (play: Partial<GamePlay>, config?: AugmentationConfig) => {
+    gameCompleted: (
+      play: Omit<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs"> &
+        Partial<Pick<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs">>,
+      config?: AugmentationConfig,
+    ) => {
       internalTimer._conclude()
       stopTimerIntervals()
 
@@ -486,6 +503,28 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
       })
     },
 
+    settings: {
+      /**
+       * Register the game's settings UI with the host. Component `defaultValue`s are merged
+       * underneath the player's saved values, the host shows the components in its settings panel,
+       * and the resolved settings object is returned. Listen for the `settingsUpdate` event to
+       * react to the player changing values. Call after `gameReady()`.
+       */
+      initialize: (components: GameSettingsUIComponents[]) => {
+        currentSettings = { ...settingsDefaultsFromComponents(components), ...currentSettings }
+        hostAPI.sendMessage("INITIALIZE_SETTINGS", { components, settings: currentSettings })
+        return currentSettings
+      },
+      /** Get the current resolved settings object. */
+      get: () => currentSettings ?? {},
+      /** Merge changes into the current settings and persist them to the host. Returns the updated settings. */
+      update: (changes: any) => {
+        currentSettings = { ...currentSettings, ...changes }
+        hostAPI.sendMessage("UPDATE_SETTINGS_FROM_EMBED", { settings: currentSettings })
+        return currentSettings
+      },
+    },
+
     keyboard: {
       /** Show the on-screen keyboard with the given config. Call again to update state (e.g. to change disabled keys). */
       show: (config: KeyboardConfig) => {
@@ -507,4 +546,14 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
 
     _hostAPI: hostAPI,
   }
+}
+
+/** Walks settings UI components (recursing into split groups) collecting name → defaultValue pairs */
+function settingsDefaultsFromComponents(components: GameSettingsUIComponents[]): Record<string, unknown> {
+  const defaults: Record<string, unknown> = {}
+  for (const component of components) {
+    if (component.type === "split") Object.assign(defaults, settingsDefaultsFromComponents(component.content))
+    else if ("name" in component) defaults[component.name] = component.defaultValue
+  }
+  return defaults
 }
