@@ -72,8 +72,6 @@
     "lz-string": "^1.5.0"
   },
   "devDependencies": {
-    "@puzzmo-com/clickhouse": "workspace:*",
-    "@puzzmo-com/shared": "workspace:*",
     "@typescript/native-preview": "*",
     "typescript": "catalog:",
     "vite": "catalog:",

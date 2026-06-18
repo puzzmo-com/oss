@@ -1,5 +1,4 @@
-import { createGameAnalyticsTracker } from "@puzzmo-com/clickhouse/gameTracker"
-import { GameFlags1, gameHasFlag } from "@puzzmo-com/shared/games"
+import { createGameAnalyticsTracker } from "./gameTracker"
 
 import type { BootstrapGameData } from "./types"
 
@@ -7,12 +6,11 @@ import type { BootstrapGameData } from "./types"
  * Game analytics for the SDK.
  *
  * The event-firing logic — which host messages map to which ClickHouse events, the
- * engagement thresholds, the payload, and the /events endpoint — lives in
- *
- * @puzzmo-com/clickhouse/gameTracker and is shared with the runtime. That module is
- * pure (its only imports are `import type`), so bundling it into the published SDK
- * pulls in none of the clickhouse package's server deps (kysely / @clickhouse/client);
- * they tree-shake out entirely.
+ * engagement thresholds, the payload, and the /events endpoint — lives in ./gameTracker,
+ * a self-contained mirror of the runtime's tracker. It is kept local (rather than imported
+ * from @puzzmo-com/clickhouse) so the published SDK pulls in none of the clickhouse package's
+ * server deps, and so the public OSS mirror can build the SDK without the private workspace
+ * packages present.
  *
  * This file only adds the SDK-specific glue: deciding whether analytics should run,
  * building the context from bootstrap data, and watching for link clicks. Events are
@@ -137,6 +135,10 @@ const mapUserType = (type: string | null | undefined): UserType => {
   return "user"
 }
 
+// GameFlags1.bringsOwnRuntime — see packages/shared/flags/gameFlags.ts. Inlined to keep the SDK
+// free of the @puzzmo-com/shared workspace dep (the OSS mirror doesn't have that package).
+const bringsOwnRuntimeFlag = 1 << 9
+
 /**
  * Whether the bootstrapped game has the "brings own runtime" flag set. SDK analytics only
  * run for these games; the standard Puzzmo runtime tracks the same events itself, so gating
@@ -144,7 +146,9 @@ const mapUserType = (type: string | null | undefined): UserType => {
  */
 const gameBringsOwnRuntime = (readyData: BootstrapGameData | null): boolean => {
   const game: any = readyData?.startOrFindGameplay?.gamePlayed?.puzzle?.game
-  return gameHasFlag(game?.flagsArr ?? 0, GameFlags1.bringsOwnRuntime)
+  const flags = game?.flagsArr
+  const flagValue = Array.isArray(flags) ? (flags[0] ?? 0) : typeof flags === "number" ? flags : 0
+  return (flagValue & bringsOwnRuntimeFlag) === bringsOwnRuntimeFlag
 }
 
 /** Derive the runtime bucket from host context, mirroring the runtime's getRuntimeType. */
