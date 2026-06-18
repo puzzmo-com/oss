@@ -1,4 +1,5 @@
 import { createGameAnalyticsTracker } from "@puzzmo-com/clickhouse/gameTracker"
+import { GameFlags1, gameHasFlag } from "@puzzmo-com/shared/games"
 
 import type { BootstrapGameData } from "./types"
 
@@ -51,9 +52,13 @@ export type GameAnalyticsTracker = {
 
 /**
  * Build the analytics tracker for a game, or null when analytics shouldn't run
- * (no browser, running on localhost, or missing bootstrap data).
+ * (the game doesn't bring its own runtime, no browser, running on localhost, or
+ * missing bootstrap data).
  */
 export const createGameAnalytics = (readyData: BootstrapGameData | null): GameAnalyticsTracker | null => {
+  // Only games that bring their own runtime track via the SDK — see gameBringsOwnRuntime.
+  if (!gameBringsOwnRuntime(readyData)) return null
+
   const endpoint = resolveAnalyticsEndpoint()
   if (!endpoint.enabled) return null
 
@@ -130,6 +135,16 @@ const mapUserType = (type: string | null | undefined): UserType => {
   if (!type || type === "Unverified") return "anon"
   if (type === "Paid") return "paid"
   return "user"
+}
+
+/**
+ * Whether the bootstrapped game has the "brings own runtime" flag set. SDK analytics only
+ * run for these games; the standard Puzzmo runtime tracks the same events itself, so gating
+ * here avoids double-counting for games that don't bring their own runtime.
+ */
+const gameBringsOwnRuntime = (readyData: BootstrapGameData | null): boolean => {
+  const game: any = readyData?.startOrFindGameplay?.gamePlayed?.puzzle?.game
+  return gameHasFlag(game?.flagsArr ?? 0, GameFlags1.bringsOwnRuntime)
 }
 
 /** Derive the runtime bucket from host context, mirroring the runtime's getRuntimeType. */

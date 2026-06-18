@@ -73,6 +73,7 @@
   },
   "devDependencies": {
     "@puzzmo-com/clickhouse": "workspace:*",
+    "@puzzmo-com/shared": "workspace:*",
     "@typescript/native-preview": "*",
     "typescript": "catalog:",
     "vite": "catalog:",
