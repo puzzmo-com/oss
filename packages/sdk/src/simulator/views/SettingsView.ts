@@ -41,7 +41,12 @@ export function createSettingsView(): SimulatorView {
 
       el.addEventListener("change", () => {
         let value: any
-        if (el instanceof HTMLInputElement && el.type === "checkbox") value = el.checked
+        if (valueType === "multiselect") {
+          const boxes = content.querySelectorAll<HTMLInputElement>(`input[data-multiselect="${name}"]`)
+          value = Array.from(boxes)
+            .filter((b) => b.checked)
+            .map((b) => b.value)
+        } else if (el instanceof HTMLInputElement && el.type === "checkbox") value = el.checked
         else if (valueType === "number") value = Number((el as HTMLSelectElement).value)
         else value = (el as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value
 
@@ -131,6 +136,24 @@ function renderComponent(component: GameSettingsUIComponents, settings: Record<s
         <div class="simulator-field">
           ${fieldLabel(component)}
           <select class="simulator-select" data-setting="${component.name}">${options}</select>
+        </div>`
+    }
+    case "multiselect": {
+      const raw = settings[component.name] ?? component.defaultValue
+      const current: string[] = Array.isArray(raw) ? raw : []
+      const boxes = component.values
+        .map(
+          (v, i) => `
+            <label class="sim-settings-row">
+              <input type="checkbox" data-setting="${component.name}" data-setting-type="multiselect" data-multiselect="${component.name}" value="${escapeHTML(v)}" ${current.includes(v) ? "checked" : ""} />
+              <span class="simulator-label">${escapeHTML(component.displays[i] ?? v)}</span>
+            </label>`,
+        )
+        .join("")
+      return `
+        <div class="simulator-field">
+          ${fieldLabel(component)}
+          ${boxes}
         </div>`
     }
     case "number": {

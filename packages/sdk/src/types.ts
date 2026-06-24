@@ -440,6 +440,17 @@ export type GameSettingsUIComponents =
       title: string
       subtitle?: string
     }
+  | {
+      id: string
+      type: "multiselect"
+      name: string
+      /** The subset of `values` selected by default. */
+      defaultValue: string[]
+      values: string[]
+      displays: string[]
+      title: string
+      subtitle?: string
+    }
   | { id: string; type: "separator"; key: string }
   | { id: string; type: "split"; content: GameSettingsUIComponents[] }
 

@@ -164,6 +164,8 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   for (const file of files) totalBytes += fs.statSync(file).size
   console.log(`  ${plural(files.length, "file")}, ${formatBytes(totalBytes)} (sha ${sha.slice(0, 8)})`)
 
+  warnAboutAbsoluteScriptURLs(distDir)
+
   const result = await uploadFiles(
     apiURL,
     credential.token,
@@ -376,6 +378,34 @@ const maybeCreateMissingGame = async (
     return false
   }
 }
+
+/**
+ * Warns when dist/index.html loads its JS via absolute URLs. Games are served from a per-version subpath
+ * (e.g. puzzmousercontent.com/assets/<hash>/...), so a "/assets/foo.js" src resolves to the host root and 404s.
+ * The fix is a relative base — e.g. `base: "./"` in vite.config.ts — so srcs become "./assets/foo.js".
+ */
+const warnAboutAbsoluteScriptURLs = (distDir: string): void => {
+  const indexPath = path.join(distDir, "index.html")
+  if (!fs.existsSync(indexPath)) return
+
+  const html = fs.readFileSync(indexPath, "utf-8")
+  const offenders: string[] = []
+  const scriptRe = /<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi
+  let match: RegExpExecArray | null
+  while ((match = scriptRe.exec(html)) !== null) {
+    if (isAbsoluteAssetURL(match[1])) offenders.push(match[1])
+  }
+  if (!offenders.length) return
+
+  console.log(yellow(`  Warning: index.html loads JS via absolute URLs, which will break as game is served from a subpath:`))
+  for (const url of offenders) console.log(yellow(`      ${url}`))
+  console.log(
+    yellow(`    Use relative paths instead — set \`base: "./"\` in your vite.config.ts (or your bundler's equivalent) and rebuild.`),
+  )
+}
+
+/** True for URLs that resolve outside the game's own folder: site-root ("/x"), protocol-relative ("//x"), or fully-qualified ("https://x"). */
+const isAbsoluteAssetURL = (url: string): boolean => url.startsWith("/") || /^[a-z][a-z0-9+.-]*:\/\//i.test(url)
 
 /** Formats a byte count as a human-readable string */
 const formatBytes = (bytes: number): string => {
