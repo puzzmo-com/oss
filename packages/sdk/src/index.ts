@@ -3,6 +3,8 @@ export { defaultKeyboardConfig } from "./keyboard"
 
 export type { SDK as PuzzmoSDK, PuzzmoSDKOptions, SDKEventMap, SDKEventType, SDKTimer } from "./sdk"
 
+export type { SDKPlugin, SDKPluginContext, PluginAPIs } from "./plugins"
+
 export type {
   Theme,
   GamePlay,

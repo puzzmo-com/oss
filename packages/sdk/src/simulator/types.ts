@@ -12,6 +12,12 @@ export interface SimulatorConfig {
   fixtures?: FixtureImports
   /** Game slug for API features (e.g. "crossword", "ribbit") */
   slug?: string
+  /**
+   * Extra views (tabs) appended after the built-in ones. This is how a plugin ships its own
+   * host-side mock — e.g. a Sound view that lists `SENSORY_EVENT`s, or a Collab view that fakes
+   * a second player. Each view's `id` becomes its tab id, so keep them unique.
+   */
+  views?: SimulatorView[]
 }
 
 export type TabName = string

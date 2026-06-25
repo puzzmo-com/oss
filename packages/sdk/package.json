@@ -12,6 +12,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js",
+      "require": "./dist/contracts.cjs"
+    },
     "./inputs": {
       "types": "./dist/inputs/index.d.ts",
       "import": "./dist/inputs/index.js",

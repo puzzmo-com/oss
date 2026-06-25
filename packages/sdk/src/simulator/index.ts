@@ -1,2 +1,2 @@
 export { createSimulator } from "./createSimulator"
-export type { SimulatorConfig, FixtureImports } from "./types"
+export type { SimulatorConfig, FixtureImports, SimulatorView, SimulatorContext } from "./types"

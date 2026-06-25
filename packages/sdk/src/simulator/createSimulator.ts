@@ -100,6 +100,9 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     createFeaturesView(),
     createKeyboardView(),
     createSettingsView(),
+    // Plugin-provided views are appended after the built-ins; they get a tab, content, message
+    // delegation, and binding for free via the same machinery as the core views.
+    ...(config.views ?? []),
   ] satisfies SimulatorView[]
 
   const validTabIds = views.map((v) => v.id)

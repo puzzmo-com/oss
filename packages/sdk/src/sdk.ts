@@ -1,4 +1,5 @@
 import { createGameAnalytics, setupLinkTracking, type GameAnalyticsTracker } from "./analytics"
+import type { PluginAPIs, SDKPlugin, SDKPluginContext } from "./plugins"
 import type {
   MessagesSentFromEmbed,
   MessagesReceived,
@@ -13,9 +14,11 @@ import type {
 
 export type SDK = ReturnType<typeof createPuzzmoSDK>
 
-export interface PuzzmoSDKOptions {
+export interface PuzzmoSDKOptions<Plugins extends readonly SDKPlugin[] = []> {
   /** Optional timeout in ms to wait for READY_DATA (default: 5000) */
   timeout?: number
+  /** Plugins to extend the SDK with; each contributes a namespaced API at `sdk.plugins[name]`. */
+  plugins?: Plugins
 }
 
 type SupportedOutgoingMessages = Pick<
@@ -222,7 +225,7 @@ function createHostAPI() {
 const hostAPI = createHostAPI()
 
 /** Creates a Puzzmo SDK instance for communicating with the Puzzmo host */
-export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
+export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>(options: PuzzmoSDKOptions<Plugins> = {}) => {
   let readyData: MessagesReceived["READY_DATA"] | null = null
   let readyDataResolve: ((data: MessagesReceived["READY_DATA"]) => void) | null = null
 
@@ -355,8 +358,22 @@ export const createPuzzmoSDK = (options: PuzzmoSDKOptions = {}) => {
     isRunning: () => internalTimer.isRunning(),
   }
 
+  // Wire up plugins. Each gets the host transport (open to the full protocol), the timer, and
+  // the bootstrap payload, and contributes a namespaced API onto `sdk.plugins[name]`.
+  const pluginContext: SDKPluginContext = {
+    send: (type, json) => hostAPI.sendMessage(type as keyof SupportedOutgoingMessages, json as never),
+    on: (type, handler) => hostAPI.onMessage(type as keyof SupportedIncomingMessages, handler),
+    timer,
+    bootstrap: () => readyData,
+  }
+  const pluginAPIs: Record<string, unknown> = {}
+  for (const plugin of options.plugins ?? []) pluginAPIs[plugin.name] = plugin.setup(pluginContext)
+
   return {
     timer,
+
+    /** APIs contributed by the plugins passed to `createPuzzmoSDK`, keyed by plugin name. */
+    plugins: pluginAPIs as PluginAPIs<Plugins>,
 
     gameReady: async (): Promise<{
       puzzleString: string
