@@ -1,4 +1,4 @@
-import type { GameSettingsUIComponents, MessagesReceived, Theme, ThumbnailConfig } from "../types"
+import type { GameSettingsUIComponents, HostContext, MessagesReceived, Theme, ThumbnailConfig } from "../types"
 
 /** Raw fixture strings keyed by path from Vite's import.meta.glob (eager, ?raw). Each value is the file's text. */
 export type FixtureImports = Record<string, string | { default?: string }>
@@ -13,6 +13,18 @@ export interface SimulatorConfig {
   /** Game slug for API features (e.g. "crossword", "ribbit") */
   slug?: string
   /**
+   * The `hostContext` array sent in READY_DATA, so host-context-dependent features (embed
+   * settings, sandbox mode, mobile layout, …) can be exercised locally. Defaults to a single
+   * desktop "app" context. The Host tab can override this at runtime (persisted per-browser,
+   * applied on restart).
+   */
+  hostContext?: HostContext[]
+  /**
+   * Extra named `hostContext` presets shown in the Host tab alongside the generic built-ins —
+   * how a game ships its own scenarios (e.g. crossword's partner-embed toolbar settings).
+   */
+  hostContextPresets?: HostContextPreset[]
+  /**
    * Extra views (tabs) appended after the built-in ones. This is how a plugin ships its own
    * host-side mock — e.g. a Sound view that lists `SENSORY_EVENT`s, or a Collab view that fakes
    * a second player. Each view's `id` becomes its tab id, so keep them unique.
@@ -21,6 +33,12 @@ export interface SimulatorConfig {
 }
 
 export type TabName = string
+
+/** A named `hostContext` scenario selectable in the Host tab. */
+export interface HostContextPreset {
+  name: string
+  context: HostContext[]
+}
 
 export interface SimulatorState {
   isCollapsed: boolean
@@ -41,6 +59,10 @@ export interface SimulatorState {
   gameSettings: Record<string, any>
   /** The settings UI description from the game's INITIALIZE_SETTINGS, null until received */
   settingsComponents: GameSettingsUIComponents[] | null
+  /** The resolved `hostContext` sent in READY_DATA: Host-tab override > config > default app context */
+  hostContext: HostContext[]
+  /** True when the Host tab's persisted override (not the vite config) is providing `hostContext` */
+  hostContextIsOverridden: boolean
 }
 
 export interface MessageLogEntry {

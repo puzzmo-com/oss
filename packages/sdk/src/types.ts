@@ -215,8 +215,40 @@ export type AppHostContext = {
   host: null | string
 }
 
-/** Subset of host-provided context the SDK surfaces to games. Extend as more variants are needed. */
-export type HostContext = AppHostContext
+/**
+ * The "embed" variant — the game is running inside a partner-page embed. Per-game settings live
+ * under the game's slug; their shape is owned by the game (hosts pass them through verbatim).
+ */
+export type EmbedHostContext = {
+  type: "embed"
+  /** Hide the host-provided chrome around the game. */
+  noUI?: boolean
+  /** The embed record driving this page, when known. */
+  embedID?: string
+  /** Puzzle strings for bonus puzzles playable after the main puzzle. */
+  bonusPuzzles?: string[]
+  /** Game-specific embed settings keyed by game slug (e.g. `crossword: {...}`). */
+  [gameSlug: string]: unknown
+}
+
+/** The "sandbox" variant — the game is hosted in a puzzle-editing sandbox (e.g. the workshop). */
+export type SandboxHostContext = {
+  type: "sandbox"
+  /** Game-specific sandbox settings keyed by game slug (e.g. `crossword: { fill: true }`). */
+  [gameSlug: string]: unknown
+}
+
+/** The "server-config" variant — infrastructure endpoints the host wants the game to use. */
+export type ServerConfigHostContext = {
+  type: "server-config"
+  /** The URL of the multiplayer server */
+  multiplayerServerURL?: string
+  /** The URL of the singleplayer server */
+  printServerURL?: string
+}
+
+/** Host-provided context the SDK surfaces to games. Extend as more variants are needed. */
+export type HostContext = AppHostContext | EmbedHostContext | SandboxHostContext | ServerConfigHostContext
 
 export type AppBundle = {
   /** Renders a puzzle and optional state string into an SVG */

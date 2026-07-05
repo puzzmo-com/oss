@@ -19,6 +19,11 @@ export type {
   ThumbnailConfig,
   KeyboardConfig,
   GameSettingsUIComponents,
+  HostContext,
+  AppHostContext,
+  EmbedHostContext,
+  SandboxHostContext,
+  ServerConfigHostContext,
 } from "./types"
 
 export type {

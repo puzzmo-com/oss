@@ -1,4 +1,4 @@
-import type { Theme, ThumbnailConfig } from "../types"
+import type { HostContext, Theme, ThumbnailConfig } from "../types"
 import { themes } from "../themes"
 import type { SimulatorConfig, SimulatorState, TabName } from "./types"
 
@@ -11,7 +11,29 @@ const storageKeys = {
   renderHost: "simulator-render-host",
   renderContext: "simulator-render-context",
   gameSettings: "simulator-game-settings",
+  hostContext: "simulator-host-context",
 } as const
+
+/** The Host tab's persisted `hostContext` override, or null when the tab hasn't set one. */
+function getStoredHostContext(): HostContext[] | null {
+  const stored = localStorage.getItem(storageKeys.hostContext)
+  if (!stored) return null
+  try {
+    const parsed = JSON.parse(stored)
+    if (Array.isArray(parsed)) return parsed
+  } catch {
+    // Corrupt JSON — fall through to no override
+  }
+  return null
+}
+
+export function persistHostContext(hostContext: HostContext[]): void {
+  localStorage.setItem(storageKeys.hostContext, JSON.stringify(hostContext))
+}
+
+export function clearHostContext(): void {
+  localStorage.removeItem(storageKeys.hostContext)
+}
 
 function getStoredGameSettings(): Record<string, any> {
   const stored = localStorage.getItem(storageKeys.gameSettings)
@@ -69,8 +91,11 @@ function getStoredRenderContext(): ThumbnailConfig["renderContext"] {
 export function createInitialState(config: SimulatorConfig, fixtureCategories: string[], validTabIds: string[]): SimulatorState {
   const storedFixtureCategory = localStorage.getItem(storageKeys.fixtureCategory)
   const storedFixturePuzzle = localStorage.getItem(storageKeys.fixturePuzzle)
+  const storedHostContext = getStoredHostContext()
 
   return {
+    hostContext: storedHostContext ?? config.hostContext ?? [{ type: "app", layout: "desktop", host: null }],
+    hostContextIsOverridden: storedHostContext !== null,
     isCollapsed: getStoredCollapsed(config.collapsed ?? true),
     isPaused: false,
     hasStarted: false,

@@ -1,5 +1,5 @@
-const fontSubsetBase = "https://www.puzzmo.com/assets/fonts-subset"
-const fontFullBase = "https://www.puzzmo.com/assets/fonts"
+const fontSubsetBase = "https://cdn.puzzmo.com/assets/fonts-subset"
+const fontFullBase = "https://cdn.puzzmo.com/assets/fonts"
 
 /**
  * Maps PostScript-style font names used in thumbnail SVGs to their font URLs.

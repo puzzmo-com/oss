@@ -12,6 +12,7 @@ import {
   createCheckpointsView,
   createThumbView,
   createThemeView,
+  createHostView,
   createAuthView,
   createFeaturesView,
   createKeyboardView,
@@ -96,6 +97,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     createCheckpointsView(),
     thumbView,
     createThemeView(),
+    createHostView(config.hostContextPresets),
     createAuthView(),
     createFeaturesView(),
     createKeyboardView(),
@@ -456,13 +458,8 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
         },
       },
       theme: state.selectedTheme,
-      hostContext: [
-        {
-          type: "app",
-          layout: "desktop",
-          host: null,
-        },
-      ],
+      // Resolved in createInitialState: Host-tab override > config.hostContext > default app context.
+      hostContext: state.hostContext,
       appRuntimeContract: "1.0",
     }
   }

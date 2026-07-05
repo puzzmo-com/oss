@@ -2,6 +2,8 @@ import type { Plugin, ResolvedConfig } from "vite"
 import { build } from "vite"
 import path from "path"
 import fs from "fs"
+import type { HostContext } from "./types"
+import type { HostContextPreset } from "./simulator/types"
 
 export type PuzzmoSimulatorPluginOptions = {
   /** Whether to auto-start the game after READY (default: true) */
@@ -14,6 +16,23 @@ export type PuzzmoSimulatorPluginOptions = {
    * TOML, or a custom format) and delivered to the game verbatim, so the game parses them itself. Pass false to disable.
    */
   fixturesGlob?: string | false
+  /**
+   * The `hostContext` array the simulator sends in READY_DATA, so host-context-dependent features
+   * (embed settings, sandbox mode, mobile layout, …) can be exercised locally. Must be
+   * JSON-serializable. Defaults to a single desktop "app" context; the simulator's Host tab can
+   * override it at runtime (persisted per-browser, applied on restart).
+   *
+   * @internal
+   */
+  hostContext?: HostContext[]
+  /**
+   * Extra named `hostContext` presets for the simulator's Host tab, alongside the generic
+   * built-ins — how a game ships its own scenarios (e.g. crossword's partner-embed toolbar
+   * settings). Must be JSON-serializable.
+   *
+   * @internal
+   */
+  hostContextPresets?: HostContextPreset[]
 }
 
 const simulatorURL = "/@puzzmo-simulator-init.js"
