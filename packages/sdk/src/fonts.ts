@@ -1,3 +1,6 @@
+// Serve fonts straight from the CDN, which sends `Access-Control-Allow-Origin: *`. www.puzzmo.com
+// 308-redirects these to Azure blob storage, and that redirect response carries no CORS header — so a
+// cross-origin/sandboxed consumer (e.g. the thumbnail iframe's opaque origin) is blocked at the redirect.
 const fontSubsetBase = "https://cdn.puzzmo.com/assets/fonts-subset"
 const fontFullBase = "https://cdn.puzzmo.com/assets/fonts"
 
@@ -22,6 +25,9 @@ const fontURLMap = {
 } as const satisfies Record<string, string>
 
 export type ThumbnailFontName = keyof typeof fontURLMap
+
+/** Every font the SDK can serve to thumbnails. Pass to `svgFontFaceCSS`/`svgFontFaceCSSRaw` to declare them all. */
+export const thumbnailFontNames = Object.keys(fontURLMap) as ThumbnailFontName[]
 
 function fontFaceRules(fontNames: ThumbnailFontName[]): string {
   return fontNames

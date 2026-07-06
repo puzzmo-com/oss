@@ -16,6 +16,7 @@ export type {
   MessagesReceived,
   MessagesSentFromEmbed,
   AppBundle,
+  ThumbnailResult,
   ThumbnailConfig,
   KeyboardConfig,
   GameSettingsUIComponents,

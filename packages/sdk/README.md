@@ -202,7 +202,7 @@ import { h, render } from "@puzzmo/sdk/svgJSX"
 // Needed for fragments
 const React = { Fragment: "g" }
 
-export function renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): string {
+export function renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): ThumbnailResult {
   const puzzle = JSON.parse(puzzleStr)
   const size = 200
 
@@ -216,11 +216,11 @@ export function renderThumbnail(puzzleStr: string, inputStr?: string, config?: T
   )
 
   const el = render(svg)
-  return el instanceof Element ? el.outerHTML : ""
+  return { svg: el instanceof Element ? el.outerHTML : "", width: size, height: size }
 }
 ```
 
-The `h` function is a JSX factory that creates virtual DOM nodes, and `render` converts them into real DOM elements. Since thumbnails can run server-side or in a DOM-shimmed environment, the result is serialized to an SVG string via `outerHTML`.
+The `h` function is a JSX factory that creates virtual DOM nodes, and `render` converts them into real DOM elements. Since thumbnails can run server-side or in a DOM-shimmed environment, the SVG is serialized via `outerHTML` and returned alongside its `width`/`height` so the host can size the thumbnail without parsing it.
 
 ## Editor Integration
 

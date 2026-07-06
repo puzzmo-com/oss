@@ -17,13 +17,14 @@ const stateSchema = defineSchema<State>({
 const escapeXml = (s: string) => s.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 /**
- * Renders a small SVG preview of the puzzle. When an `inputStr` is supplied the
- * preview reflects the player's progress; otherwise it shows a blank board.
+ * Renders a small SVG preview of the puzzle plus its pixel dimensions, so the host can size
+ * the thumbnail without parsing the SVG. When an `inputStr` is supplied the preview reflects
+ * the player's progress; otherwise it shows a blank board.
  *
  * The host renders this in lists/share cards/completion screens — there's no DOM,
  * no animation, no theme variables. We bake colors from `config.theme` directly.
  */
-export const renderThumbnail: AppBundle["renderThumbnail"] = (puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): string => {
+export const renderThumbnail: AppBundle["renderThumbnail"] = (puzzleStr: string, inputStr?: string, config?: ThumbnailConfig) => {
   const puzzle = JSON.parse(puzzleStr) as Puzzle
   const { rows, cols } = puzzle
   const cells = rows * cols
@@ -102,7 +103,7 @@ export const renderThumbnail: AppBundle["renderThumbnail"] = (puzzleStr: string,
   }
 
   parts.push(`</svg>`)
-  return parts.join("")
+  return { svg: parts.join(""), width: size, height: size }
 }
 
 const countAdjacent = (mineSet: Set<number>, i: number, rows: number, cols: number): number => {

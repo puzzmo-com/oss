@@ -250,9 +250,16 @@ export type ServerConfigHostContext = {
 /** Host-provided context the SDK surfaces to games. Extend as more variants are needed. */
 export type HostContext = AppHostContext | EmbedHostContext | SandboxHostContext | ServerConfigHostContext
 
+/** An SVG thumbnail plus its intrinsic pixel dimensions, so consumers can size it without parsing the SVG. */
+export type ThumbnailResult = {
+  svg: string
+  width: number
+  height: number
+}
+
 export type AppBundle = {
-  /** Renders a puzzle and optional state string into an SVG */
-  renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): string
+  /** Renders a puzzle and optional state string into an SVG and its dimensions */
+  renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): ThumbnailResult
 
   /** Takes an input string, and backtracks to a version somewhere between 0-1 for its completion */
   interpolateInputString?: (

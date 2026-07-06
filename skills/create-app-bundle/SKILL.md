@@ -31,15 +31,17 @@ Set up the metadata and assets needed for the game to appear on Puzzmo.
 3. Create `src/appBundle.js` (or `src/appBundle.ts`) that exports the `renderThumbnail` function:
 
 ```ts
+export type ThumbnailResult = { svg: string; width: number; height: number }
+
 export type AppBundle = {
-  /** Renders a puzzle and optional state string into an SVG  */
-  renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): string
+  /** Renders a puzzle and optional state string into an SVG and its dimensions */
+  renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): ThumbnailResult
 }
 ```
 
-You can find the `ThumbnailConfig` type definition in `@puzzmo-com/sdk/types`.
+You can find the `ThumbnailConfig` and `ThumbnailResult` type definitions in `@puzzmo-com/sdk/types`.
 
-The function should return an SVG string that visually represents the puzzle. You could use code from the original game but the goal is a drastically simplified rendering that captures the essence of the puzzle in a small thumbnail. The thumbnail will be used on the Puzzmo platform to represent the puzzle in lists and previews.
+The function should return `{ svg, width, height }` — an SVG string that visually represents the puzzle plus its pixel dimensions (so the platform can size it without parsing the SVG). You could use code from the original game but the goal is a drastically simplified rendering that captures the essence of the puzzle in a small thumbnail. The thumbnail will be used on the Puzzmo platform to represent the puzzle in lists and previews.
 
 4. Verify the build output has:
    - `dist/index.html`

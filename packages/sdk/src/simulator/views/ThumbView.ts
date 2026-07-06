@@ -1,4 +1,5 @@
 import type { AppBundle, ThumbnailConfig } from "../../types"
+import { normalizeThumbnailResult } from "../normalizeThumbnail"
 import type { SimulatorContext, SimulatorView } from "../types"
 import { persistRenderContext, persistRenderHost } from "../state"
 
@@ -45,8 +46,8 @@ export function createThumbView(): ThumbViewExtended {
         renderContext: ctx.state.renderContext,
       }
 
-      const svgString = thumbFn.fn(puzzleStr, ctx.state.currentInputStr, thumbnailConfig)
-      if (previewEl) previewEl.innerHTML = svgString
+      const { svg } = normalizeThumbnailResult(thumbFn.fn(puzzleStr, ctx.state.currentInputStr, thumbnailConfig))
+      if (previewEl) previewEl.innerHTML = svg
     } catch (e) {
       console.error("Simulator: Thumbnail error", e)
       if (previewEl) previewEl.innerHTML = `<span class="simulator-empty">Error: ${e}</span>`

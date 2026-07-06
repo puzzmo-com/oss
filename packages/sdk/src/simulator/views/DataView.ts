@@ -1,4 +1,5 @@
 import type { AppBundle, ThumbnailConfig } from "../../types"
+import { normalizeThumbnailResult } from "../normalizeThumbnail"
 import type { SimulatorContext, SimulatorView } from "../types"
 
 // Storage key for saved states (global across all puzzles)
@@ -28,7 +29,7 @@ function generateMiniThumbnail(ctx: SimulatorContext, inputStr: string): string 
       strict: true,
       renderHost: "game",
     }
-    return thumbFn.fn(puzzleStr, inputStr, thumbnailConfig)
+    return normalizeThumbnailResult(thumbFn.fn(puzzleStr, inputStr, thumbnailConfig)).svg
   } catch {
     return ""
   }
