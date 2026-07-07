@@ -114,13 +114,17 @@ const jsonPost = async (url: string, token: string, body: object, step: string, 
   return readResponse(res, url, step, verbose)
 }
 
-/** Uploads a single file as raw binary with filename in query param */
+/**
+ * Uploads a single file with filename in query param. The body is base64-encoded: game builds are
+ * arbitrary code and regularly contain byte sequences that WAF content rules in front of the API
+ * block as attack payloads (e.g. security-scanner signatures like Log4Shell's \${jndi:).
+ */
 const uploadFile = async (url: string, token: string, filePath: string, baseDir: string, verbose: boolean): Promise<FileResponse> => {
   const relativePath = path.relative(baseDir, filePath)
   const content = fs.readFileSync(filePath)
   const step = `file upload (${relativePath})`
 
-  const fullURL = `${url}?name=${encodeURIComponent(relativePath)}`
+  const fullURL = `${url}?name=${encodeURIComponent(relativePath)}&encoding=base64`
   const res = await fetchWithContext(
     fullURL,
     {
@@ -129,7 +133,7 @@ const uploadFile = async (url: string, token: string, filePath: string, baseDir:
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/octet-stream",
       },
-      body: content,
+      body: content.toString("base64"),
     },
     step,
     verbose,
