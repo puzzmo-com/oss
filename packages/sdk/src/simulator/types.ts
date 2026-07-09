@@ -34,6 +34,12 @@ export interface SimulatorConfig {
 
 export type TabName = string
 
+/**
+ * Which bundle export the Thumb view previews. `image` calls `renderThumbnail`;
+ * `text` calls `getShareString`. Purely a simulator UI concept — the game never sees it.
+ */
+export type PreviewKind = "image" | "text"
+
 /** A named `hostContext` scenario selectable in the Host tab. */
 export interface HostContextPreset {
   name: string
@@ -55,6 +61,8 @@ export interface SimulatorState {
   selectedPuzzle: string | null
   renderHost: ThumbnailConfig["renderHost"]
   renderContext: ThumbnailConfig["renderContext"]
+  /** Which bundle export the Thumb view previews (image ↔ text). */
+  previewKind: PreviewKind
   /** The player's settings for this game, persisted to localStorage and sent in READY_DATA */
   gameSettings: Record<string, any>
   /** The settings UI description from the game's INITIALIZE_SETTINGS, null until received */

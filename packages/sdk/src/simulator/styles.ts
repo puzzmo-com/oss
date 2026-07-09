@@ -505,6 +505,74 @@ export const simulatorStyles = `
     text-align: center;
     padding: 20px;
   }
+  .simulator-share-preview {
+    margin: 0;
+    padding: 8px;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .simulator-segmented {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--sim-bg);
+    border: 2px solid var(--sim-border);
+    border-radius: 2px;
+    margin-bottom: 6px;
+  }
+  .simulator-segmented-btn {
+    flex: 1;
+    padding: 4px 8px;
+    background: transparent;
+    border: 0;
+    border-radius: 2px;
+    color: var(--sim-text-dim);
+    font: inherit;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+  }
+  .simulator-segmented-btn:hover:not(.active) {
+    color: var(--sim-text);
+  }
+  .simulator-segmented-btn.active {
+    background: var(--sim-border);
+    color: var(--sim-text);
+  }
+  .simulator-share-missing {
+    color: var(--sim-text-dim);
+    font-size: 11px;
+    padding: 12px;
+    line-height: 1.4;
+  }
+  .simulator-share-missing p {
+    margin: 0 0 6px;
+  }
+  .simulator-share-missing code {
+    color: var(--sim-text);
+    background: var(--sim-bg);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .simulator-share-missing pre {
+    margin: 6px 0 0;
+    padding: 8px;
+    background: var(--sim-bg);
+    border: 1px solid var(--sim-border);
+    border-radius: 2px;
+    color: var(--sim-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-x: auto;
+  }
   .simulator-value {
     color: var(--sim-text);
     font-size: 10px;

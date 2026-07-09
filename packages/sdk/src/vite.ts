@@ -117,6 +117,7 @@ export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, gam
   if (game?.appBundlePath) {
     lines.push(`import(${JSON.stringify(game.appBundlePath)}).then(m => {`)
     lines.push(`  if (m.renderThumbnail) globalThis.renderThumbnail = m.renderThumbnail`)
+    lines.push(`  if (m.getShareString) globalThis.getShareString = m.getShareString`)
     lines.push(`}).catch(() => {})`)
   }
 

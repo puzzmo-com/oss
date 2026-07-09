@@ -235,6 +235,7 @@ describe("generateSimulatorCode", () => {
     const code = generateSimulatorCode({}, game)
     expect(code).toContain('import("/games/foo/src/appBundle.js")')
     expect(code).toContain("globalThis.renderThumbnail = m.renderThumbnail")
+    expect(code).toContain("globalThis.getShareString = m.getShareString")
   })
 
   it("disables fixtures when fixturesGlob is false", () => {

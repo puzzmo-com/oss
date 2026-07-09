@@ -1,6 +1,6 @@
 import type { HostContext, Theme, ThumbnailConfig } from "../types"
 import { themes } from "../themes"
-import type { SimulatorConfig, SimulatorState, TabName } from "./types"
+import type { PreviewKind, SimulatorConfig, SimulatorState, TabName } from "./types"
 
 const storageKeys = {
   collapsed: "simulator-collapsed",
@@ -10,6 +10,7 @@ const storageKeys = {
   fixturePuzzle: "simulator-fixture-puzzle",
   renderHost: "simulator-render-host",
   renderContext: "simulator-render-context",
+  previewKind: "simulator-preview-kind",
   gameSettings: "simulator-game-settings",
   hostContext: "simulator-host-context",
 } as const
@@ -80,6 +81,11 @@ function getStoredRenderHost(): ThumbnailConfig["renderHost"] {
   return "game"
 }
 
+function getStoredPreviewKind(): PreviewKind {
+  const stored = localStorage.getItem(storageKeys.previewKind)
+  return stored === "text" ? "text" : "image"
+}
+
 function getStoredRenderContext(): ThumbnailConfig["renderContext"] {
   const stored = localStorage.getItem(storageKeys.renderContext)
   if (stored && ["preview", "share", "completed", "timeline"].includes(stored)) {
@@ -110,6 +116,7 @@ export function createInitialState(config: SimulatorConfig, fixtureCategories: s
     selectedPuzzle: storedFixturePuzzle ?? null,
     renderHost: getStoredRenderHost(),
     renderContext: getStoredRenderContext(),
+    previewKind: getStoredPreviewKind(),
     gameSettings: getStoredGameSettings(),
     settingsComponents: null,
   }
@@ -153,6 +160,10 @@ export function persistRenderHost(host: ThumbnailConfig["renderHost"]): void {
   } else {
     localStorage.removeItem(storageKeys.renderHost)
   }
+}
+
+export function persistPreviewKind(kind: PreviewKind): void {
+  localStorage.setItem(storageKeys.previewKind, kind)
 }
 
 export function persistRenderContext(context: ThumbnailConfig["renderContext"]): void {
