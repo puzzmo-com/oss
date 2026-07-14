@@ -159,6 +159,10 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
 
   const files = collectFiles(distDir)
   if (!files.length) throw new Error(`Dist folder is empty: ${distDir}`)
+  if (!fs.existsSync(path.join(distDir, "index.html")))
+    throw new Error(
+      `No index.html at the root of ${distDir} — the game is served from index.html, so it can't go live without it. Check your build output.`,
+    )
 
   let totalBytes = 0
   for (const file of files) totalBytes += fs.statSync(file).size
