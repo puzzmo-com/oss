@@ -259,7 +259,12 @@ const resolveBundleEntry = (dir: string, baseRelative: string): string | null =>
   return null
 }
 
-export type AppBundlePluginOptions = Partial<BundlePluginOptions>
+export type AppBundlePluginOptions = {
+  /** Entry file for the app bundle (default: `src/appBundle.js`) */
+  entry?: string
+  /** Output file name (default: `app-bundle.js`) */
+  outputFile?: string
+}
 
 /**
  * Vite plugin that produces dist/app-bundle.js after the main build for app-level integrations.
@@ -270,7 +275,12 @@ export type AppBundlePluginOptions = Partial<BundlePluginOptions>
  */
 export const appBundlePlugin = createBundlePlugin("app-bundle", { entry: "src/appBundle.js", outputFile: "app-bundle.js" })
 
-export type EditorBundlePluginOptions = Partial<BundlePluginOptions>
+export type EditorBundlePluginOptions = {
+  /** Entry file for the editor bundle (default: `src/editorBundle.js`) */
+  entry?: string
+  /** Output file name (default: `editor-bundle.js`) */
+  outputFile?: string
+}
 
 /** Vite plugin that produces dist/editor-bundle.js after the main build for editor-level integrations. */
 export const editorBundlePlugin = createBundlePlugin("editor-bundle", { entry: "src/editorBundle.js", outputFile: "editor-bundle.js" })

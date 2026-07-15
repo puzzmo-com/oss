@@ -30,6 +30,19 @@ interface SimulatorInstance {
 }
 let simulatorInstance: SimulatorInstance | null = null
 
+/** True when the game is embedded in the real Puzzmo app, which sets `?developer=true` on the iframe. */
+function isEmbeddedInApp(): boolean {
+  if (typeof window === "undefined") return false
+  return new URLSearchParams(window.location.search).has("developer")
+}
+
+/** Inert instance returned when the simulator declines to boot (the app is the host). */
+const noopSimulatorInstance: SimulatorInstance = {
+  updateFixtures: () => {},
+  sendToGame: () => {},
+  loadPuzzle: async () => null,
+}
+
 /**
  * Simulator - A development UI for testing games with the Puzzmo Proto SDK.
  *
@@ -69,6 +82,15 @@ let simulatorInstance: SimulatorInstance | null = null
  */
 
 export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance {
+  // When a game's dev build is loaded inside the real Puzzmo app (puzzmo.com adds `?developer=true`
+  // to the iframe URL), the app itself is the host. Booting the simulator here would double-host the
+  // game — two READY_DATA replies, two keyboards, a stray collab room — so bail out and let the app
+  // drive. The game still mounts itself into #root; only this dev-host overlay is skipped.
+  if (isEmbeddedInApp()) {
+    console.log("[Simulator] developer=true in URL — running inside the Puzzmo app, skipping simulator boot")
+    return noopSimulatorInstance
+  }
+
   console.log("[Simulator] createSimulator called with config:", { slug: config.slug, hasFixtures: !!config.fixtures })
 
   // If instance already exists, update it with new config

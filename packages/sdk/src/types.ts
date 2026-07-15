@@ -102,8 +102,12 @@ export type AugmentationConfig = {
 }
 
 export type CheckpointConfig = {
+  /** Can the system show ads at this checkpoint */
   interruptible: boolean
+  /** Has the game gone on enough to auto-complete */
   complete: boolean
+  /** Which parts of the completion pipeline to process at this checkpoint (e.g. `["leaderboards"]`). Empty means nothing is processed. */
+  process: "leaderboards"[]
 }
 
 export type Deed = {
