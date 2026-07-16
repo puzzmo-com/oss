@@ -221,6 +221,10 @@ export interface SDKTimer {
   isPaused: () => boolean
   /** Check if timer has been started */
   isRunning: () => boolean
+  /** Pause the timer (same as a host-sent PAUSE_GAME); emits "pause" on an actual transition. */
+  pause: () => void
+  /** Resume the timer (same as a host-sent RESUME_GAME); emits "resume" on an actual transition. */
+  resume: () => void
 }
 
 function formatTime(timeMs: number): string {
@@ -234,7 +238,7 @@ function formatTime(timeMs: number): string {
 function createTimer(
   initialTimeMs = 0,
   initialAddedTimeMs = 0,
-): SDKTimer & {
+): Omit<SDKTimer, "pause" | "resume"> & {
   _init: () => void
   _pause: () => void
   _resume: () => void
@@ -430,15 +434,21 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     emit("start")
   })
 
-  hostAPI.onMessage("PAUSE_GAME", () => {
+  // Shared by the host-sent PAUSE_GAME/RESUME_GAME messages and the game-initiated
+  // sdk.timer.pause()/resume() below, so both paths stop/start the same timer identically.
+  const pauseTimer = () => {
+    const wasPaused = internalTimer.isPaused()
     internalTimer._pause()
-    emit("pause")
-  })
-
-  hostAPI.onMessage("RESUME_GAME", () => {
+    if (internalTimer.isPaused() !== wasPaused) emit("pause")
+  }
+  const resumeTimer = () => {
+    const wasPaused = internalTimer.isPaused()
     internalTimer._resume()
-    emit("resume")
-  })
+    if (internalTimer.isPaused() !== wasPaused) emit("resume")
+  }
+
+  hostAPI.onMessage("PAUSE_GAME", pauseTimer)
+  hostAPI.onMessage("RESUME_GAME", resumeTimer)
 
   hostAPI.onMessage("SETTINGS_UPDATE", (data) => {
     currentSettings = { ...currentSettings, ...data }
@@ -492,6 +502,8 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     addPenalty: (ms: number) => internalTimer.addPenalty(ms),
     isPaused: () => internalTimer.isPaused(),
     isRunning: () => internalTimer.isRunning(),
+    pause: pauseTimer,
+    resume: resumeTimer,
   }
 
   // Wire up plugins. Each gets the host transport (open to the full protocol), the timer, and
