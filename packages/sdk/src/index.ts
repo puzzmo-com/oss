@@ -1,7 +1,7 @@
 export { createPuzzmoSDK } from "./sdk"
 export { defaultKeyboardConfig } from "./keyboard"
 
-export type { SDK as PuzzmoSDK, PuzzmoSDKOptions, SDKEventMap, SDKEventType, SDKTimer } from "./sdk"
+export type { PuzzmoSDK, PuzzmoSDKOptions, GameReadyResult, SDKEventMap, SDKEventType, SDKTimer, SDKSettings, SDKKeyboard } from "./sdk"
 
 export type { SDKPlugin, SDKPluginContext, PluginAPIs } from "./plugins"
 

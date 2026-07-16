@@ -139,7 +139,9 @@ const uploadFile = async (url: string, token: string, filePath: string, baseDir:
     verbose,
   )
   if (res.status === 413) throw new Error(`File ${relativePath} is too large to upload (${formatBytes(content.length)})`)
-  return (await readResponse(res, fullURL, step, verbose)) as FileResponse
+  const result = (await readResponse(res, fullURL, step, verbose)) as FileResponse
+  if (verbose && result.path) console.log(`    stored at ${result.path} [${step}]`)
+  return result
 }
 
 /** Formats a byte count as a human-readable string (e.g. "1.6 MB") */
@@ -197,6 +199,7 @@ export const uploadFiles = async (
     CompleteResponse,
     "integrationsChanged" | "gameURL" | "versionsURL"
   >
+  if (verbose) console.log(`  Assets base: ${complete.assetsBase}`)
   return {
     ...complete,
     integrationsChanged: !!init.integrationsChanged,

@@ -2,6 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 
 import { discoverGames } from "../util/discoverGames.js"
+import { lintPuzzmoFile } from "../util/lintPuzzmoFile.js"
 
 /** CLI command: puzzmo games validate [dir] — discovers every puzzmo.json under dir and validates each */
 export const validate = async (dir: string) => {
@@ -25,6 +26,7 @@ export const validate = async (dir: string) => {
     console.log(`OK   ${game.puzzmoFile.game.slug.padEnd(24)} (${rel})`)
     console.log(`     dist: ${distRel}`)
     if (integrations.length) console.log(`     integrations: ${integrations.join(", ")}`)
+    for (const warning of lintPuzzmoFile(game.puzzmoFile)) console.log(`     warning: ${warning}`)
   }
 
   for (const err of errors) {

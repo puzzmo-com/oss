@@ -16,6 +16,7 @@ import {
 } from "../util/config.js"
 import { createUserGame } from "../util/createGame.js"
 import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
+import { lintPuzzmoFile } from "../util/lintPuzzmoFile.js"
 import { slugify } from "../util/slugify.js"
 
 type UploadOptions = {
@@ -169,6 +170,7 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   console.log(`  ${plural(files.length, "file")}, ${formatBytes(totalBytes)} (sha ${sha.slice(0, 8)})`)
 
   warnAboutAbsoluteScriptURLs(distDir)
+  for (const warning of lintPuzzmoFile(puzzmoFile)) console.log(yellow(`  Warning: ${warning}`))
 
   const result = await uploadFiles(
     apiURL,

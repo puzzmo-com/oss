@@ -8,11 +8,12 @@ import type {
   CheckpointConfig,
   Theme,
   Deed,
+  GameOverMessageUIComponent,
   KeyboardConfig,
   GameSettingsUIComponents,
 } from "./types"
 
-export type SDK = ReturnType<typeof createPuzzmoSDK>
+export type SDK = PuzzmoSDK
 
 export interface PuzzmoSDKOptions<Plugins extends readonly SDKPlugin[] = []> {
   /** Optional timeout in ms to wait for READY_DATA (default: 5000) */
@@ -21,7 +22,140 @@ export interface PuzzmoSDKOptions<Plugins extends readonly SDKPlugin[] = []> {
   plugins?: Plugins
 }
 
-type SupportedOutgoingMessages = Pick<
+/** The bootstrap info a game needs to set up its board, returned by `sdk.gameReady()`. */
+export type GameReadyResult = {
+  /** The serialized puzzle for this gameplay, in the game's own format. */
+  puzzleString: string
+  /** The player's saved in-progress board state from a previous session, or null when starting fresh. */
+  inputString: string | null
+  /** The host's current display theme, so the game can match the surrounding page. */
+  theme: Theme | null
+  /** True when the player has already finished this puzzle (e.g. re-opening a completed daily). */
+  completed: boolean
+  /** The raw bootstrap payload from the host: user state, the gameplay record, host context, etc. */
+  readyData: MessagesReceived["READY_DATA"] | null
+}
+
+/** Player-facing game settings, rendered by the host's settings panel and persisted per-user, per-game. */
+export interface SDKSettings {
+  /**
+   * Register the game's settings UI with the host. Component `defaultValue`s are merged
+   * underneath the player's saved values, the host shows the components in its settings panel,
+   * and the resolved settings object is returned. Listen for the `settingsUpdate` event to
+   * react to the player changing values. Call after `gameReady()`.
+   */
+  initialize: (components: GameSettingsUIComponents[]) => any
+  /** Get the current resolved settings object. */
+  get: () => any
+  /** Merge changes into the current settings and persist them to the host. Returns the updated settings. */
+  update: (changes: any) => any
+}
+
+/** The host-rendered on-screen keyboard, for games that take text or symbol input on touch devices. */
+export interface SDKKeyboard {
+  /** Show the on-screen keyboard with the given config. Call again to update state (e.g. to change disabled keys). */
+  show: (config: KeyboardConfig) => void
+  /** Hide the on-screen keyboard. */
+  hide: () => void
+}
+
+/**
+ * The SDK instance returned by `createPuzzmoSDK` — a game's API surface for talking to whichever
+ * host is embedding it (puzzmo.com, a partner embed, or the native apps): bootstrapping the
+ * puzzle, syncing progress, reporting completion, and driving host UI like settings and the
+ * on-screen keyboard.
+ *
+ * The expected lifecycle is: `gameReady()` → build your board from the result → `gameLoaded()` →
+ * play, persisting via `updateGameState()` → `gameCompleted()` → `showCompletionScreen()`.
+ */
+export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
+  /**
+   * The play clock. The SDK manages it for you: it starts when the host starts the game, pauses
+   * and resumes with the host UI, and its display is mirrored into the host chrome twice a
+   * second. Most games only need `addPenalty()` for hint or mistake costs.
+   */
+  timer: SDKTimer
+
+  /** APIs contributed by the plugins passed to `createPuzzmoSDK`, keyed by plugin name. */
+  plugins: PluginAPIs<Plugins>
+
+  /**
+   * Announce that the game is ready to receive data. Sends `READY` to the host and resolves with
+   * the bootstrap info once the host replies: the puzzle to load, any saved in-progress state,
+   * and the host theme. Call this first — every other API assumes it has resolved. Rejects when
+   * the host doesn't reply within `PuzzmoSDKOptions.timeout` (default 5s).
+   */
+  gameReady: () => Promise<GameReadyResult>
+
+  /**
+   * Tell the host the game has parsed the puzzle, rendered, and is ready to be revealed. The
+   * host dismisses its loading UI and replies with a start signal — listen via `on("start")` to
+   * begin play; the timer starts then too.
+   */
+  gameLoaded: (state?: any) => void
+
+  /**
+   * Subscribe to a host lifecycle event: `start`, `pause`, `resume`, `retry`, `settingsUpdate`,
+   * or the on-screen `keyboard*` events. Returns an unsubscribe function.
+   */
+  on: <T extends SDKEventType>(event: T, listener: (data?: SDKEventMap[T]) => void) => () => void
+
+  /** Remove an event listener previously registered with `on`. */
+  off: <T extends SDKEventType>(event: T, listener: (data?: SDKEventMap[T]) => void) => void
+
+  /**
+   * Save the player's in-progress board state to the server so play can resume later, on any
+   * device. `inputString` is the game's own serialized format — it comes back as `inputString`
+   * from `gameReady()`. Call whenever the player makes a meaningful move; elapsed time is filled
+   * in from the SDK timer unless provided in `play`.
+   */
+  updateGameState: (inputString: string, play?: Partial<GamePlay>) => void
+
+  /**
+   * Report the game as finished. Concludes the timer, fills in elapsed/penalty time when not
+   * provided, and uploads the final play plus its deeds — the host uses these for scoring,
+   * leaderboards, stats, and other augmentations. Follow with `showCompletionScreen()`.
+   */
+  gameCompleted: (
+    play: Omit<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs"> &
+      Partial<Pick<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs">>,
+    config?: AugmentationConfig,
+  ) => void
+
+  /**
+   * Ask the host to show its post-game completion UI. `results` render in the completion
+   * sidebar: markdown congratulations, the player's streak stats, and custom stat rows. Call
+   * after `gameCompleted()`, typically once your own victory animation has finished.
+   */
+  showCompletionScreen: (results: GameOverMessageUIComponent[], gameplay: GamePlay, showRetry?: boolean) => void
+
+  /**
+   * Record a named mid-game checkpoint. Uploads the current board state and play time, and can
+   * run parts of the completion pipeline early (e.g. posting to leaderboards) via
+   * `checkpointConfig.process`. A checkpoint is also the host's opportunity to show an ad when
+   * `checkpointConfig.interruptible` is true.
+   */
+  hitCheckpoint: (checkpointName: string, checkpointConfig: CheckpointConfig, config?: AugmentationConfig) => void
+
+  /** Player-facing game settings, rendered in the host's settings panel and persisted per-user, per-game. */
+  settings: SDKSettings
+
+  /** The host-rendered on-screen keyboard, for games that take text or symbol input on touch devices. */
+  keyboard: SDKKeyboard
+
+  /**
+   * The raw postMessage transport to the host — an escape hatch for protocol messages the SDK
+   * doesn't wrap.
+   *
+   * @internal
+   */
+  _hostAPI: {
+    sendMessage: <T extends keyof SupportedOutgoingMessages>(type: T, json: SupportedOutgoingMessages[T]) => void
+    onMessage: <T extends keyof SupportedIncomingMessages>(type: T, handler: (data: SupportedIncomingMessages[T]) => void) => () => void
+  }
+}
+
+export type SupportedOutgoingMessages = Pick<
   MessagesSentFromEmbed,
   | "READY"
   | "READY_GAME_LOADED"
@@ -36,7 +170,7 @@ type SupportedOutgoingMessages = Pick<
   | "UPDATE_SETTINGS_FROM_EMBED"
 >
 
-type SupportedIncomingMessages = Pick<
+export type SupportedIncomingMessages = Pick<
   MessagesReceived,
   | "READY_DATA"
   | "START_GAME"
@@ -225,7 +359,9 @@ function createHostAPI() {
 const hostAPI = createHostAPI()
 
 /** Creates a Puzzmo SDK instance for communicating with the Puzzmo host */
-export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>(options: PuzzmoSDKOptions<Plugins> = {}) => {
+export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>(
+  options: PuzzmoSDKOptions<Plugins> = {},
+): PuzzmoSDK<Plugins> => {
   let readyData: MessagesReceived["READY_DATA"] | null = null
   let readyDataResolve: ((data: MessagesReceived["READY_DATA"]) => void) | null = null
 
@@ -372,16 +508,9 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   return {
     timer,
 
-    /** APIs contributed by the plugins passed to `createPuzzmoSDK`, keyed by plugin name. */
     plugins: pluginAPIs as PluginAPIs<Plugins>,
 
-    gameReady: async (): Promise<{
-      puzzleString: string
-      inputString: string | null
-      theme: Theme | null
-      completed: boolean
-      readyData: MessagesReceived["READY_DATA"] | null
-    }> => {
+    gameReady: async (): Promise<GameReadyResult> => {
       hostAPI.sendMessage("READY", {})
 
       if (getPuzzleString()) {
@@ -494,7 +623,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
       }
     },
 
-    showCompletionScreen: (results: any[], gameplay: GamePlay, showRetry = true) => {
+    showCompletionScreen: (results: GameOverMessageUIComponent[], gameplay: GamePlay, showRetry = true) => {
       hostAPI.sendMessage("SHOW_GAME_COMPLETE_SCREEN", {
         results,
         showRetry,
@@ -521,20 +650,12 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     },
 
     settings: {
-      /**
-       * Register the game's settings UI with the host. Component `defaultValue`s are merged
-       * underneath the player's saved values, the host shows the components in its settings panel,
-       * and the resolved settings object is returned. Listen for the `settingsUpdate` event to
-       * react to the player changing values. Call after `gameReady()`.
-       */
       initialize: (components: GameSettingsUIComponents[]) => {
         currentSettings = { ...settingsDefaultsFromComponents(components), ...currentSettings }
         hostAPI.sendMessage("INITIALIZE_SETTINGS", { components, settings: currentSettings })
         return currentSettings
       },
-      /** Get the current resolved settings object. */
       get: () => currentSettings ?? {},
-      /** Merge changes into the current settings and persist them to the host. Returns the updated settings. */
       update: (changes: any) => {
         currentSettings = { ...currentSettings, ...changes }
         hostAPI.sendMessage("UPDATE_SETTINGS_FROM_EMBED", { settings: currentSettings })
@@ -543,11 +664,9 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     },
 
     keyboard: {
-      /** Show the on-screen keyboard with the given config. Call again to update state (e.g. to change disabled keys). */
       show: (config: KeyboardConfig) => {
         hostAPI.sendMessage("KEYBOARD_UPDATE_CONFIG", config)
       },
-      /** Hide the on-screen keyboard. */
       hide: () => {
         hostAPI.sendMessage("KEYBOARD_UPDATE_CONFIG", {
           layout: [],

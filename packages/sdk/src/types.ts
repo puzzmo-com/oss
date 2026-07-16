@@ -116,6 +116,7 @@ export type Deed = {
   textRepresentation?: string | null
 }
 
+/** A UI component the game asks the host to render in the post-game completion sidebar */
 export type GameOverMessageUIComponent =
   | { type: "md"; text: string }
   | { type: "streak" }
@@ -530,7 +531,11 @@ export type MessagesSentFromEmbed = {
   }
   /** Ask the host to show the post-game completion screen. Send after `GAME_COMPLETED`. */
   SHOW_GAME_COMPLETE_SCREEN: {
-    /** @deprecated Components to render in the sidebar — no longer used by the host. */
+    /**
+     * Components to render in the completion sidebar: `md` items show as rich text under a
+     * "Congrats!" section, `streak` expands into the player's streak stats, and `augmentation`
+     * items become label/value rows in the stats table.
+     */
     results: GameOverMessageUIComponent[]
     /** Whether to show the retry button — currently ignored by the host but good practice to send. */
     showRetry: boolean
