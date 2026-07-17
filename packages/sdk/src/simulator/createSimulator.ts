@@ -440,7 +440,8 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   const createReadyData = (puzzle: string): BootstrapGameData => {
     return {
       userState: {
-        gameSettings: state.gameSettings,
+        // Keyed by game slug, matching the shape real hosts send
+        gameSettings: { "proto-game": state.gameSettings },
         id: "simulator-user",
         ownerID: "simulator-owner",
       },

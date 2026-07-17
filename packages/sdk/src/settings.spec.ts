@@ -21,9 +21,10 @@ const { createPuzzmoSDK } = await import("./sdk")
 
 const sendFromHost = (type: string, data: any) => windowStub.postMessage({ type, data })
 
-const readyDataWithSettings = (gameSettings: any) => ({
-  userState: { gameSettings, id: "u", ownerID: "o" },
-  startOrFindGameplay: { gamePlayed: { id: "gp", puzzle: { puzzle: "puzzle-str" } } },
+// userState.gameSettings is keyed by game slug, matching what real hosts send
+const readyDataWithSettings = (settingsForGame: any) => ({
+  userState: { gameSettings: { "test-game": settingsForGame }, id: "u", ownerID: "o" },
+  startOrFindGameplay: { gamePlayed: { id: "gp", puzzle: { puzzle: "puzzle-str", game: { slug: "test-game" } } } },
 })
 
 const components: GameSettingsUIComponents[] = [
@@ -61,6 +62,24 @@ describe("sdk.settings", () => {
 
     const sent = sentToHost.find((m) => m.type === "INITIALIZE_SETTINGS")
     expect(sent?.json).toEqual({ components, settings: resolved })
+  })
+
+  it("parses settings stored as a JSON string (older records)", () => {
+    const sdk = createPuzzmoSDK()
+    sendFromHost("READY_DATA", readyDataWithSettings(JSON.stringify({ confirmSubmit: true })))
+
+    expect(sdk.settings.get()).toEqual({ confirmSubmit: true })
+  })
+
+  it("falls back to component defaults when the user has no saved settings for this game", () => {
+    const sdk = createPuzzmoSDK()
+    sendFromHost("READY_DATA", {
+      userState: { gameSettings: { "other-game": { confirmSubmit: true } }, id: "u", ownerID: "o" },
+      startOrFindGameplay: { gamePlayed: { id: "gp", puzzle: { puzzle: "puzzle-str", game: { slug: "test-game" } } } },
+    })
+
+    expect(sdk.settings.get()).toEqual({})
+    expect(sdk.settings.initialize(components)).toEqual({ confirmSubmit: false, mode: "standard", size: 3 })
   })
 
   it("applies SETTINGS_UPDATE from the host and emits the full settings object", () => {

@@ -125,7 +125,7 @@ export type GameOverMessageUIComponent =
 export type BootstrapGameData = {
   /** Per-user state scoped to this game (settings, identity, multiplayer login). */
   userState: {
-    /** Player's game-specific settings blob; shape is owned by the game. */
+    /** Player's saved settings for all games, keyed by game slug; each value's shape is owned by that game. */
     gameSettings: any
     /** ID of the UserState record. */
     id: string

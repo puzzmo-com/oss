@@ -469,9 +469,22 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     const bootstrapData = data as MessagesReceived["READY_DATA"]
     readyData = bootstrapData
 
-    if (currentSettings === null) currentSettings = bootstrapData.userState?.gameSettings ?? {}
-
     const gamePlayed = bootstrapData.startOrFindGameplay?.gamePlayed
+
+    // userState.gameSettings is a map keyed by game slug; older records can hold the
+    // value as a JSON string rather than an object
+    if (currentSettings === null) {
+      const gameSlug = gamePlayed?.puzzle?.game?.slug
+      let saved = gameSlug ? bootstrapData.userState?.gameSettings?.[gameSlug] : null
+      if (typeof saved === "string") {
+        try {
+          saved = JSON.parse(saved)
+        } catch {
+          saved = null
+        }
+      }
+      currentSettings = saved ?? {}
+    }
     if (gamePlayed) {
       const existingTime = (gamePlayed.elapsedTimeSecs ?? 0) * 1000
       const existingAddedTime = (gamePlayed.additionalTimeAddedSecs ?? 0) * 1000
