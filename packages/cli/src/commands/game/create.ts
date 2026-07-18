@@ -368,7 +368,7 @@ export const gameCreate = async (opts: CreateOptions) => {
       p.note(message, "Paste this prompt into your LLM agent:")
     } else {
       p.log.step("Running agent with your prompt...")
-      const ok = runAgentWithBuildLoop(selectedAgent, message, gameDir, "from-prompt")
+      const ok = await runAgentWithBuildLoop(selectedAgent, message, gameDir, "from-prompt")
       if (!ok) p.log.warn("Agent step did not complete cleanly. The Minesweeper starter is still in place.")
     }
   }
