@@ -112,7 +112,7 @@ const runOpencode = async function* (input: RunInput): AsyncIterable<AgentEvent>
   }
 }
 
-const mapOpencodeEvent = (event: any, sessionID: string | null): AgentEvent[] => {
+export const mapOpencodeEvent = (event: any, sessionID: string | null): AgentEvent[] => {
   if (event.type === "message.part.updated") {
     const part = event.properties?.part
     const delta = event.properties?.delta as string | undefined

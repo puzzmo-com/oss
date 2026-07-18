@@ -22,7 +22,7 @@ export const codexAgent: Agent = {
  * Map one JSONL event from `codex exec --json` to an AgentEvent. Schema matches
  * the `ThreadEvent` union in `@openai/codex-sdk`.
  */
-const parseCodexLine = (line: string): AgentEvent | null => {
+export const parseCodexLine = (line: string): AgentEvent | null => {
   let event: any
   try {
     event = JSON.parse(line)

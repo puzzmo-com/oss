@@ -24,7 +24,7 @@ export const claudeAgent: Agent = {
 }
 
 /** Map one stream-json line from claude to an AgentEvent (or null to skip). */
-const parseClaudeLine = (line: string): AgentEvent | null => {
+export const parseClaudeLine = (line: string): AgentEvent | null => {
   let obj: any
   try {
     obj = JSON.parse(line)

@@ -24,7 +24,7 @@ export const geminiAgent: Agent = {
  * Event union per `@google/gemini-cli-core`'s `JsonStreamEvent`:
  * init / message / tool_use / tool_result / error / result.
  */
-const parseGeminiLine = (line: string): AgentEvent | null => {
+export const parseGeminiLine = (line: string): AgentEvent | null => {
   let obj: any
   try {
     obj = JSON.parse(line)

@@ -23,7 +23,7 @@ export const copilotAgent: Agent = {
  * Map one JSONL event from `copilot --output-format json` to an AgentEvent.
  * Schema: `node_modules/@github/copilot/schemas/session-events.schema.json`.
  */
-const parseCopilotLine = (line: string): AgentEvent | null => {
+export const parseCopilotLine = (line: string): AgentEvent | null => {
   let event: any
   try {
     event = JSON.parse(line)

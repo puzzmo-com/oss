@@ -18,7 +18,8 @@
   },
   "scripts": {
     "build": "tsgo",
-    "type-check": "tsgo --noEmit"
+    "type-check": "tsgo --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@types/node": "^25.0.0",
     "@typescript/native-preview": "*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

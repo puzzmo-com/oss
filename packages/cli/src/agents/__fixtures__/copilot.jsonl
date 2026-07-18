@@ -1,0 +1,6 @@
+{"type":"assistant.reasoning_delta","ephemeral":true,"data":{"reasoningId":"reasoning-456","deltaContent":"thinking chunk text"}}
+{"type":"assistant.message_delta","ephemeral":true,"data":{"messageId":"msg-123","deltaContent":"Here are "}}
+{"type":"assistant.message_delta","ephemeral":true,"data":{"messageId":"msg-123","deltaContent":"the files."}}
+{"type":"tool.execution_start","data":{"toolCallId":"call-789","toolName":"bash","arguments":{"command":"ls -la"}}}
+{"type":"tool.execution_complete","data":{"toolCallId":"call-789","success":true,"result":{"content":"total 0\ndrwxr-xr-x  2 user  staff","detailedContent":"full result with diffs","contents":[]},"error":null}}
+{"type":"assistant.turn_end","data":{"turnId":"turn-001"}}

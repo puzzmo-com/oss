@@ -1,5 +1,5 @@
 import { getAgent } from "../agents/index.js"
-import { skillsPipeline } from "./registry.js"
+import { skillsPipeline, type SkillDefinition } from "./registry.js"
 import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
 import { fetchSkillPrompt } from "./mcp-client.js"
 import { runPipelineTUI } from "../tui/pipeline.js"
@@ -114,6 +114,43 @@ export const runSkillsPipeline = async (agent: string, gameDir: string, repoCont
 /** Runs the skills pipeline with a split-pane TUI */
 export const runSkillsPipelineTUI = async (agent: string, gameDir: string, repoContext: string) => {
   await runPipelineTUI(agent, gameDir, repoContext)
+}
+
+/** Runs a chosen subset of skills (the optional add-ons after the prompt flow); warns but never exits on failure */
+export const runSelectedSkills = async (agent: string, gameDir: string, repoContext: string, skills: SkillDefinition[]) => {
+  const total = skills.length
+
+  for (let i = 0; i < total; i++) {
+    const skill = skills[i]
+    console.log(`[${i + 1}/${total}] Running step: ${skill.name}`)
+
+    const prompt = await buildPrompt(skill.name, gameDir, repoContext)
+    let success = await invokeAgent(agent, prompt, gameDir)
+    if (!success) {
+      console.log(`  Agent failed, retrying...`)
+      success = await invokeAgent(agent, prompt, gameDir)
+    }
+    if (!success) {
+      console.error(`  Step ${skill.name} did not complete cleanly, skipping.`)
+      continue
+    }
+
+    // Verify build; ask the agent to fix but keep going regardless
+    const buildResult = verifyBuild(gameDir)
+    if (!buildResult.success) {
+      console.log(`  Build failed after ${skill.name}, asking agent to fix...`)
+      const fixPrompt = `The vite build failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.error}`
+      await invokeAgent(agent, fixPrompt, gameDir)
+    }
+
+    try {
+      runCommand("git add -A", { cwd: gameDir })
+      gitCommit(`step: ${skill.name}`, { cwd: gameDir })
+      console.log(`  Committed.`)
+    } catch {
+      console.log(`  No changes to commit.`)
+    }
+  }
 }
 
 /** Runs a single agent invocation, verifies the build, and commits. Used by one-shot prompt-driven flows. */

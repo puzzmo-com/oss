@@ -8,11 +8,12 @@ import { agentNames } from "../../agents/index.js"
 import { detectAgent } from "../../wizard/agent-detect.js"
 import { downloadPage } from "../../download/page-downloader.js"
 import { runCommand, gitCommit } from "../../util/exec.js"
-import { runSkillsPipelineTUI, runAgentWithBuildLoop } from "../../skills/runner.js"
+import { runSkillsPipelineTUI, runAgentWithBuildLoop, runSelectedSkills } from "../../skills/runner.js"
+import { optionalPromptSkills, type SkillDefinition } from "../../skills/registry.js"
 import { login } from "../login.js"
 import { getDefaultToken } from "../../util/config.js"
 import { slugify } from "../../util/slugify.js"
-import { detectRepoContext, type RepoType } from "./detectRepo.js"
+import { detectRepoContext, type RepoContext, type RepoType } from "./detectRepo.js"
 
 export type Strategy = "import" | "blank" | "prompt"
 
@@ -35,8 +36,7 @@ const writeMcpConfig = (dir: string) => {
     mcpServers: {
       "dev.puzzmo.com": {
         type: "http",
-        // url: "https://dev.puzzmo.com/api/mcp",
-        url: "https://dev-dj9e.onrender.com/api/mcp",
+        url: "https://dev.puzzmo.com/api/mcp",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       },
     },
@@ -178,21 +178,49 @@ const pickAgent = async (preselected?: string): Promise<string> => {
   return result
 }
 
+/** Presents the recommended optional skills as pre-checked tick boxes, returning the ones left on */
+const pickOptionalSkills = async (): Promise<SkillDefinition[]> => {
+  const result = await p.multiselect({
+    message: "Apply these recommended extras? (space to toggle, enter to confirm)",
+    options: optionalPromptSkills.map((s) => ({ value: s.name, label: s.label ?? s.name })),
+    initialValues: optionalPromptSkills.map((s) => s.name),
+    required: false,
+  })
+  if (p.isCancel(result)) process.exit(0)
+  const chosen = result as string[]
+  return optionalPromptSkills.filter((s) => chosen.includes(s.name))
+}
+
+/** Builds the repo-context lines passed to skill agents so they respect the repo layout */
+const buildRepoContext = (repo: RepoContext, repoType: RepoType): string => {
+  const lines = [
+    `Repo type: ${repoType}`,
+    `Package manager: ${repo.packageManager} (use this instead of npm/npx when running commands or adding dependencies)`,
+  ]
+  if (repoType === "multi-game")
+    lines.push("This is a multi-game repo with a shared root package.json. Do not create a per-game package.json or vite config.")
+  if (repoType === "workspace-monorepo") lines.push("This is a workspace monorepo. The game has its own package.json.")
+  return lines.join("\n")
+}
+
+type PromptStrategyArgs = {
+  userPrompt: string
+  displayName: string
+}
+
 /** Composes the prompt sent to the agent for the "from prompt" strategy */
-const buildPromptStrategyMessage = (userPrompt: string, displayName: string): string =>
-  [
-    `You are scaffolding a Puzzmo game called "${displayName}" in the current directory.`,
-    `The starter is a working Vite + Puzzmo SDK Minesweeper. Replace the gameplay with the game described below.`,
-    ``,
-    `Game description:`,
-    userPrompt,
-    ``,
-    `Constraints:`,
-    `- Keep puzzmo.json valid (do not remove the slug or displayName fields).`,
-    `- Use the Puzzmo SDK lifecycle: gameReady → gameLoaded → on("start"|"retry") → updateGameState → gameCompleted.`,
-    `- Replace fixtures in fixtures/puzzles/ with puzzles for the new game.`,
-    `- Keep the build green (\`npx vite build\` should succeed).`,
-  ].join("\n")
+const buildPromptStrategyMessage = ({ userPrompt, displayName }: PromptStrategyArgs): string =>
+  `You are scaffolding a Puzzmo game called "${displayName}" in the current directory.
+The starter is a working Vite + Puzzmo SDK Minesweeper. Replace the gameplay with the game described below.
+
+Game description:
+${userPrompt}
+
+Constraints:
+- Keep puzzmo.json valid (do not remove the slug or displayName fields).
+- Use the Puzzmo SDK lifecycle: gameReady → gameLoaded → on("start"|"retry") → updateGameState → gameCompleted.
+- Replace fixtures in fixtures/puzzles/ with puzzles for the new game.
+- Keep the build green (\`npx vite build\` should succeed).`
 
 /** Main game create wizard */
 export const gameCreate = async (opts: CreateOptions) => {
@@ -347,29 +375,27 @@ export const gameCreate = async (opts: CreateOptions) => {
   if (strategy === "import") {
     const selectedAgent = await pickAgent(opts.agent)
     if (selectedAgent !== "none") {
-      const repoContextLines = [
-        `Repo type: ${repoType}`,
-        `Package manager: ${repo.packageManager} (use this instead of npm/npx when running commands or adding dependencies)`,
-      ]
-      if (repoType === "multi-game")
-        repoContextLines.push(
-          "This is a multi-game repo with a shared root package.json. Do not create a per-game package.json or vite config.",
-        )
-      if (repoType === "workspace-monorepo") repoContextLines.push("This is a workspace monorepo. The game has its own package.json.")
-
       p.log.step("Running Puzzmo migration pipeline...")
-      await runSkillsPipelineTUI(selectedAgent, gameDir, repoContextLines.join("\n"))
+      await runSkillsPipelineTUI(selectedAgent, gameDir, buildRepoContext(repo, repoType))
     }
   } else if (strategy === "prompt") {
     const selectedAgent = await pickAgent(opts.agent)
-    const message = buildPromptStrategyMessage(userPrompt!, name)
+    const message = buildPromptStrategyMessage({ userPrompt: userPrompt!, displayName: name })
     if (selectedAgent === "none") {
       p.log.warn("No agent selected; skipping LLM customization.")
       p.note(message, "Paste this prompt into your LLM agent:")
     } else {
+      // Ask which optional extras to apply up front, then run everything unattended
+      const extras = await pickOptionalSkills()
+
       p.log.step("Running agent with your prompt...")
       const ok = await runAgentWithBuildLoop(selectedAgent, message, gameDir, "from-prompt")
       if (!ok) p.log.warn("Agent step did not complete cleanly. The Minesweeper starter is still in place.")
+
+      if (extras.length > 0) {
+        p.log.step(`Applying optional skills: ${extras.map((s) => s.name).join(", ")}`)
+        await runSelectedSkills(selectedAgent, gameDir, buildRepoContext(repo, repoType), extras)
+      }
     }
   }
 

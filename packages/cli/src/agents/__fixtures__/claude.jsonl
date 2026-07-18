@@ -1,0 +1,12 @@
+{"type":"system","subtype":"init","cwd":"/tmp/game","session_id":"d90bdbde","tools":["Write","Bash"],"model":"claude-opus-4-8","permissionMode":"bypassPermissions","apiKeySource":"none"}
+{"type":"system","subtype":"status","status":"requesting","session_id":"d90bdbde"}
+{"type":"stream_event","event":{"type":"message_start","message":{"role":"assistant","content":[]}},"session_id":"d90bdbde"}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}},"session_id":"d90bdbde"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"p"}},"session_id":"d90bdbde"}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong"}},"session_id":"d90bdbde"}
+{"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_01SAm7","name":"Write","input":{},"caller":{"type":"direct"}}},"session_id":"d90bdbde"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01SAm7","name":"Write","input":{"file_path":"/tmp/game/ping.txt","content":"pong"}}]},"session_id":"d90bdbde"}
+{"type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01SAm7","type":"tool_result","content":"File created successfully at: /tmp/game/ping.txt"}]},"session_id":"d90bdbde","tool_use_result":{"type":"create","filePath":"/tmp/game/ping.txt","content":"pong","structuredPatch":[],"originalFile":null,"userModified":false}}
+{"type":"stream_event","event":{"type":"message_stop"},"session_id":"d90bdbde"}
+{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"},"session_id":"d90bdbde"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1567,"num_turns":1,"result":"pong","session_id":"d90bdbde","total_cost_usd":0.061597}
