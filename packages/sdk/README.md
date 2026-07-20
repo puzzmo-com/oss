@@ -202,8 +202,8 @@ import { h, render } from "@puzzmo/sdk/svgJSX"
 // Needed for fragments
 const React = { Fragment: "g" }
 
-export function renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): ThumbnailResult {
-  const puzzle = JSON.parse(puzzleStr)
+export function renderThumbnail(puzzleString: string, inputString?: string, config?: ThumbnailConfig): ThumbnailResult {
+  const puzzle = JSON.parse(puzzleString)
   const size = 200
 
   const svg = (

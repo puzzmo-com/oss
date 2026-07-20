@@ -89,12 +89,17 @@ export type Theme = {
 
 /** Gameplay metrics sent to the host */
 export type GamePlay = {
+  /** The player's serialized progress. Game-facing APIs call this `inputString`; `boardState` is the wire/database name. */
   boardState: string
   elapsedTimeSecs: number
   additionalTimeAddedSecs: number
   pointsAwarded: number
   completed?: boolean
 }
+
+/** The play a game reports to `gameCompleted()` — pass progress as `inputString`. */
+export type GameCompletedPlay = Omit<GamePlay, "boardState" | "elapsedTimeSecs" | "additionalTimeAddedSecs"> &
+  Partial<Pick<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs">> & { inputString: string }
 
 /** Things the server uses for meta-game augmentations */
 export type AugmentationConfig = {
@@ -110,10 +115,26 @@ export type CheckpointConfig = {
   process: "leaderboards"[]
 }
 
-export type Deed = {
+export type Deed = PipelineDeed | PersistedDeed
+
+/** A deed only used inside the completion pipeline for the play it came from */
+export type PipelineDeed = {
   id: string
   value: any
   textRepresentation?: string | null
+  persist?: never
+}
+
+/**
+ * A deed stored on the player's long-term history — persisted values must be numbers (and they will be persisted as ints after being
+ * floored.)
+ */
+export type PersistedDeed = {
+  id: string
+  value: number
+  textRepresentation?: string | null
+  /** Store this deed on the player's long-term history, not just this play's completion pipeline */
+  persist: true
 }
 
 /** A UI component the game asks the host to render in the post-game completion sidebar */
@@ -264,26 +285,27 @@ export type ThumbnailResult = {
 
 export type AppBundle = {
   /** Renders a puzzle and optional state string into an SVG and its dimensions */
-  renderThumbnail(puzzleStr: string, inputStr?: string, config?: ThumbnailConfig): ThumbnailResult
+  renderThumbnail(puzzleString: string, inputString?: string, config?: ThumbnailConfig): ThumbnailResult
 
   /** Takes an input string, and backtracks to a version somewhere between 0-1 for its completion */
   interpolateInputString?: (
-    inputStr: string,
-    puzzleStr: string,
+    inputString: string,
+    puzzleString: string,
     // 0-1
     value: number,
   ) => {
+    // The returned property stays `inputStr` — hosts read it at runtime, renaming it is a protocol change
     inputStr: string
     display: string
     time?: number
   }
 
   /** Gives you an indication of how many possible steps are available for interpolation */
-  getInterpolatedStepCount?: (inputStr: string) => { count: number }
+  getInterpolatedStepCount?: (inputString: string) => { count: number }
 
   /** Gets a share-able string representation of the puzzle */
   getShareString?: (
-    inputStr: string,
+    inputString: string,
     title: string,
     extraData?: { puzzleString: string; dateKey: string; gameplaySlug: string; partnerSlug?: string },
   ) => {
@@ -460,9 +482,13 @@ export type KeyboardConfig = {
  * presentational (titles, paragraphs, separators).
  */
 export type GameSettingsUIComponents =
+  /** A section heading, rendered with a rule underneath. */
   | { id: string; type: "title"; value: string }
+  /** A smaller sub-heading. */
   | { id: string; type: "subtitle"; value: string }
+  /** A block of explanatory body text. */
   | { id: string; type: "paragraph"; value: string }
+  /** A free-text field writing `name`; set `textarea` for a multi-line box. */
   | {
       id: string
       type: "text"
@@ -472,8 +498,11 @@ export type GameSettingsUIComponents =
       subtitle?: string
       textarea?: true
     }
+  /** A numeric picker writing `name`, offering `values` as the choices. */
   | { id: string; type: "number"; name: string; defaultValue: number; values: number[]; title: string; subtitle?: string }
+  /** An on/off toggle writing `name`. */
   | { id: string; type: "boolean"; name: string; defaultValue: boolean; title: string; subtitle?: string }
+  /** A pick-one dropdown writing `name`. `displays` are the human labels, parallel to `values`. */
   | {
       id: string
       type: "enum"
@@ -484,6 +513,7 @@ export type GameSettingsUIComponents =
       title: string
       subtitle?: string
     }
+  /** A pick-many toggle row writing `name` as a string array. `displays` are the human labels, parallel to `values`. */
   | {
       id: string
       type: "multiselect"
@@ -495,7 +525,9 @@ export type GameSettingsUIComponents =
       title: string
       subtitle?: string
     }
+  /** A horizontal rule between components. */
   | { id: string; type: "separator"; key: string }
+  /** Lays out its `content` components side by side in one row. */
   | { id: string; type: "split"; content: GameSettingsUIComponents[] }
 
 /** Messages from the SDK to the host */
@@ -537,10 +569,8 @@ export type MessagesSentFromEmbed = {
      * items become label/value rows in the stats table.
      */
     results: GameOverMessageUIComponent[]
-    /** Whether to show the retry button — currently ignored by the host but good practice to send. */
+    /** Reserved for a host play-again button — no host renders one yet. The SDK always sends true. */
     showRetry: boolean
-    /** The gameplay object that was sent with `GAME_COMPLETED`. */
-    gameplay: GamePlay
   }
   /** Update the timer display string shown in the host UI. Sent automatically by the SDK every 500ms. */
   TIMER_TICK: { display: [string, string] }

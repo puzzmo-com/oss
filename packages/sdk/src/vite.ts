@@ -269,7 +269,7 @@ export type AppBundlePluginOptions = {
 /**
  * Vite plugin that produces dist/app-bundle.js after the main build for app-level integrations.
  *
- * The bundle exports `renderThumbnail(puzzleStr, inputStr?, config?)` — a pure renderer
+ * The bundle exports `renderThumbnail(puzzleString, inputString?, config?)` — a pure renderer
  * returning the SVG and its dimensions (`{ svg, width, height }`), used by the Puzzmo
  * platform for puzzle previews.
  */

@@ -23,26 +23,35 @@ const sendFromHost = (type: string, data: any) => windowStub.postMessage({ type,
 
 // userState.gameSettings is keyed by game slug, matching what real hosts send
 const readyDataWithSettings = (settingsForGame: any) => ({
-  userState: { gameSettings: { "test-game": settingsForGame }, id: "u", ownerID: "o" },
-  startOrFindGameplay: { gamePlayed: { id: "gp", puzzle: { puzzle: "puzzle-str", game: { slug: "test-game" } } } },
+  userState: { gameSettings: { typeshift: settingsForGame }, id: "u", ownerID: "o" },
+  startOrFindGameplay: { gamePlayed: { id: "gp", puzzle: { puzzle: "puzzle-str", game: { slug: "typeshift" } } } },
 })
 
+// The settings UI Typeshift ships in production, so the fixture reads like real usage
 const components: GameSettingsUIComponents[] = [
-  { id: "t", type: "title", value: "Options" },
-  { id: "a", type: "boolean", name: "confirmSubmit", defaultValue: false, title: "Confirm" },
   {
-    id: "b",
-    type: "enum",
-    name: "mode",
-    defaultValue: "standard",
-    values: ["standard", "zen"],
-    displays: ["Standard", "Zen"],
-    title: "Mode",
+    id: "typeshift-safe-mode",
+    subtitle: "Require double tapping to submit a word?",
+    title: "Confirm word submission",
+    type: "boolean",
+    defaultValue: false,
+    name: "confirmSubmit",
   },
   {
-    id: "c",
-    type: "split",
-    content: [{ id: "d", type: "number", name: "size", defaultValue: 3, values: [1, 2, 3], title: "Size" }],
+    id: "typeshift-highlight-core-words",
+    subtitle: "Highlight letters found in core words?",
+    title: "Highlight core words",
+    type: "boolean",
+    defaultValue: false,
+    name: "highlightCoreWords",
+  },
+  {
+    id: "typeshift-skip-single-letter-columns",
+    subtitle: "Skip over columns with only one letter while typing?",
+    title: "Skip single letter columns",
+    type: "boolean",
+    defaultValue: true,
+    name: "skipSingleLetterColumns",
   },
 ]
 
@@ -58,7 +67,7 @@ describe("sdk.settings", () => {
     expect(sdk.settings.get()).toEqual({ confirmSubmit: true })
 
     const resolved = sdk.settings.initialize(components)
-    expect(resolved).toEqual({ confirmSubmit: true, mode: "standard", size: 3 })
+    expect(resolved).toEqual({ confirmSubmit: true, highlightCoreWords: false, skipSingleLetterColumns: true })
 
     const sent = sentToHost.find((m) => m.type === "INITIALIZE_SETTINGS")
     expect(sent?.json).toEqual({ components, settings: resolved })
@@ -75,11 +84,11 @@ describe("sdk.settings", () => {
     const sdk = createPuzzmoSDK()
     sendFromHost("READY_DATA", {
       userState: { gameSettings: { "other-game": { confirmSubmit: true } }, id: "u", ownerID: "o" },
-      startOrFindGameplay: { gamePlayed: { id: "gp", puzzle: { puzzle: "puzzle-str", game: { slug: "test-game" } } } },
+      startOrFindGameplay: { gamePlayed: { id: "gp", puzzle: { puzzle: "puzzle-str", game: { slug: "typeshift" } } } },
     })
 
     expect(sdk.settings.get()).toEqual({})
-    expect(sdk.settings.initialize(components)).toEqual({ confirmSubmit: false, mode: "standard", size: 3 })
+    expect(sdk.settings.initialize(components)).toEqual({ confirmSubmit: false, highlightCoreWords: false, skipSingleLetterColumns: true })
   })
 
   it("applies SETTINGS_UPDATE from the host and emits the full settings object", () => {
@@ -89,9 +98,9 @@ describe("sdk.settings", () => {
 
     let emitted: any
     sdk.on("settingsUpdate", (data) => (emitted = data))
-    sendFromHost("SETTINGS_UPDATE", { mode: "zen" })
+    sendFromHost("SETTINGS_UPDATE", { skipSingleLetterColumns: false })
 
-    expect(emitted).toEqual({ confirmSubmit: false, mode: "zen", size: 3 })
+    expect(emitted).toEqual({ confirmSubmit: false, highlightCoreWords: false, skipSingleLetterColumns: false })
     expect(sdk.settings.get()).toEqual(emitted)
   })
 
@@ -100,11 +109,26 @@ describe("sdk.settings", () => {
     sendFromHost("READY_DATA", readyDataWithSettings({ confirmSubmit: true }))
     sdk.settings.initialize(components)
 
-    const updated = sdk.settings.update({ size: 2 })
-    expect(updated).toEqual({ confirmSubmit: true, mode: "standard", size: 2 })
+    const updated = sdk.settings.update({ highlightCoreWords: true })
+    expect(updated).toEqual({ confirmSubmit: true, highlightCoreWords: true, skipSingleLetterColumns: true })
 
     const sent = sentToHost.find((m) => m.type === "UPDATE_SETTINGS_FROM_EMBED")
     expect(sent?.json).toEqual({ settings: updated })
     expect(sdk.settings.get()).toEqual(updated)
+  })
+
+  it("skips display-only components and recurses into split groups when merging defaults", () => {
+    const sdk = createPuzzmoSDK()
+    sendFromHost("READY_DATA", readyDataWithSettings({}))
+
+    const resolved = sdk.settings.initialize([
+      { id: "t", type: "title", value: "Options" },
+      {
+        id: "c",
+        type: "split",
+        content: [{ id: "d", type: "number", name: "size", defaultValue: 3, values: [1, 2, 3], title: "Size" }],
+      },
+    ])
+    expect(resolved).toEqual({ size: 3 })
   })
 })

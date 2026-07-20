@@ -8,6 +8,7 @@ export type { SDKPlugin, SDKPluginContext, PluginAPIs } from "./plugins"
 export type {
   Theme,
   GamePlay,
+  GameCompletedPlay,
   AugmentationConfig,
   CheckpointConfig,
   Deed,

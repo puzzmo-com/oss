@@ -4,6 +4,7 @@ import type {
   MessagesSentFromEmbed,
   MessagesReceived,
   GamePlay,
+  GameCompletedPlay,
   AugmentationConfig,
   CheckpointConfig,
   Theme,
@@ -104,7 +105,7 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
   off: <T extends SDKEventType>(event: T, listener: (data?: SDKEventMap[T]) => void) => void
 
   /**
-   * Save the player's in-progress board state to the server so play can resume later, on any
+   * Save the player's in-progress state to the server so play can resume later, on any
    * device. `inputString` is the game's own serialized format — it comes back as `inputString`
    * from `gameReady()`. Call whenever the player makes a meaningful move; elapsed time is filled
    * in from the SDK timer unless provided in `play`.
@@ -114,20 +115,17 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
   /**
    * Report the game as finished. Concludes the timer, fills in elapsed/penalty time when not
    * provided, and uploads the final play plus its deeds — the host uses these for scoring,
-   * leaderboards, stats, and other augmentations. Follow with `showCompletionScreen()`.
+   * leaderboards, stats, and other augmentations. Pass progress as `inputString` (the same
+   * string `updateGameState()` takes). Follow with `showCompletionScreen()`.
    */
-  gameCompleted: (
-    play: Omit<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs"> &
-      Partial<Pick<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs">>,
-    config?: AugmentationConfig,
-  ) => void
+  gameCompleted: (play: GameCompletedPlay, config?: AugmentationConfig) => void
 
   /**
    * Ask the host to show its post-game completion UI. `results` render in the completion
    * sidebar: markdown congratulations, the player's streak stats, and custom stat rows. Call
    * after `gameCompleted()`, typically once your own victory animation has finished.
    */
-  showCompletionScreen: (results: GameOverMessageUIComponent[], gameplay: GamePlay, showRetry?: boolean) => void
+  showCompletionScreen: (results: GameOverMessageUIComponent[]) => void
 
   /**
    * Record a named mid-game checkpoint. Uploads the current board state and play time, and can
@@ -616,16 +614,16 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
       trackAnalyticsEvent("UPLOAD_NEW_GAME_STATE")
     },
 
-    gameCompleted: (
-      play: Omit<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs"> &
-        Partial<Pick<GamePlay, "elapsedTimeSecs" | "additionalTimeAddedSecs">>,
-      config?: AugmentationConfig,
-    ) => {
+    gameCompleted: (play: GameCompletedPlay, config?: AugmentationConfig) => {
       internalTimer._conclude()
       stopTimerIntervals()
 
+      // Games say inputString; the wire and database say boardState. Untyped callers
+      // may still send the old boardState spelling, so keep accepting it at runtime.
+      const { inputString, ...rest } = play
       const finalPlay: Partial<GamePlay> = {
-        ...play,
+        ...rest,
+        boardState: inputString ?? (play as { boardState?: string }).boardState,
         elapsedTimeSecs: play.elapsedTimeSecs ?? internalTimer.timeWithoutPenaltySecs(),
         additionalTimeAddedSecs: play.additionalTimeAddedSecs ?? internalTimer.addedTimeSecs(),
       }
@@ -648,12 +646,9 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
       }
     },
 
-    showCompletionScreen: (results: GameOverMessageUIComponent[], gameplay: GamePlay, showRetry = true) => {
-      hostAPI.sendMessage("SHOW_GAME_COMPLETE_SCREEN", {
-        results,
-        showRetry,
-        gameplay,
-      })
+    showCompletionScreen: (results: GameOverMessageUIComponent[]) => {
+      // showRetry stays in the message contract for a future host play-again button; no host renders one yet
+      hostAPI.sendMessage("SHOW_GAME_COMPLETE_SCREEN", { results, showRetry: true })
     },
 
     hitCheckpoint: (checkpointName: string, checkpointConfig: CheckpointConfig, config?: AugmentationConfig) => {

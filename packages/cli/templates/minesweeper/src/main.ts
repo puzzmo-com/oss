@@ -139,14 +139,14 @@ const render = () => {
 /**
  * Called once on win. Reports gameplay metrics back to the host via:
  * - `sdk.gameCompleted(gameplay, augmentations)` — durable record + deeds
- * - `sdk.showCompletionScreen(content, gameplay, completed)` — the host's win UI
+ * - `sdk.showCompletionScreen(content)` — the host's win UI
  */
 const onComplete = () => {
   const elapsed = Math.round(sdk.timer.timeSecs())
   const penalty = Math.round(sdk.timer.addedTimeSecs())
   const data = { elapsedTimeSecs: elapsed, additionalTimeAddedSecs: penalty, pointsAwarded: 0, completed: true }
   sdk.gameCompleted(data, { deeds: [] })
-  sdk.showCompletionScreen([{ type: "md", text: penalty > 0 ? `**Cleared!** With ${penalty}s in penalties.` : "**Cleared!**" }], data, true)
+  sdk.showCompletionScreen([{ type: "md", text: penalty > 0 ? `**Cleared!** With ${penalty}s in penalties.` : "**Cleared!**" }])
 }
 
 const persistState = () => {
