@@ -479,15 +479,16 @@ export type KeyboardConfig = {
  * Declarative description of a game's settings UI. The game sends these to the host via
  * `sdk.settings.initialize` and the host renders them in its settings panel. Components with a
  * `name` are value-producing (their `defaultValue` seeds the settings object); the rest are
- * presentational (titles, paragraphs, separators).
+ * presentational (titles, paragraphs, separators). Any component may set `hidden: true` to keep
+ * seeding its `defaultValue` while removing it from the host's settings panel.
  */
 export type GameSettingsUIComponents =
   /** A section heading, rendered with a rule underneath. */
-  | { id: string; type: "title"; value: string }
+  | { id: string; type: "title"; value: string; hidden?: boolean }
   /** A smaller sub-heading. */
-  | { id: string; type: "subtitle"; value: string }
+  | { id: string; type: "subtitle"; value: string; hidden?: boolean }
   /** A block of explanatory body text. */
-  | { id: string; type: "paragraph"; value: string }
+  | { id: string; type: "paragraph"; value: string; hidden?: boolean }
   /** A free-text field writing `name`; set `textarea` for a multi-line box. */
   | {
       id: string
@@ -497,11 +498,12 @@ export type GameSettingsUIComponents =
       title: string
       subtitle?: string
       textarea?: true
+      hidden?: boolean
     }
   /** A numeric picker writing `name`, offering `values` as the choices. */
-  | { id: string; type: "number"; name: string; defaultValue: number; values: number[]; title: string; subtitle?: string }
+  | { id: string; type: "number"; name: string; defaultValue: number; values: number[]; title: string; subtitle?: string; hidden?: boolean }
   /** An on/off toggle writing `name`. */
-  | { id: string; type: "boolean"; name: string; defaultValue: boolean; title: string; subtitle?: string }
+  | { id: string; type: "boolean"; name: string; defaultValue: boolean; title: string; subtitle?: string; hidden?: boolean }
   /** A pick-one dropdown writing `name`. `displays` are the human labels, parallel to `values`. */
   | {
       id: string
@@ -512,6 +514,7 @@ export type GameSettingsUIComponents =
       displays: string[]
       title: string
       subtitle?: string
+      hidden?: boolean
     }
   /** A pick-many toggle row writing `name` as a string array. `displays` are the human labels, parallel to `values`. */
   | {
@@ -524,11 +527,12 @@ export type GameSettingsUIComponents =
       displays: string[]
       title: string
       subtitle?: string
+      hidden?: boolean
     }
   /** A horizontal rule between components. */
-  | { id: string; type: "separator"; key: string }
+  | { id: string; type: "separator"; key: string; hidden?: boolean }
   /** Lays out its `content` components side by side in one row. */
-  | { id: string; type: "split"; content: GameSettingsUIComponents[] }
+  | { id: string; type: "split"; content: GameSettingsUIComponents[]; hidden?: boolean }
 
 /** Messages from the SDK to the host */
 export type MessagesSentFromEmbed = {
