@@ -3,6 +3,8 @@ import path from "node:path"
 
 /** The schema for a puzzmo.json file - mirrors PuzzmoFile from @puzzmo-com/shared/hostAPI */
 export type PuzzmoFile = {
+  /** Editor hint pointing at this JSON schema (path or URL). Ignored by the CLI. */
+  $schema?: string
   game: {
     displayName: string
     slug: string

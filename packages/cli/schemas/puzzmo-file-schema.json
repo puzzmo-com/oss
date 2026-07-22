@@ -5,6 +5,10 @@
     "PuzzmoFile": {
       "type": "object",
       "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "Editor hint pointing at this JSON schema (path or URL). Ignored by the CLI."
+        },
         "game": {
           "type": "object",
           "properties": {

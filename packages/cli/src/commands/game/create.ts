@@ -136,6 +136,34 @@ const resolveTemplateDir = (name: string): string => {
   return path.resolve(here, "..", "..", "..", "..", "templates", name)
 }
 
+const schemaSubPath = "@puzzmo/cli/schemas/puzzmo-file-schema.json"
+
+/** Finds @puzzmo/cli's bundled JSON schema on disk, preferring the copy installed alongside the game. */
+const resolveSchemaFile = (gameDir: string, repoRoot: string): string => {
+  // Prefer the project's installed copy (handles monorepo hoisting) so the hint points at what the editor loads.
+  try {
+    return createRequire(path.join(gameDir, "noop.js")).resolve(schemaSubPath)
+  } catch {}
+  // Deps may not be installed yet (fresh repo): fall back to where install will place it, at the repo root.
+  return path.join(repoRoot, "node_modules", ...schemaSubPath.split("/"))
+}
+
+/** Points the game's puzzmo.json `$schema` at the installed CLI schema, as a path relative to the file. */
+const writeSchemaHint = (gameDir: string, repoRoot: string) => {
+  const puzzmoJsonPath = path.join(gameDir, "puzzmo.json")
+  if (!fs.existsSync(puzzmoJsonPath)) return
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(fs.readFileSync(puzzmoJsonPath, "utf-8"))
+  } catch {
+    return // leave a hand-broken puzzmo.json alone
+  }
+  let rel = path.relative(gameDir, resolveSchemaFile(gameDir, repoRoot)).split(path.sep).join("/")
+  if (!rel.startsWith(".")) rel = `./${rel}`
+  const { $schema: _drop, ...rest } = parsed
+  fs.writeFileSync(puzzmoJsonPath, JSON.stringify({ $schema: rel, ...rest }, null, 2) + "\n")
+}
+
 /** File extensions where we apply template variable substitution */
 const textExtension = new Set([".md", ".json", ".html", ".css", ".ts", ".tsx", ".js", ".jsx", ".mjs"])
 
@@ -398,6 +426,10 @@ export const gameCreate = async (opts: CreateOptions) => {
       }
     }
   }
+
+  // Point puzzmo.json's $schema at the installed CLI schema now that the file is in its final home.
+  const effectiveRepoRoot = mode === "new-repo" ? gameDir : repo.repoRoot!
+  writeSchemaHint(gameDir, effectiveRepoRoot)
 
   // Done
   const pm = opts.pm || repo.packageManager
