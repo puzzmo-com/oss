@@ -27,6 +27,16 @@ export const gitCommit = (message: string, opts: ExecOptions = {}) => {
   })
 }
 
+/** True if a `git` executable is available on PATH */
+export const isGitInstalled = (): boolean => {
+  try {
+    execSync("git --version", { stdio: "ignore" })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Runs vite build and returns success/failure */
 export const verifyBuild = (cwd: string): { success: boolean; error?: string } => {
   try {

@@ -212,6 +212,12 @@ export type BootstrapGameData = {
   hostContext: HostContext[]
   /** Version string for the host<->game runtime contract; bumped on breaking changes. */
   appRuntimeContract: string
+  /**
+   * Physical safe-area insets (CSS px) of the host viewport, e.g. the iOS home-indicator gap. Games render
+   * full-bleed in the app, so inset your own content by these while your background paints to the screen
+   * edge. `env(safe-area-inset-*)` reads 0 inside the game iframe, so the host measures and passes them here.
+   */
+  safeAreaInsets?: { top: number; right: number; bottom: number; left: number }
 }
 
 /** The subset of the Puzzmo user that's exposed to games at bootstrap. */

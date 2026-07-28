@@ -1,13 +1,13 @@
 import fs from "node:fs"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { createRequire } from "node:module"
 import * as p from "@clack/prompts"
 
 import { agentNames } from "../../agents/index.js"
 import { detectAgent } from "../../wizard/agent-detect.js"
 import { downloadPage } from "../../download/page-downloader.js"
-import { runCommand, gitCommit } from "../../util/exec.js"
+import { runCommand, gitCommit, isGitInstalled } from "../../util/exec.js"
 import { runSkillsPipelineTUI, runAgentWithBuildLoop, runSelectedSkills } from "../../skills/runner.js"
 import { optionalPromptSkills, type SkillDefinition } from "../../skills/registry.js"
 import { login } from "../login.js"
@@ -83,6 +83,7 @@ const rootKeepList = new Set([
   "node_modules",
   "dist",
   ".puzzmo",
+  ".puzzmo-import-tmp",
   ".DS_Store",
   "package.json",
   "package-lock.json",
@@ -103,8 +104,15 @@ const rootKeepList = new Set([
   "eslint.config.js",
 ])
 
-/** Converts a standalone single-game repo into a multi-game repo by moving existing files into games/<name>/ */
-const convertToMultiGame = (repoRoot: string): string => {
+/**
+ * Converts a standalone single-game repo into a multi-game repo by moving existing files into games/<name>/.
+ * Returns the moved game's name, or null when the repo has no game files to move (e.g. a freshly-init'd repo).
+ */
+const convertToMultiGame = (repoRoot: string): string | null => {
+  // Anything not in the keep list (and not games/ itself) is the existing game's files
+  const movable = fs.readdirSync(repoRoot).filter((entry) => !rootKeepList.has(entry) && entry !== "games")
+  if (movable.length === 0) return null
+
   // Derive existing game name from package.json or directory name
   let existingName: string | undefined
   try {
@@ -113,15 +121,10 @@ const convertToMultiGame = (repoRoot: string): string => {
   } catch {}
   if (!existingName) existingName = path.basename(repoRoot)
 
-  const gamesDir = path.join(repoRoot, "games")
-  const existingGameDir = path.join(gamesDir, existingName)
+  const existingGameDir = path.join(repoRoot, "games", existingName)
   fs.mkdirSync(existingGameDir, { recursive: true })
 
-  // Move all non-root files into games/<existing>/
-  for (const entry of fs.readdirSync(repoRoot)) {
-    if (rootKeepList.has(entry) || entry === "games") continue
-    fs.renameSync(path.join(repoRoot, entry), path.join(existingGameDir, entry))
-  }
+  for (const entry of movable) fs.renameSync(path.join(repoRoot, entry), path.join(existingGameDir, entry))
 
   runCommand("git add -A", { cwd: repoRoot })
   gitCommit(`Restructure: move existing game to games/${existingName}`, { cwd: repoRoot })
@@ -256,6 +259,13 @@ export const gameCreate = async (opts: CreateOptions) => {
   const { version } = require("../../../package.json")
   p.intro(`Puzzmo Game Creator v${version}`)
 
+  // git is required throughout (per-step commits, repo setup) — fail fast rather than half-scaffolding and crashing
+  if (!isGitInstalled()) {
+    p.log.error("git is required to create a game, but no `git` was found on your PATH.")
+    p.log.info("Install it from https://git-scm.com/downloads and try again.")
+    process.exit(1)
+  }
+
   // Step 1: Pick strategy
   let strategy: Strategy
   if (opts.strategy) {
@@ -372,7 +382,7 @@ export const gameCreate = async (opts: CreateOptions) => {
 
     if (repo.repoType === "standalone") {
       const existingGame = convertToMultiGame(repo.repoRoot)
-      p.log.step(`Moved existing game to games/${existingGame}/`)
+      if (existingGame) p.log.step(`Moved existing game to games/${existingGame}/`)
       repoType = "multi-game"
     }
 
@@ -417,8 +427,12 @@ export const gameCreate = async (opts: CreateOptions) => {
       const extras = await pickOptionalSkills()
 
       p.log.step("Running agent with your prompt...")
-      const ok = await runAgentWithBuildLoop(selectedAgent, message, gameDir, "from-prompt")
-      if (!ok) p.log.warn("Agent step did not complete cleanly. The Minesweeper starter is still in place.")
+      const result = await runAgentWithBuildLoop(selectedAgent, message, gameDir, "from-prompt")
+      if (!result.ok) {
+        p.log.warn(`Agent step did not complete cleanly: ${result.reason}. The Minesweeper starter is still in place.`)
+        if (result.buildError) p.note(result.buildError.trimEnd().split("\n").slice(-40).join("\n"), "Last build error")
+      }
+      p.log.info(`Full agent log: ${pathToFileURL(result.logPath).href}`)
 
       if (extras.length > 0) {
         p.log.step(`Applying optional skills: ${extras.map((s) => s.name).join(", ")}`)
