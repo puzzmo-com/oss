@@ -131,7 +131,7 @@
             "properties": {
               "userAggregateStatStableID": {
                 "type": "string",
-                "description": "The stableID from userAggregateStats to display. Converted to camelCase for lookup (e.g. \"best-score\" -> \"bestScore\")."
+                "description": "The stableID from userAggregateStats to display. Matched verbatim, so it must be identical to the stat's stableID."
               },
               "formatString": {
                 "type": "string",
