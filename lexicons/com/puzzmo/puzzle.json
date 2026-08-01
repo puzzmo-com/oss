@@ -1,0 +1,243 @@
+{
+  "lexicon": 1,
+  "id": "com.puzzmo.puzzle",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A puzzle record.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["gameSlug", "gameDisplayName", "puzzle", "createdAt"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The name or title of the puzzle."
+          },
+          "emoji": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "An emoji prepended to the puzzle name."
+          },
+          "gameSlug": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The game type identifier (e.g., 'crossword', 'memoku')."
+          },
+          "gameDisplayName": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Human-readable display name for the game (e.g., 'Cross|word', 'Big Cross|word')."
+          },
+          "puzzle": {
+            "type": "string",
+            "maxLength": 100000,
+            "description": "The puzzle data as a string representation."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048,
+            "description": "URL for this puzzle's detail or landing page."
+          },
+          "playUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048,
+            "description": "URL to play this puzzle directly."
+          },
+          "shortDescription": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "A brief description of the puzzle."
+          },
+          "difficulty": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20,
+            "description": "Difficulty rating from 0-20."
+          },
+          "tags": {
+            "type": "array",
+            "maxLength": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "Tags for categorizing the puzzle."
+          },
+          "variant": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The variant type of this puzzle, say if it's a themed version."
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The source or origin of this puzzle if it was not primarily built in-house."
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "Fallback author string when no author records exist, or is too hard to model."
+          },
+          "editor": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "Fallback editor string when no editor records exist, or is too hard to model."
+          },
+          "authors": {
+            "type": "array",
+            "maxLength": 10,
+            "items": {
+              "type": "ref",
+              "ref": "lex:com.puzzmo.puzzle#contributor"
+            },
+            "description": "The puzzle authors."
+          },
+          "editors": {
+            "type": "array",
+            "maxLength": 10,
+            "items": {
+              "type": "ref",
+              "ref": "lex:com.puzzmo.puzzle#contributor"
+            },
+            "description": "The puzzle editors."
+          },
+          "hinters": {
+            "type": "array",
+            "maxLength": 10,
+            "items": {
+              "type": "ref",
+              "ref": "lex:com.puzzmo.puzzle#contributor"
+            },
+            "description": "Contributors who wrote hints for the puzzle."
+          },
+          "publications": {
+            "type": "array",
+            "maxLength": 100,
+            "items": {
+              "type": "ref",
+              "ref": "lex:com.puzzmo.puzzle#publication"
+            },
+            "description": "Dates when this puzzle was published."
+          },
+          "completionNotes": {
+            "type": "string",
+            "maxLength": 5000,
+            "description": "Notes shown after puzzle completion."
+          },
+          "editorsNotes": {
+            "type": "string",
+            "maxLength": 5000,
+            "description": "Editor's notes shown under the completion notes."
+          },
+          "introNotes": {
+            "type": "string",
+            "maxLength": 5000,
+            "description": "Notes shown before starting the puzzle."
+          },
+          "contentWarning": {
+            "type": "boolean",
+            "description": "Whether this puzzle should show a content warning."
+          },
+          "set": {
+            "type": "ref",
+            "ref": "lex:com.puzzmo.puzzle#puzzleSet",
+            "description": "If this puzzle is part of a set, details about that set."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When this puzzle was created."
+          }
+        }
+      }
+    },
+    "contributor": {
+      "type": "object",
+      "description": "A contributor to a puzzle.",
+      "required": ["displayName", "type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "maxLength": 32,
+          "knownValues": ["author", "editor", "hinter", "hint-editor", "verified-by"],
+          "description": "The type of contribution this person made to the puzzle."
+        },
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "The DID of the contributor, if they have an atproto account."
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Display name of the contributor."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048,
+          "description": "URL to the contributor's avatar image."
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "description": "The representation of when an instance of a puzzle was published.",
+      "required": ["publishedAt"],
+      "properties": {
+        "publishedAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When this puzzle was published."
+        },
+        "seriesNumber": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The series number for this publication."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048,
+          "description": "URL to play this puzzle for this specific publication."
+        },
+        "did": {
+          "type": "string",
+          "format": "at-uri",
+          "description": "AT-URI reference to the record that contains this puzzle publication."
+        }
+      }
+    },
+    "puzzleSet": {
+      "type": "object",
+      "description": "Information about a puzzle set this puzzle belongs to, this is when you have an ordered collection which binds a series of puzzles.",
+      "required": ["key", "total", "index"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Unique identifier for the set."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "Display name for the set."
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of puzzles in the set."
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based index of this puzzle within the set."
+        }
+      }
+    }
+  }
+}

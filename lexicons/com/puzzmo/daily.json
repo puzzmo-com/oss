@@ -1,0 +1,58 @@
+{
+  "lexicon": 1,
+  "id": "com.puzzmo.daily",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A daily puzzle collection from Puzzmo.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["dayString", "puzzles", "createdAt"],
+        "properties": {
+          "dayString": {
+            "type": "string",
+            "format": "datetime",
+            "description": "The date this daily was published (e.g., '2024-01-15')."
+          },
+          "seriesNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The sequential number for this daily (e.g., Crossword #245)."
+          },
+          "puzzles": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "lex:com.puzzmo.daily#puzzleReference"
+            },
+            "description": "The puzzles included in this daily."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When this daily was created."
+          }
+        }
+      }
+    },
+    "puzzleReference": {
+      "type": "object",
+      "description": "A reference to a puzzle in the daily collection.",
+      "required": ["puzzleUri"],
+      "properties": {
+        "puzzleUri": {
+          "type": "string",
+          "format": "at-uri",
+          "description": "AT URI reference to the com.puzzmo.puzzle record."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048,
+          "description": "URL to play this puzzle on Puzzmo."
+        }
+      }
+    }
+  }
+}

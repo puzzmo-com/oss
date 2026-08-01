@@ -1,0 +1,70 @@
+{
+  "lexicon": 1,
+  "id": "com.puzzmo.streak",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A streak record for a specific Puzzmo game",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": ["teamSlug", "gameSlug", "current", "max", "lastUpdated", "total", "sigs", "syncedAt"],
+        "properties": {
+          "teamSlug": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The team that owns this game (e.g., 'puzzmo')"
+          },
+          "gameSlug": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The game identifier (e.g., 'crossword', 'pile-up-poker')"
+          },
+          "gameDisplayName": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Human-readable display name for the game (e.g., 'Crossword', 'Pile-Up Poker')"
+          },
+          "remixSlug": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Optional remix identifier for games with unique streaks (e.g., 'mini')"
+          },
+          "current": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current consecutive day streak"
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Maximum streak ever achieved"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "datetime",
+            "description": "ISO 8601 date when the streak was last updated"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of games completed"
+          },
+          "sigs": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "dev.keytrace.signature#main"
+            },
+            "description": "One or more cryptographic attestation signatures from Puzzmo."
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "ISO 8601 timestamp when this record was synced to AT Protocol"
+          }
+        }
+      }
+    }
+  }
+}
