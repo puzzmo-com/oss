@@ -387,7 +387,7 @@ const maybeCreateMissingGame = async (
 
 /**
  * Warns when dist/index.html loads its JS via absolute URLs. Games are served from a per-version subpath
- * (e.g. puzzmousercontent.com/assets/<hash>/...), so a "/assets/foo.js" src resolves to the host root and 404s.
+ * (e.g. puzzmo-game-assets.com/assets/<hash>/...), so a "/assets/foo.js" src resolves to the host root and 404s.
  * The fix is a relative base — e.g. `base: "./"` in vite.config.ts — so srcs become "./assets/foo.js".
  */
 const warnAboutAbsoluteScriptURLs = (distDir: string): void => {
