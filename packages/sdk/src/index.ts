@@ -3,7 +3,7 @@ export { defaultKeyboardConfig } from "./keyboard"
 
 export type { PuzzmoSDK, PuzzmoSDKOptions, GameReadyResult, SDKEventMap, SDKEventType, SDKTimer, SDKSettings, SDKKeyboard } from "./sdk"
 
-export type { SDKPlugin, SDKPluginContext, PluginAPIs } from "./plugins"
+export type { SDKPlugin, SDKPluginContext, PluginAPIs, SDKPluginBootstrap } from "./plugins"
 
 export type {
   Theme,
@@ -12,8 +12,11 @@ export type {
   AugmentationConfig,
   CheckpointConfig,
   Deed,
+  PipelineDeed,
+  PersistedDeed,
   GameOverMessageUIComponent,
   BootstrapGameData,
+  BootstrapCurrentUser,
   MessagesReceived,
   MessagesSentFromEmbed,
   AppBundle,
