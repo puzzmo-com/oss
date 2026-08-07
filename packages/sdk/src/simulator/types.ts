@@ -55,6 +55,10 @@ export interface SimulatorState {
   puzzleData: string | null
   originalPuzzle: string
   currentInputStr: string
+  /** The puzzle string applied from the Data tab, persisted across reloads. Null when unset. */
+  appliedPuzzleOverride: string | null
+  /** The board state applied from the Data tab, persisted across reloads. Null when unset. */
+  appliedInputOverride: string | null
   completionData: any
   selectedTheme: Theme
   selectedCategory: string | null

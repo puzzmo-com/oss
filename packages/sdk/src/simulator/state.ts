@@ -15,6 +15,57 @@ const storageKeys = {
   hostContext: "simulator-host-context",
 } as const
 
+/**
+ * The Data tab's puzzle/input overrides. The game only ever receives a puzzle and a board state in
+ * READY_DATA, so "Apply" cannot poke a running game — it has to persist the string and reload the
+ * page so the value is in place before the next READY_DATA is built.
+ */
+export type SimulatorOverride = "puzzle" | "input"
+
+const overridePrefix = "simulator-override:"
+
+/**
+ * Overrides are scoped to the page that applied them. localStorage is per-origin but a dev server
+ * commonly hosts many games from one origin (each at its own /games/<name>/ path), and an input
+ * string is only meaningful to the game it came from.
+ */
+function overrideKey(kind: SimulatorOverride): string {
+  const path = (window.location.pathname || "/").replace(/\/index\.html$/, "").replace(/\/+$/, "")
+  return `${overridePrefix}${kind}:${path || "/"}`
+}
+
+/** The applied override for this page, or null when nothing has been applied. "" is a real value. */
+export function getSimulatorOverride(kind: SimulatorOverride): string | null {
+  try {
+    return localStorage.getItem(overrideKey(kind))
+  } catch {
+    return null
+  }
+}
+
+/** False when the write failed — private-mode storage, or a board state over the origin's quota. */
+export function persistSimulatorOverride(kind: SimulatorOverride, value: string): boolean {
+  try {
+    localStorage.setItem(overrideKey(kind), value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function clearSimulatorOverride(kind: SimulatorOverride): void {
+  try {
+    localStorage.removeItem(overrideKey(kind))
+  } catch {
+    // Storage is unavailable, so there is nothing persisted to clear
+  }
+}
+
+export function clearSimulatorOverrides(): void {
+  clearSimulatorOverride("puzzle")
+  clearSimulatorOverride("input")
+}
+
 /** The Host tab's persisted `hostContext` override, or null when the tab hasn't set one. */
 function getStoredHostContext(): HostContext[] | null {
   const stored = localStorage.getItem(storageKeys.hostContext)
@@ -98,6 +149,9 @@ export function createInitialState(config: SimulatorConfig, fixtureCategories: s
   const storedFixtureCategory = localStorage.getItem(storageKeys.fixtureCategory)
   const storedFixturePuzzle = localStorage.getItem(storageKeys.fixturePuzzle)
   const storedHostContext = getStoredHostContext()
+  // Seeded before anything else runs so the override is already in place when the game sends READY.
+  const puzzleOverride = getSimulatorOverride("puzzle")
+  const inputOverride = getSimulatorOverride("input")
 
   return {
     hostContext: storedHostContext ?? config.hostContext ?? [{ type: "app", layout: "desktop", host: null }],
@@ -106,9 +160,11 @@ export function createInitialState(config: SimulatorConfig, fixtureCategories: s
     isPaused: false,
     hasStarted: false,
     activeTab: getStoredTab(validTabIds),
-    puzzleData: null,
-    originalPuzzle: "",
-    currentInputStr: "",
+    puzzleData: puzzleOverride,
+    originalPuzzle: puzzleOverride ?? "",
+    currentInputStr: inputOverride ?? "",
+    appliedPuzzleOverride: puzzleOverride,
+    appliedInputOverride: inputOverride,
     completionData: null,
     selectedTheme: getStoredTheme(),
     selectedCategory:

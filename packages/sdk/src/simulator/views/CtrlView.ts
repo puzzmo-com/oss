@@ -1,6 +1,6 @@
 import type { SimulatorContext, SimulatorView } from "../types"
 import { renderFixtureSelector, updatePuzzleOptions, getFixturePuzzle } from "../fixtures"
-import { persistFixtureCategory, persistFixturePuzzle, clearFixturePuzzle } from "../state"
+import { persistFixtureCategory, persistFixturePuzzle, clearFixturePuzzle, clearSimulatorOverrides } from "../state"
 
 export function createCtrlView(): SimulatorView {
   return {
@@ -57,8 +57,13 @@ export function createCtrlView(): SimulatorView {
             hasPuzzleData: !!puzzleData,
           })
           if (puzzleData) {
-            ctx.state.puzzleData = puzzleData
-            ctx.state.originalPuzzle = puzzleData
+            // A puzzle applied from the Data tab outranks the dropdowns until it is reset. It is
+            // already seeded into state, so leave it alone — this runs before READY, and stomping
+            // it here is what used to make "Apply" look like it did nothing.
+            if (ctx.state.appliedPuzzleOverride === null) {
+              ctx.state.puzzleData = puzzleData
+              ctx.state.originalPuzzle = puzzleData
+            }
             if (ctx.state.selectedCategory) persistFixtureCategory(ctx.state.selectedCategory)
             if (ctx.state.selectedPuzzle) persistFixturePuzzle(ctx.state.selectedPuzzle)
           }
@@ -66,6 +71,8 @@ export function createCtrlView(): SimulatorView {
           // Category change handler
           categorySelect.addEventListener("change", () => {
             console.log("Simulator: Category changed, reloading...", categorySelect.value)
+            // Picking a different puzzle invalidates any applied puzzle and board state.
+            clearSimulatorOverrides()
             persistFixtureCategory(categorySelect.value)
             clearFixturePuzzle()
             window.location.reload()
@@ -74,6 +81,7 @@ export function createCtrlView(): SimulatorView {
           // Puzzle change handler
           puzzleSelect.addEventListener("change", () => {
             console.log("Simulator: Puzzle changed, reloading...", puzzleSelect.value)
+            clearSimulatorOverrides()
             persistFixturePuzzle(puzzleSelect.value)
             window.location.reload()
           })

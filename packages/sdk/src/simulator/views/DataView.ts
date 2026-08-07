@@ -1,5 +1,6 @@
 import type { AppBundle, ThumbnailConfig } from "../../types"
 import { normalizeThumbnailResult } from "../normalizeThumbnail"
+import { clearSimulatorOverride, clearSimulatorOverrides, persistSimulatorOverride } from "../state"
 import type { SimulatorContext, SimulatorView } from "../types"
 
 // Storage key for saved states (global across all puzzles)
@@ -85,7 +86,9 @@ export function createDataView(): SimulatorView {
 
           <div class="data-subtab-content active" id="data-subtab-edit">
             <div class="simulator-field">
-              <label class="simulator-label">Puzzle String</label>
+              <label class="simulator-label">
+                Puzzle String<span class="simulator-override-tag" id="simulator-puzzle-override-tag" hidden>applied</span>
+              </label>
               <textarea class="simulator-textarea auto-resize" id="simulator-puzzle" placeholder="Loading..."></textarea>
               <div class="simulator-row">
                 <button class="simulator-btn subtle" id="simulator-puzzle-reset">Reset</button>
@@ -94,7 +97,9 @@ export function createDataView(): SimulatorView {
             </div>
             <div class="simulator-divider"></div>
             <div class="simulator-field">
-              <label class="simulator-label">Input String</label>
+              <label class="simulator-label">
+                Input String<span class="simulator-override-tag" id="simulator-input-override-tag" hidden>applied</span>
+              </label>
               <textarea class="simulator-textarea auto-resize" id="simulator-input" placeholder="No input yet..."></textarea>
               <div class="simulator-row">
                 <button class="simulator-btn subtle" id="simulator-input-reset">Reset</button>
@@ -163,23 +168,23 @@ export function createDataView(): SimulatorView {
       const puzzleApplyBtn = ctx.getElement<HTMLButtonElement>("#simulator-puzzle-apply")
       const inputResetBtn = ctx.getElement<HTMLButtonElement>("#simulator-input-reset")
       const inputApplyBtn = ctx.getElement<HTMLButtonElement>("#simulator-input-apply")
-      const startBtn = ctx.getElement<HTMLButtonElement>("#simulator-start")
-      const pauseBtn = ctx.getElement<HTMLButtonElement>("#simulator-pause")
 
       // Initialize puzzle textarea - defer to allow CtrlView to set state first
       setTimeout(() => {
-        if (puzzleTextarea && ctx.state.originalPuzzle) {
+        if (puzzleTextarea && ctx.state.originalPuzzle && document.activeElement !== puzzleTextarea) {
           puzzleTextarea.value = ctx.state.originalPuzzle
           originalPuzzleValue = ctx.state.originalPuzzle
           autoResizeTextarea(puzzleTextarea)
         }
 
         // Initialize input textarea
-        if (inputTextarea && ctx.state.currentInputStr) {
+        if (inputTextarea && ctx.state.currentInputStr && document.activeElement !== inputTextarea) {
           inputTextarea.value = ctx.state.currentInputStr
           originalInputValue = ctx.state.currentInputStr
           autoResizeTextarea(inputTextarea)
         }
+
+        updateOverrideTags(ctx)
       }, 0)
 
       // Auto-resize and change detection for puzzle
@@ -196,8 +201,15 @@ export function createDataView(): SimulatorView {
         if (inputApplyBtn) inputApplyBtn.disabled = !hasChanges
       })
 
-      // Puzzle reset
+      // Puzzle reset - drops the applied puzzle and goes back to the fixture dropdowns
       puzzleResetBtn?.addEventListener("click", () => {
+        if (ctx.state.appliedPuzzleOverride !== null) {
+          clearSimulatorOverride("puzzle")
+          ctx.updateStatus("Restoring fixture puzzle...", "waiting")
+          window.location.reload()
+          return
+        }
+        // Nothing applied, so this is just discarding unsaved edits in the box
         if (puzzleTextarea) {
           puzzleTextarea.value = ctx.state.originalPuzzle
           originalPuzzleValue = ctx.state.originalPuzzle
@@ -209,24 +221,27 @@ export function createDataView(): SimulatorView {
       // Puzzle apply - the puzzle is an opaque string; the game parses it, so no validation here
       puzzleApplyBtn?.addEventListener("click", () => {
         if (!puzzleTextarea) return
-        ctx.state.puzzleData = puzzleTextarea.value
-        ctx.state.originalPuzzle = puzzleTextarea.value
-        originalPuzzleValue = puzzleTextarea.value
-        // Trigger a retry with the new puzzle
-        ctx.sendToGame("RETRY_PUZZLE", {})
-        ctx.state.hasStarted = false
-        ctx.state.isPaused = false
-        if (pauseBtn) {
-          pauseBtn.disabled = true
-          pauseBtn.textContent = "Pause"
+        // The game is handed its puzzle exactly once, in READY_DATA. Mutating state here and
+        // sending RETRY_PUZZLE left the running game on the old puzzle, so persist and reload.
+        if (!persistSimulatorOverride("puzzle", puzzleTextarea.value)) {
+          ctx.updateStatus("Could not store puzzle — storage unavailable", "paused")
+          return
         }
-        if (startBtn) startBtn.textContent = "Start"
-        ctx.updateStatus("Puzzle updated", "ready")
+        // A board state only makes sense against the puzzle it came from
+        clearSimulatorOverride("input")
         puzzleApplyBtn.disabled = true
+        ctx.updateStatus("Applying puzzle...", "waiting")
+        window.location.reload()
       })
 
-      // Input reset
+      // Input reset - drops the applied board state so the game starts fresh
       inputResetBtn?.addEventListener("click", () => {
+        if (ctx.state.appliedInputOverride !== null) {
+          clearSimulatorOverride("input")
+          ctx.updateStatus("Clearing input...", "waiting")
+          window.location.reload()
+          return
+        }
         if (inputTextarea) {
           inputTextarea.value = originalInputValue
           autoResizeTextarea(inputTextarea)
@@ -234,15 +249,16 @@ export function createDataView(): SimulatorView {
         }
       })
 
-      // Input apply
+      // Input apply - boardState is only read when READY_DATA is built, so this needs a reload too
       inputApplyBtn?.addEventListener("click", () => {
-        if (inputTextarea) {
-          ctx.state.currentInputStr = inputTextarea.value
-          originalInputValue = inputTextarea.value
-          console.log("Simulator: Input string updated (game restart required to apply)")
-          ctx.updateStatus("Input stored", "ready")
-          inputApplyBtn.disabled = true
+        if (!inputTextarea) return
+        if (!persistSimulatorOverride("input", inputTextarea.value)) {
+          ctx.updateStatus("Could not store input — storage unavailable", "paused")
+          return
         }
+        inputApplyBtn.disabled = true
+        ctx.updateStatus("Applying input...", "waiting")
+        window.location.reload()
       })
 
       // History tab
@@ -312,10 +328,14 @@ export function createDataView(): SimulatorView {
           }
         }
 
-        if (inputTextarea) {
-          inputTextarea.value = ctx.state.currentInputStr
-          originalInputValue = ctx.state.currentInputStr
-          autoResizeTextarea(inputTextarea)
+        // Leave the box alone while it has focus. Games upload state on every move, and rewriting
+        // (then re-measuring) the textarea under the caret drops selections and half-typed edits.
+        if (inputTextarea && document.activeElement !== inputTextarea) {
+          if (inputTextarea.value !== boardState) {
+            inputTextarea.value = boardState
+            autoResizeTextarea(inputTextarea)
+          }
+          originalInputValue = boardState
           if (inputApplyBtn) inputApplyBtn.disabled = true
         }
       }
@@ -376,17 +396,20 @@ function renderHistory(ctx: SimulatorContext) {
       const idx = parseInt((e.target as HTMLElement).getAttribute("data-history-idx") || "0")
       const entry = inputHistory[idx]
       if (entry) {
-        ctx.state.currentInputStr = entry.value
+        // Switch first: the edit sub-tab repopulates its textareas from state on activation, which
+        // would immediately overwrite the entry we are restoring.
+        const editTab = ctx.getElement<HTMLElement>('.data-subtab[data-subtab="edit"]')
+        editTab?.click()
+
+        // Stage the value rather than applying it — Apply is the one path that loads it into a game
         const inputTextarea = ctx.getElement<HTMLTextAreaElement>("#simulator-input")
+        const inputApplyBtn = ctx.getElement<HTMLButtonElement>("#simulator-input-apply")
         if (inputTextarea) {
           inputTextarea.value = entry.value
           autoResizeTextarea(inputTextarea)
         }
-        ctx.updateStatus("Input restored from history", "ready")
-
-        // Switch to edit tab
-        const editTab = ctx.getElement<HTMLElement>('.data-subtab[data-subtab="edit"]')
-        editTab?.click()
+        if (inputApplyBtn) inputApplyBtn.disabled = false
+        ctx.updateStatus("Input restored — press Apply to load it", "ready")
       }
     })
   })
@@ -432,30 +455,16 @@ function renderSaves(ctx: SimulatorContext) {
       const idx = parseInt((e.target as HTMLElement).getAttribute("data-save-idx") || "0")
       const state = savedStates[idx]
       if (state) {
-        // Update puzzle - stored as a raw string, passed to the game verbatim
-        ctx.state.puzzleData = state.puzzleStr
-        ctx.state.originalPuzzle = state.puzzleStr
-
-        // Update input
-        ctx.state.currentInputStr = state.inputStr
-
-        // Refresh UI
-        const puzzleTextarea = ctx.getElement<HTMLTextAreaElement>("#simulator-puzzle")
-        const inputTextarea = ctx.getElement<HTMLTextAreaElement>("#simulator-input")
-        if (puzzleTextarea) {
-          puzzleTextarea.value = state.puzzleStr
-          autoResizeTextarea(puzzleTextarea)
+        // A save is a puzzle + board state pair, and the game only reads both when READY_DATA is
+        // built — so loading one means persisting both overrides and reloading into them.
+        if (!persistSimulatorOverride("puzzle", state.puzzleStr) || !persistSimulatorOverride("input", state.inputStr)) {
+          // Half-written overrides would boot a puzzle with a mismatched board state
+          clearSimulatorOverrides()
+          ctx.updateStatus(`Could not load "${state.name}" — storage unavailable`, "paused")
+          return
         }
-        if (inputTextarea) {
-          inputTextarea.value = state.inputStr
-          autoResizeTextarea(inputTextarea)
-        }
-
-        ctx.updateStatus(`Loaded: ${state.name}`, "ready")
-
-        // Switch to edit tab
-        const editTab = ctx.getElement<HTMLElement>('.data-subtab[data-subtab="edit"]')
-        editTab?.click()
+        ctx.updateStatus(`Loading: ${state.name}`, "waiting")
+        window.location.reload()
       }
     })
   })
@@ -494,4 +503,15 @@ function refreshEditTab(ctx: SimulatorContext) {
     autoResizeTextarea(inputTextarea)
     if (inputApplyBtn) inputApplyBtn.disabled = true
   }
+
+  updateOverrideTags(ctx)
+}
+
+// Overrides survive reloads, so flag which fields are no longer coming from the fixture — otherwise
+// a puzzle applied days ago looks like the dropdowns are lying about what the game is playing.
+function updateOverrideTags(ctx: SimulatorContext) {
+  const puzzleTag = ctx.getElement<HTMLElement>("#simulator-puzzle-override-tag")
+  const inputTag = ctx.getElement<HTMLElement>("#simulator-input-override-tag")
+  if (puzzleTag) puzzleTag.hidden = ctx.state.appliedPuzzleOverride === null
+  if (inputTag) inputTag.hidden = ctx.state.appliedInputOverride === null
 }

@@ -281,6 +281,9 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
 
   // Load puzzle data from fixtures
   const loadPuzzle = async (): Promise<any> => {
+    // Checked explicitly rather than via state.puzzleData so an empty applied puzzle still counts
+    // as an override instead of silently falling back to the fixture.
+    if (state.appliedPuzzleOverride !== null) return state.appliedPuzzleOverride
     if (state.puzzleData) return state.puzzleData
 
     if (!fixtures || fixtures.size === 0) {

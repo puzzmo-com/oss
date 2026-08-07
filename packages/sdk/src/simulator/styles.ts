@@ -377,6 +377,19 @@ export const simulatorStyles = `
     letter-spacing: 1px;
     margin-bottom: 4px;
   }
+  .simulator-override-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 4px;
+    border-radius: 2px;
+    background: var(--sim-accent);
+    color: var(--sim-bg);
+    font-size: 8px;
+    letter-spacing: 0.5px;
+  }
+  .simulator-override-tag[hidden] {
+    display: none;
+  }
   .simulator-textarea {
     width: 100%;
     min-height: 40px;
