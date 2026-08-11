@@ -8,10 +8,44 @@
 // - Added support for null/false
 // - Added support for camelCase -> kebab attributes
 // - Special case for certain camel case attributes
+// - Added the JSX types, so .tsx files can compile against `h`
 //
 
 /** A virtual DOM node produced by the `h` JSX factory. */
 type VNode = { tag: string | Function; props: Record<string, any>; children: any[] }
+
+/**
+ * Element and attribute types for `.tsx` files compiled with `"jsx": "react"` and
+ * `"jsxFactory": "h"` — a classic factory takes its types from the global namespace, so this is
+ * where they have to live. Files compiled with an import source (React's, or any other) resolve
+ * their JSX types from that module instead and never see these.
+ *
+ * `IntrinsicElements` is intentionally loose: `h` passes attributes through to `setAttribute`, so
+ * anything stringable is valid, and the alternative is a hand-maintained map of every SVG element
+ * and attribute that would reject valid markup the day SVG gains one.
+ */
+declare global {
+  namespace JSX {
+    type Element = VNode
+
+    interface ElementChildrenAttribute {
+      children: object
+    }
+
+    interface IntrinsicElements {
+      [tag: string]: Record<string, any>
+    }
+  }
+}
+
+/**
+ * `<>…</>` becomes a `<g>`, wired up by `"jsxFragmentFactory": "Fragment"`.
+ *
+ * A fragment has to be *something* here, because `render` produces a single node. A group is the
+ * SVG element that changes nothing about how its contents draw, which is as close to absent as
+ * the format allows.
+ */
+export const Fragment = "g"
 
 /** Converts a JSX element into DOM calls, this is sorta your root entry point */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- target can be any DOM element
@@ -81,7 +115,11 @@ const createNode = (tag: string, props: any, children: any[], ns?: boolean) => {
     Object.keys(props).forEach((name) => {
       const value = props[name]
 
-      if (name === "className") {
+      if (name === "children") {
+        // Components are handed their children in props, so a component that spreads its props
+        // onto an element brings `children` along. It is never an attribute — the real children
+        // arrive below, as nodes.
+      } else if (name === "className") {
         setClassAttr(node, value)
       } else if (name === "style") {
         setStyleAttr(node, value)

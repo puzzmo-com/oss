@@ -193,14 +193,22 @@ There are Vite plugins to make this easy, but otherwise, they should be files in
 
 We have found over time that using JSX for thumbnails makes it a lot easier to ensure correct SVG output, but React/Preact are big runtimes, so we have a smaller JSX runtime built just for non-interactive SVGs based on [understated](https://github.com/callmecavs/understated).
 
-To use it, configure your file's JSX pragma to use `h` and `render` from `@puzzmo/sdk/svgJSX`:
+To use it, point your tsconfig's JSX factory at `h`. Your `.tsx` files then compile to the SVG runtime instead of to React:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment"
+  }
+}
+```
+
+A classic factory has to be in scope, so import `h` in every file that writes JSX even though nothing calls it by hand — and `Fragment` too, if you use `<>…</>`, which becomes a `<g>` since `render` produces a single node. Attribute names can be SVG's own (`stroke-width`) or React's (`strokeWidth`): camelCase is kebab-cased for you, bar the few SVG spells that way itself, like `viewBox`.
 
 ```tsx
-/** @jsxRuntime classic @jsx h */
 import { h, render } from "@puzzmo/sdk/svgJSX"
-
-// Needed for fragments
-const React = { Fragment: "g" }
 
 export function renderThumbnail(puzzleString: string, inputString?: string, config?: ThumbnailConfig): ThumbnailResult {
   const puzzle = JSON.parse(puzzleString)
@@ -216,7 +224,10 @@ export function renderThumbnail(puzzleString: string, inputString?: string, conf
   )
 
   const el = render(svg)
-  return { svg: el instanceof Element ? el.outerHTML : "", width: size, height: size }
+  // Duck-typed rather than `instanceof Element`: the server-side renderer runs bundles against a
+  // minimal SVG DOM that has no such global.
+  if (!el || !("outerHTML" in el)) throw new Error("Could not render the thumbnail")
+  return { svg: el.outerHTML, width: size, height: size }
 }
 ```
 

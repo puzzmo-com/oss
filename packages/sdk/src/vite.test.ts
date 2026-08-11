@@ -131,6 +131,15 @@ describe("discoverGames", () => {
     expect(games.get("with-ts-bundle")!.appBundlePath).toBe("/src/appBundle.ts")
   })
 
+  it("detects app bundle when src/appBundle.tsx exists", () => {
+    tmpRoot = createTempTree({
+      "puzzmo.json": puzzmoJson("with-tsx-bundle"),
+      "src/appBundle.tsx": "export function renderThumbnail() { return '' }",
+    })
+    const games = discoverGames(tmpRoot)
+    expect(games.get("with-tsx-bundle")!.appBundlePath).toBe("/src/appBundle.tsx")
+  })
+
   it("prefers .js over .ts when both exist", () => {
     tmpRoot = createTempTree({
       "puzzmo.json": puzzmoJson("dual"),

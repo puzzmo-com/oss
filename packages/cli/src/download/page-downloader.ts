@@ -3,18 +3,38 @@ import path from "node:path"
 import https from "node:https"
 import http from "node:http"
 
-/** Fetch that tolerates expired/self-signed SSL certificates */
-const fetchPage = async (
-  url: string,
-): Promise<{ ok: boolean; status: number; text: () => Promise<string>; arrayBuffer: () => Promise<ArrayBuffer> }> => {
+/** Browser UA, as some hosts refuse requests without one */
+const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+type FetchResult = {
+  ok: boolean
+  status: number
+  contentType: string
+  text: () => Promise<string>
+  arrayBuffer: () => Promise<ArrayBuffer>
+}
+
+/** Fetch that tolerates expired/self-signed SSL certificates, and follows redirects */
+const fetchPage = async (url: string, redirectsLeft = 5): Promise<FetchResult> => {
   const parsed = new URL(url)
   const isHttps = parsed.protocol === "https:"
 
   return new Promise((resolve, reject) => {
     const mod = isHttps ? https : http
-    const opts = isHttps ? { rejectUnauthorized: false } : {}
+    const opts = {
+      headers: { "user-agent": userAgent, accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+      ...(isHttps ? { rejectUnauthorized: false } : {}),
+    }
 
     const req = mod.get(url, opts, (res) => {
+      const status = res.statusCode ?? 0
+
+      if (status >= 300 && status < 400 && res.headers.location && redirectsLeft > 0) {
+        res.resume()
+        resolve(fetchPage(new URL(res.headers.location, url).href, redirectsLeft - 1))
+        return
+      }
+
       const chunks: Uint8Array[] = []
       res.on("data", (chunk: Uint8Array) => chunks.push(chunk))
       res.on("end", () => {
@@ -23,8 +43,9 @@ const fetchPage = async (
         const view = new Uint8Array(ab)
         view.set(buffer)
         resolve({
-          ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300,
-          status: res.statusCode ?? 0,
+          ok: status >= 200 && status < 300,
+          status,
+          contentType: res.headers["content-type"] ?? "",
           text: async () => buffer.toString("utf-8"),
           arrayBuffer: async () => ab,
         })
@@ -90,10 +111,13 @@ export const downloadPage = async (url: string, outputDir: string): Promise<{ ti
   const srcDir = path.join(outputDir, "src")
   fs.mkdirSync(srcDir, { recursive: true })
 
-  // Download the HTML
+  // Download the HTML. SPA hosts (e.g. static buckets) serve the app shell with a 404
+  // for client-side routes, which browsers render fine — so trust the body over the status.
   const response = await fetchPage(url)
-  if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`)
   let html = await response.text()
+  const servedHTML = response.contentType.includes("text/html") && html.trim().length > 0
+  if (!response.ok && !servedHTML) throw new Error(`Failed to fetch ${url}: ${response.status}`)
+  if (!response.ok) console.warn(`  Warning: ${url} returned ${response.status}, using the HTML it served anyway`)
 
   const baseURL = new URL(url)
   const downloaded = new Set<string>()

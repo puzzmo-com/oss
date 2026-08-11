@@ -252,7 +252,8 @@ const stripBundleExt = (p: string) => p.replace(/\.[jt]sx?$/i, "")
 
 /** Returns the absolute path to the first matching extension under `dir`, or null. */
 const resolveBundleEntry = (dir: string, baseRelative: string): string | null => {
-  for (const ext of [".js", ".ts"]) {
+  // JSX last: a bundle written as JSX still needs the plain entry to win if both somehow exist.
+  for (const ext of [".js", ".ts", ".tsx", ".jsx"]) {
     const candidate = path.join(dir, baseRelative + ext)
     if (fs.existsSync(candidate)) return candidate
   }

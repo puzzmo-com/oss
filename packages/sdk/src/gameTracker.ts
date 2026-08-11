@@ -101,9 +101,15 @@ export const createGameAnalyticsTracker = (context: GameAnalyticsContext) => {
         }
 
         // Fire active_30s for sustained engagement
-        if (seconds > 30 && !state.tracked.active30s) {
-          sendGameAnalyticsEvent(state.context, "active_30s")
-          state.tracked.active30s = true
+        if (seconds > 30) {
+          if (!state.tracked.gameplayActive) {
+            sendGameAnalyticsEvent(state.context, "gameplay_active")
+            state.tracked.gameplayActive = true
+          }
+          if (!state.tracked.active30s) {
+            sendGameAnalyticsEvent(state.context, "active_30s")
+            state.tracked.active30s = true
+          }
         }
         break
       }
