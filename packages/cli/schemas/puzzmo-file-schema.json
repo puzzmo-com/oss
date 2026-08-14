@@ -215,6 +215,13 @@
           },
           "description": "Awards notables (achievements/badges) to users when conditions are met at game completion. When a notable is awarded, it appears on the user's profile and creates a social news item.\n\nThe `valueExp` is evaluated against the game's deed scope. If it returns truthy, the notable is awarded. Expression scope includes all deed values from the gameplay (camelCase keys).\n\nTwo types of notables:\n\n1. **Code-based notables**: Use `notableName` (e.g. \"jokinAround\") with `notableIndex` (0 or 1). These reference predefined notables in    UserAwardsBitmapKeys (index 0) or UserAwardsBitmap1Keys (index 1). **Restricted to games owned by the Puzzmo team.** 2. **System notables**: Use `notableName` as \"{index}-{bitmapValue}\" format (e.g. \"2-4\"). These reference dynamic notables stored in the    SystemNotable database table. Available to all games.\n\nExample: Award a notable when player scores over 100 points\n\n```json {   \"completionNotables\": [     { \"valueExp\": \"score > 100\", \"notableIndex\": 0, \"notableName\": \"jokinAround\" },     { \"valueExp\": \"perfect === true\", \"notableName\": \"2-4\" }   ] } ```"
         },
+        "checklists": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChecklistAugmentation"
+          },
+          "description": "In-game checklists shown to the user. The `type` discriminator distinguishes between different kinds; today only `tutorial` is consumed by the runtime.\n\nTutorial checklists are an ordered sequence of steps: the player is always shown the first step they have not finished, and how far they got is remembered across sessions so an abandoned tutorial resumes rather than restarting. Once it is finished — or once the player has completed the game's daily at least once — the tutorial stops being shown.\n\nChecklists merge by `stableID` across sources (gameVersion, remix, puzzle frontmatter) with last-write-wins, so a remix or puzzle can override a game-level tutorial without duplicating the entry."
+        },
         "forceGameSettings": {
           "type": "object",
           "description": "Forces specific game settings for this puzzle, overriding user preferences. Only applies when set via puzzle front-matter (not from game-level augmentations).\n\nWhen a puzzle has forced settings, those settings are locked in the UI and displayed as read-only with a note that the setting is specific to this puzzle. Users cannot change forced settings.\n\nThe settings object keys/values are game-specific. To find valid settings for a game, set the setting yourself in the game and check your user profile in the admin to see the stored format.\n\nExample: Force monochrome grid mode for a crossword puzzle\n\n```json { \"forceGameSettings\": { \"monoGrid\": true } } ```"
@@ -349,6 +356,80 @@
       "required": ["displayName", "formatString"],
       "additionalProperties": false,
       "description": "Data given by either via a puzzle in front-matter, or a game in completion. A general unit of data which can be used to represent a lot of configuration points from the game to the API."
+    },
+    "ChecklistAugmentation": {
+      "type": "object",
+      "properties": {
+        "stableID": {
+          "type": "string",
+          "description": "Stable identifier used to de-dupe the checklist",
+          "examples": ["[gameslug]:tutorial"]
+        },
+        "type": {
+          "type": "string",
+          "const": "tutorial",
+          "description": "The kind of checklist. Currently only `tutorial` is available"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title shown above the checklist.",
+          "examples": ["Poker Hands"]
+        },
+        "instructionsVisibleFromItemIndex": {
+          "type": "number",
+          "description": "How many steps the player must finish before the help/instructions become visible; before that point they are gated to the tutorial steps. Omit to make the instructions available from the start.",
+          "examples": [2]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChecklistAugmentationItem"
+          },
+          "description": "The individual steps, in the order the player works through them."
+        }
+      },
+      "required": ["stableID", "type", "items"],
+      "additionalProperties": false
+    },
+    "ChecklistAugmentationItem": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The item's headline in the tutorial UI; when omitted nothing is shown.",
+          "examples": ["Easy"]
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Supporting line rendered under the title.",
+          "examples": ["Open the Poker Hand reference"]
+        },
+        "expandMD": {
+          "type": "string",
+          "description": "The body revealed when the item is expanded, as markdown.",
+          "examples": ["Tap the button on the lower left side of the screen with the book icon on it"]
+        },
+        "targetCount": {
+          "type": "number",
+          "description": "Target count to mark this item complete (uses `incrementExp` as an expression to determine the count from deeds sent via a checkpoint).",
+          "examples": [2]
+        },
+        "incrementExp": {
+          "type": "string",
+          "description": "Expression evaluated against the deed scope; the result is added to `count`.",
+          "examples": ["threeOfAKindCount", "flushCount >= 3"]
+        },
+        "filterExp": {
+          "type": "string",
+          "description": "Optional gate expression — when falsy, the item is skipped for evaluation.",
+          "examples": ["excessMoves === 0"]
+        },
+        "liveUpdate": {
+          "type": "boolean",
+          "description": "When true, the item updates during checkpoints, not only at completion."
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
