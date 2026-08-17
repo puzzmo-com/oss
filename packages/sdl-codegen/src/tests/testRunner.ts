@@ -3,12 +3,12 @@ import { basename, join } from "path"
 import { Project } from "ts-morph"
 
 import { getSchema as getPrismaSchema } from "@mrleebo/prisma-ast"
-import { createSystem } from "@typescript/vfs"
 
 import { AppContext } from "../context.js"
 import { prismaModeller } from "../prismaModeller.js"
 import { lookAtServiceFile } from "../serviceFile.js"
 import { createSharedSchemaFiles } from "../sharedSchema.js"
+import { createInMemorySystem } from "../system.js"
 import type { CodeFacts, FieldFacts } from "../typeFacts.js"
 
 interface Run {
@@ -29,7 +29,7 @@ export function getDTSFilesForRun(run: Run) {
 
   const vfsMap = new Map<string, string>()
 
-  const vfs = createSystem(vfsMap)
+  const vfs = createInMemorySystem(vfsMap)
 
   const appContext: AppContext = {
     gql: schema,

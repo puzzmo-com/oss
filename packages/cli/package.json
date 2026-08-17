@@ -17,8 +17,8 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsgo",
-    "type-check": "tsgo --noEmit",
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
@@ -31,7 +31,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.0",
-    "@typescript/native-preview": "*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

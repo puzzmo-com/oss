@@ -54,9 +54,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build && vite build --config vite.config.global.ts && tsgo --project tsconfig.build.json",
+    "build": "vite build && vite build --config vite.config.global.ts && tsc --project tsconfig.build.json",
     "test": "vitest run",
-    "type-check": "tsgo --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "keywords": [
     "puzzmo",
@@ -79,7 +79,6 @@
     "lz-string": "^1.5.0"
   },
   "devDependencies": {
-    "@typescript/native-preview": "*",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

@@ -16,8 +16,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsgo",
-    "type-check": "tsgo --noEmit"
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
   },
   "keywords": [
     "ai",
@@ -45,7 +45,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.0",
-    "@typescript/native-preview": "*",
     "typescript": "catalog:"
   }
 }

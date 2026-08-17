@@ -1,7 +1,6 @@
 import * as graphql from "graphql"
 import { basename, join } from "node:path"
 import { Project } from "ts-morph"
-import typescript from "typescript"
 
 import { getSchema as getPrismaSchema } from "@mrleebo/prisma-ast"
 
@@ -9,10 +8,12 @@ import { AppContext } from "./context.js"
 import { PrismaMap, prismaModeller } from "./prismaModeller.js"
 import { lookAtServiceFile } from "./serviceFile.js"
 import { createSharedSchemaFiles } from "./sharedSchema.js"
+import { createNodeSystem, SDLCodeGenSystem } from "./system.js"
 import { CodeFacts, FieldFacts } from "./typeFacts.js"
 import { RedwoodPaths } from "./types.js"
 import { makeStep } from "./utils.js"
 
+export * from "./system.js"
 export * from "./types.js"
 
 export interface SDLCodeGenWatcher {
@@ -37,7 +38,7 @@ export interface SDLCodeGenReturn {
 /** The API specifically for the Redwood preset */
 export async function runFullCodegen(
   preset: "redwood",
-  config: { paths: RedwoodPaths; sys?: typescript.System; verbose?: true },
+  config: { paths: RedwoodPaths; sys?: SDLCodeGenSystem; verbose?: true },
 ): Promise<SDLCodeGenReturn>
 
 export async function runFullCodegen(preset: string, config: unknown): Promise<SDLCodeGenReturn>
@@ -49,7 +50,7 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
   const step = makeStep(verbose)
 
   const paths = (config as { paths: RedwoodPaths }).paths
-  const sys = typescript.sys
+  const sys = (config as { sys?: SDLCodeGenSystem }).sys ?? createNodeSystem()
 
   const pathSettings: AppContext["pathSettings"] = {
     root: paths.base,
@@ -184,7 +185,7 @@ export async function runFullCodegen(preset: string, config: unknown): Promise<S
 
 const isTypesFile = (file: string) => file.endsWith(".d.ts")
 
-const isPrismaSchemaPath = (changedPath: string, prismaDSLPath: string, sys: typescript.System) => {
+const isPrismaSchemaPath = (changedPath: string, prismaDSLPath: string, sys: SDLCodeGenSystem) => {
   if (changedPath === prismaDSLPath) return true
   if (sys.directoryExists(prismaDSLPath) && changedPath.startsWith(prismaDSLPath) && changedPath.endsWith(".prisma")) return true
   return false

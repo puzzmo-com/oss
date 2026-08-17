@@ -1,8 +1,8 @@
-import type { System } from "typescript"
+import type { SDLCodeGenSystem } from "./system.js"
 
 export interface SDLCodeGenOptions {
-  /** We'll use the one which comes with TypeScript if one isn't given */
-  system?: System
+  /** We'll use a node fs-backed one if it isn't given */
+  system?: SDLCodeGenSystem
 }
 
 // These are directly ported from Redwood at

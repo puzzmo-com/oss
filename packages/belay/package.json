@@ -14,10 +14,9 @@
     "@tsconfig/node-ts": "^23.6.1",
     "@tsconfig/node24": "^24.0.1",
     "@types/node": "^25.0.0",
-    "@typescript/native-preview": "*",
-    "typescript": "5.8.3"
+    "typescript": "catalog:"
   },
   "scripts": {
-    "type-check": "tsgo --noEmit"
+    "type-check": "tsc --noEmit"
   }
 }

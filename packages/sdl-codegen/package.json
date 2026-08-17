@@ -14,7 +14,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test": "NODE_OPTIONS=--disable-warning=ExperimentalWarning vitest run",
-    "type-check": "tsgo --noEmit"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@babel/generator": "7.26.0",
@@ -29,13 +29,10 @@
     "@types/babel__generator": "^7.6.0",
     "@types/babel__traverse": "^7.14.0",
     "@types/node": "^25.0.0",
-    "@typescript/native-preview": "*",
-    "@typescript/vfs": "1.4.0",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "graphql": "*",
-    "typescript": "*"
+    "graphql": "*"
   }
 }

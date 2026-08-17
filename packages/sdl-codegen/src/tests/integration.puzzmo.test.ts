@@ -2,8 +2,7 @@ import { existsSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { createSystem } from "@typescript/vfs"
-
+import { createInMemorySystem } from "../system"
 import { runFullCodegen } from "../index"
 
 it("Passes", () => expect(true).toBe(true))
@@ -15,7 +14,7 @@ desc("Puzzmo", () => {
   it("Runs the entire puzzmo codebase fast", async () => {
     const puzzmoAPIWD = resolve(process.cwd() + "/..../../../app/apps/api.puzzmo.com")
     const vfsMap = new Map<string, string>()
-    const vfs = createSystem(vfsMap)
+    const vfs = createInMemorySystem(vfsMap)
 
     // Replicates a Redwood project config object
     const paths = {

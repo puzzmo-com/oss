@@ -7,6 +7,8 @@
     "module": "Node16",
     "moduleResolution": "node16",
     "outDir": "lib",
+    // Matches what tsc inferred before TS 7, which now requires it to be explicit (TS5011)
+    "rootDir": "src",
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
