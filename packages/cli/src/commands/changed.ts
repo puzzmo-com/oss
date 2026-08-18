@@ -141,11 +141,16 @@ const evaluateGame = async (game: DiscoveredGame, ctx: EvalContext): Promise<Eva
   // Never deployed (or the chosen slot is empty) — nothing to diff against, so it's new and buildable.
   if (!baseSha) return { entry: makeEntry(game, dir, null, ctx.refSha, "new", 0) }
 
-  // The deployed commit has to exist locally or we can't diff — fail loudly rather than guessing.
-  if (!commitExists(baseSha, ctx.repoRoot))
-    return {
-      error: `${slug}: deployed commit ${baseSha} not found locally. Fetch full git history (e.g. actions/checkout fetch-depth: 0).`,
-    }
+  // The deployed commit has to exist locally or we can't diff. A single-commit shallow checkout can't
+  // possibly hold it, so fail loudly; with deeper history the miss is more likely a rebase/force-push,
+  // so assume the game changed rather than blocking the run.
+  if (!commitExists(baseSha, ctx.repoRoot)) {
+    if (commitDepth(ctx.repoRoot) <= 1)
+      return {
+        error: `${slug}: deployed commit ${baseSha} not found locally. Fetch full git history (e.g. actions/checkout fetch-depth: 0).`,
+      }
+    return { entry: makeEntry(game, dir, baseSha, ctx.refSha, "changed", 0) }
+  }
 
   const changedFiles = countChanges(baseSha, ctx.ref, game.puzzmoJsonDir, ctx.includeUncommitted)
   return { entry: makeEntry(game, dir, baseSha, ctx.refSha, changedFiles > 0 ? "changed" : "unchanged", changedFiles) }
@@ -233,6 +238,13 @@ const commitExists = (sha: string, cwd: string): boolean => {
   } catch {
     return false
   }
+}
+
+/** Number of commits reachable from HEAD; 1 signals a shallow single-commit checkout. Defaults to 1 on failure. */
+const commitDepth = (cwd: string): number => {
+  const out = tryGit(["rev-list", "--count", "HEAD"], cwd)
+  const count = out ? Number.parseInt(out, 10) : NaN
+  return Number.isFinite(count) ? count : 1
 }
 
 /** Runs a git command and returns its trimmed stdout, or null if it failed (git's own stderr is suppressed). */
