@@ -50,14 +50,53 @@ export const removeToken = (source: string): boolean => {
   return true
 }
 
-/** Returns saved tokens. PUZZMO_TOKEN env var (with optional PUZZMO_API_URL) overrides everything. */
+/**
+ * Returns saved tokens. Env vars override the config file entirely: `PUZZMO_TOKEN`, plus any
+ * `PUZZMO_TOKEN_<NAME>` so one environment can hold tokens for several teams.
+ */
 export const getTokens = (): TokenEntry[] => {
-  const envToken = process.env.PUZZMO_TOKEN
-  if (envToken) {
-    const source = normalizeSource(process.env.PUZZMO_API_URL ?? defaultSource)
-    return [{ source, token: envToken }]
+  const envTokens = readEnvTokens()
+  return envTokens.length ? envTokens : readConfig().tokens
+}
+
+const envTokenPrefix = "PUZZMO_TOKEN_"
+
+/**
+ * Reads tokens out of the environment: `PUZZMO_TOKEN` first, then every `PUZZMO_TOKEN_<NAME>`.
+ * `<NAME>` is only a label — a token's team comes from its JWT — but it does pick that token's
+ * server via `PUZZMO_API_URL_<NAME>`, falling back to `PUZZMO_API_URL` then the default.
+ */
+const readEnvTokens = (): TokenEntry[] => {
+  const fallbackSource = process.env.PUZZMO_API_URL ?? defaultSource
+  const entries: TokenEntry[] = []
+
+  const add = (token: string | undefined, source: string) => {
+    const trimmed = token?.trim()
+    if (!trimmed) return
+    entries.push({ source: normalizeSource(source), token: trimmed })
   }
-  return readConfig().tokens
+
+  add(process.env.PUZZMO_TOKEN, fallbackSource)
+  // Sorted so the token order is stable regardless of how the environment was assembled.
+  for (const name of Object.keys(process.env).sort()) {
+    if (!name.startsWith(envTokenPrefix)) continue
+    const suffix = name.slice(envTokenPrefix.length)
+    if (!suffix) continue
+    add(process.env[name], process.env[`PUZZMO_API_URL_${suffix}`] ?? fallbackSource)
+  }
+
+  return dedupeTokens(entries)
+}
+
+/** Drops repeats of the same token against the same server, keeping the first occurrence */
+const dedupeTokens = (tokens: TokenEntry[]): TokenEntry[] => {
+  const seen = new Set<string>()
+  return tokens.filter((entry) => {
+    const key = `${entry.source} ${entry.token}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 /** Best-guess token for clients that don't care which server it points at (e.g. .mcp.json scaffolding) */

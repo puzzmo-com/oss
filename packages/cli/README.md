@@ -65,16 +65,24 @@ The wizard:
 
 ## Configuration
 
-Config is stored in `~/.puzzmo/config.json`:
+Config is stored in `~/.puzzmo/config.json`, one entry per server:
 
 ```json
 {
-  "token": "pzt-...",
-  "apiURL": "https://api.puzzmo.com"
+  "tokens": [{ "source": "api.puzzmo.com", "token": "pzt-..." }]
 }
 ```
 
-The token can also be set via the `PUZZMO_TOKEN` environment variable, and the API URL via `PUZZMO_API_URL`.
+Tokens can also come from the environment, which replaces the config file entirely:
+
+| Variable                | Description                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| `PUZZMO_TOKEN`          | A team access token                                                                      |
+| `PUZZMO_TOKEN_<NAME>`   | Additional tokens, so one environment can cover several teams (e.g. `PUZZMO_TOKEN_ACME`) |
+| `PUZZMO_API_URL`        | Server those tokens belong to (defaults to `https://api.puzzmo.com`)                     |
+| `PUZZMO_API_URL_<NAME>` | Server for `PUZZMO_TOKEN_<NAME>` specifically                                            |
+
+`<NAME>` is only a label — each token states its own team, and the CLI picks the token whose team matches the game's `puzzmo.json`.
 
 ## Also available via
 

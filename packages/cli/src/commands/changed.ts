@@ -18,7 +18,7 @@ export type ChangedOptions = {
   includeUncommitted?: boolean
 }
 
-type GameStatus = "changed" | "unchanged" | "new"
+type GameStatus = "changed" | "unchanged" | "new" | "skipped"
 
 type ChangedEntry = {
   slug: string
@@ -29,6 +29,8 @@ type ChangedEntry = {
   ref: string
   status: GameStatus
   changedFiles: number
+  /** Why the game was left out of the buildable set; only set when status is "skipped" */
+  skipReason?: string
 }
 
 type EvalResult = { entry: ChangedEntry } | { error: string }
@@ -79,13 +81,20 @@ export const changed = async (dir: string, options: ChangedOptions = {}) => {
     else hardErrors.push(result.error)
   }
 
-  const buildable = report.filter((entry) => entry.status !== "unchanged")
+  const buildable = report.filter(isBuildable)
 
   if (json) console.log(JSON.stringify(report, null, 2))
   else if (matrix) console.log(JSON.stringify({ include: buildable.map((entry) => ({ dir: entry.dir, slug: entry.slug })) }))
   else if (list) for (const entry of buildable) console.log(entry.dir)
   else if (report.length) printTable(report)
   else if (!hardErrors.length) console.log(`No puzzmo.json files found under ${rootDir}`)
+
+  // Skips go to stderr so --list/--matrix stdout stays machine-readable, but never pass silently.
+  const skipped = report.filter((entry) => entry.status === "skipped")
+  if (skipped.length && !json) {
+    console.error(`\n${skipped.length} game${skipped.length === 1 ? "" : "s"} skipped, they cannot be uploaded from here:`)
+    for (const entry of skipped) console.error(`  ${entry.slug}: ${entry.skipReason}`)
+  }
 
   if (hardErrors.length) {
     console.error(`\n${hardErrors.length} error${hardErrors.length === 1 ? "" : "s"}:`)
@@ -109,14 +118,15 @@ const evaluateGame = async (game: DiscoveredGame, ctx: EvalContext): Promise<Eva
   const { slug, teamID } = game.puzzmoFile.game
   const dir = toPosix(path.relative(ctx.repoRoot, game.puzzmoJsonDir)) || "."
 
+  // A game we have no token for can't be uploaded, so it is skipped rather than failing the run.
   const credential = await resolveServerForTeam(teamID)
   if (!credential) {
     const matches = findTokensForTeam(teamID)
     const message =
       matches.length === 0
-        ? `No saved token for team ${teamID}. Run \`puzzmo login <token>\`.`
-        : `Token for team ${teamID} is registered against ${matches.map((m) => m.source).join(", ")} but none of those servers are reachable.`
-    return { error: `${slug}: ${message}` }
+        ? `no token for team ${teamID}`
+        : `token for team ${teamID} is registered against ${matches.map((m) => m.source).join(", ")}, none of which are reachable`
+    return { entry: makeEntry(game, dir, null, ctx.refSha, "skipped", 0, message) }
   }
 
   let versions: GameVersions | undefined
@@ -148,6 +158,7 @@ const makeEntry = (
   ref: string,
   status: GameStatus,
   changedFiles: number,
+  skipReason?: string,
 ): ChangedEntry => ({
   slug: game.puzzmoFile.game.slug,
   displayName: game.puzzmoFile.game.displayName,
@@ -157,6 +168,7 @@ const makeEntry = (
   ref,
   status,
   changedFiles,
+  ...(skipReason ? { skipReason } : {}),
 })
 
 /** Fetches a team's per-game runtime SHAs once, memoizing the in-flight promise so concurrent games share the call. */
@@ -202,9 +214,12 @@ const printTable = (report: ChangedEntry[]) => {
   console.log(format(headers))
   for (const row of rows) console.log(format(row))
 
-  const changedCount = report.filter((entry) => entry.status !== "unchanged").length
+  const changedCount = report.filter(isBuildable).length
   console.log(`\n${changedCount} of ${report.length} game${report.length === 1 ? "" : "s"} changed.`)
 }
+
+/** Games worth building: changed or never deployed. Unchanged and skipped ones are left out. */
+const isBuildable = (entry: ChangedEntry): boolean => entry.status === "changed" || entry.status === "new"
 
 const getRepoRoot = (cwd: string): string | null => tryGit(["rev-parse", "--show-toplevel"], cwd)
 

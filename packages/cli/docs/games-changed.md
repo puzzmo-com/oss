@@ -85,16 +85,17 @@ An array with one entry per discovered game:
 ]
 ```
 
-| Field          | Description                                                                             |
-| -------------- | --------------------------------------------------------------------------------------- |
-| `slug`         | The game's slug, from its `puzzmo.json`.                                                |
-| `displayName`  | The game's display name, from its `puzzmo.json`.                                        |
-| `teamID`       | The owning team, from its `puzzmo.json`.                                                |
-| `dir`          | The game's folder, relative to the repo root. Pass this to your build step.             |
-| `baseSha`      | The commit the deployed build was made from. `null` if the game was never deployed.     |
-| `ref`          | The commit you compared against (your checkout, or `--ref`).                            |
-| `status`       | `changed`, `unchanged`, or `new` (never deployed before — treat as something to build). |
-| `changedFiles` | How many files differ inside the game's folder.                                         |
+| Field          | Description                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| `slug`         | The game's slug, from its `puzzmo.json`.                                                   |
+| `displayName`  | The game's display name, from its `puzzmo.json`.                                           |
+| `teamID`       | The owning team, from its `puzzmo.json`.                                                   |
+| `dir`          | The game's folder, relative to the repo root. Pass this to your build step.                |
+| `baseSha`      | The commit the deployed build was made from. `null` if the game was never deployed.        |
+| `ref`          | The commit you compared against (your checkout, or `--ref`).                               |
+| `status`       | `changed`, `unchanged`, `new` (never deployed — build it), or `skipped` (no usable token). |
+| `changedFiles` | How many files differ inside the game's folder.                                            |
+| `skipReason`   | Why the game was skipped. Only present on `skipped` entries.                               |
 
 ### `--matrix`
 
@@ -117,6 +118,20 @@ The command only works with your own games, so it needs a token:
 env:
   PUZZMO_TOKEN: ${{ secrets.PUZZMO_TOKEN }}
 ```
+
+When a repo holds games from more than one team, add a token per team with `PUZZMO_TOKEN_<NAME>`.
+`<NAME>` is just a label; each token states its own team and the CLI matches it to each game's
+`puzzmo.json`. A per-token server can be set with `PUZZMO_API_URL_<NAME>`.
+
+```yaml
+env:
+  PUZZMO_TOKEN_ACME: ${{ secrets.PUZZMO_TOKEN_ACME }}
+  PUZZMO_TOKEN_ZENITH: ${{ secrets.PUZZMO_TOKEN_ZENITH }}
+```
+
+Games whose team has no usable token are reported as `skipped` and left out of `--list` and
+`--matrix`, so CI only builds what it can actually upload. The skipped games and the reason are
+printed to stderr.
 
 ## Using it in CI
 
@@ -143,6 +158,9 @@ guessing — so you'll know to deepen your checkout.
 | ---- | ----------------------------------------------------------------------------------------- |
 | `0`  | Ran fine. There may or may not be changes — look at the output to decide what to build.   |
 | `1`  | Something went wrong: a `puzzmo.json` couldn't be read, or a deployed build wasn't found. |
+
+A game with no usable token is a skip, not an error, so it does not affect the exit code. Missing
+tokens entirely (nothing saved and nothing in the environment) still exits `1`.
 
 Decide whether to deploy based on the **output** (e.g. an empty list or matrix), not the exit code.
 

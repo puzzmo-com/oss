@@ -78,7 +78,13 @@ export const discoverGames = async (rootDir: string, options: DiscoverOptions = 
 
     if (requireDist) {
       if (!distDir) {
-        fileErrors.push(`Could not find a dist/build folder for ${puzzmoFile.game.slug}. Set "output.dir" in puzzmo.json.`)
+        // output.dir set but missing usually means "not built yet", which the generic message hides.
+        const configured = puzzmoFile.output?.dir
+        fileErrors.push(
+          configured
+            ? `Build output folder not found for ${puzzmoFile.game.slug}: "${configured}" (${path.resolve(puzzmoJsonDir, configured)}) does not exist. Build the game first, or fix "output.dir" in puzzmo.json.`
+            : `Could not find a dist/build folder for ${puzzmoFile.game.slug}. Set "output.dir" in puzzmo.json.`,
+        )
       } else if (!hasFiles(distDir)) {
         fileErrors.push(`Dist folder is empty: ${distDir}`)
       }

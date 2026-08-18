@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process"
+import { type ExecSyncOptionsWithStringEncoding, execSync } from "node:child_process"
 import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
@@ -76,12 +76,14 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     for (const game of games) {
       console.log(`  - ${game.puzzmoFile.game.slug} (${path.relative(rootDir, game.distDir) || "."})`)
     }
-    if (discoveryErrors.length) {
-      console.log(`\n${plural(discoveryErrors.length, "puzzmo.json file")} could not be loaded:`)
-      for (const err of discoveryErrors) {
-        console.log(`  - ${err.slug ?? path.relative(rootDir, err.puzzmoJsonPath)}`)
-        for (const e of err.errors) console.log(`      ${e}`)
-      }
+  }
+
+  // Always report unloadable files: with a single game they are the only output before exit 1.
+  if (discoveryErrors.length) {
+    console.error(`${multi ? "\n" : ""}${plural(discoveryErrors.length, "puzzmo.json file")} could not be loaded:`)
+    for (const err of discoveryErrors) {
+      console.error(`  - ${path.relative(rootDir, err.puzzmoJsonPath)}${err.slug ? ` (${err.slug})` : ""}`)
+      for (const e of err.errors) console.error(`      ${e}`)
     }
   }
 
@@ -215,7 +217,7 @@ const printSummary = (results: GameResult[], multi: boolean) => {
   const failures = results.filter((r): r is GameFailure => !r.ok)
 
   if (successes.length === 0) {
-    if (multi) console.log(`\n${plural(failures.length, "game")} failed.`)
+    if (failures.length) console.error(`\n${plural(failures.length, "game")} failed.`)
     return
   }
 
@@ -273,7 +275,7 @@ const collectFiles = (dir: string): string[] => {
 /** Tries to get the shortest unique git SHA, returns null if not in a git repo */
 const getGitSHA = (cwd: string): string | null => {
   try {
-    return execSync("git rev-parse --short HEAD", { encoding: "utf-8", cwd }).trim()
+    return execSync("git rev-parse --short HEAD", gitExecOptions(cwd)).trim()
   } catch {
     return null
   }
@@ -282,7 +284,7 @@ const getGitSHA = (cwd: string): string | null => {
 /** Gets the subject line of the latest commit, or null if not in a git repo */
 const getGitMessage = (cwd: string): string | null => {
   try {
-    return execSync("git log -1 --pretty=%s", { encoding: "utf-8", cwd }).trim() || null
+    return execSync("git log -1 --pretty=%s", gitExecOptions(cwd)).trim() || null
   } catch {
     return null
   }
@@ -291,7 +293,7 @@ const getGitMessage = (cwd: string): string | null => {
 /** Gets the origin remote URL normalized to https, or null if unavailable */
 const getGitRepoURL = (cwd: string): string | null => {
   try {
-    const raw = execSync("git config --get remote.origin.url", { encoding: "utf-8", cwd }).trim()
+    const raw = execSync("git config --get remote.origin.url", gitExecOptions(cwd)).trim()
     return raw ? normalizeRepoURL(raw) : null
   } catch {
     return null
@@ -412,6 +414,9 @@ const warnAboutAbsoluteScriptURLs = (distDir: string): void => {
 
 /** True for URLs that resolve outside the game's own folder: site-root ("/x"), protocol-relative ("//x"), or fully-qualified ("https://x"). */
 const isAbsoluteAssetURL = (url: string): boolean => url.startsWith("/") || /^[a-z][a-z0-9+.-]*:\/\//i.test(url)
+
+/** Git lookups are best-effort, so their stderr is dropped rather than leaked into the upload output */
+const gitExecOptions = (cwd: string): ExecSyncOptionsWithStringEncoding => ({ encoding: "utf-8", cwd, stdio: ["ignore", "pipe", "ignore"] })
 
 /** Formats a byte count as a human-readable string */
 const formatBytes = (bytes: number): string => {
