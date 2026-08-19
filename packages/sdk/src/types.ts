@@ -144,7 +144,7 @@ export type GameOverMessageUIComponent =
   | { type: "augmentation"; value: string | number; display: string }
 
 export type BootstrapGameData = {
-  /** Per-user state scoped to this game (settings, identity, multiplayer login). */
+  /** Per-user state scoped to this game (settings and identity). */
   userState: {
     /** Player's saved settings for all games, keyed by game slug; each value's shape is owned by that game. */
     gameSettings: any
@@ -234,8 +234,8 @@ export type BootstrapCurrentUser = {
   type: "Paid" | "Unverified" | "User"
   /** Comma-separated internal roles (e.g. "admin,moderator"); empty string for normal users. */
   roles: string
-  /** Nakama account id for multiplayer matching; null when the user isn't logged into Nakama. */
-  nakamaID: string | null
+  /** @deprecated Nakama is decommissioned. Use `id`. No longer sent. */
+  nakamaID?: string | null
 }
 
 /** The "app" variant of hostContext — describes the runtime layout/host that's rendering the game. */

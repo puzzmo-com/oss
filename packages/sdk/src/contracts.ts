@@ -42,7 +42,7 @@ export interface SDKPluginBootstrap {
     usernameID?: string
     type?: string
     roles?: string
-    /** Nakama account id for multiplayer; null when not logged into Nakama. */
+    /** @deprecated Nakama is decommissioned. Use `id`. No longer sent. */
     nakamaID?: string | null
   } | null
   [key: string]: any
