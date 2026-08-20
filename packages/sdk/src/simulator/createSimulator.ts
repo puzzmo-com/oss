@@ -455,7 +455,6 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
         usernameID: "0000",
         type: "User",
         roles: "",
-        nakamaID: null,
       },
       startOrFindGameplay: {
         gamePlayed: {

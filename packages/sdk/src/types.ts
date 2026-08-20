@@ -234,8 +234,6 @@ export type BootstrapCurrentUser = {
   type: "Paid" | "Unverified" | "User"
   /** Comma-separated internal roles (e.g. "admin,moderator"); empty string for normal users. */
   roles: string
-  /** @deprecated Nakama is decommissioned. Use `id`. No longer sent. */
-  nakamaID?: string | null
 }
 
 /** The "app" variant of hostContext — describes the runtime layout/host that's rendering the game. */

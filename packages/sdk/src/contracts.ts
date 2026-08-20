@@ -44,8 +44,6 @@ export interface SDKPluginBootstrap {
     usernameID?: string
     type?: string
     roles?: string
-    /** @deprecated Nakama is decommissioned. Use `id`. No longer sent. */
-    nakamaID?: string | null
   } | null
   [key: string]: any
 }
