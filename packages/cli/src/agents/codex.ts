@@ -11,7 +11,18 @@ export const codexAgent: Agent = {
     runStreamJsonCli(
       {
         cmd: "codex",
-        buildArgs: (prompt) => ["exec", "--json", "--skip-git-repo-check", prompt],
+        buildArgs: (prompt, session) => [
+          "exec",
+          ...(session?.started ? ["resume", "--last"] : []),
+          "--json",
+          "--skip-git-repo-check",
+          // exec sandboxes to read-only with no network; the pipeline writes files and installs deps.
+          "-c",
+          'sandbox_mode="workspace-write"',
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          prompt,
+        ],
         parseLine: parseCodexLine,
       },
       input,

@@ -12,7 +12,15 @@ export const geminiAgent: Agent = {
     runStreamJsonCli(
       {
         cmd: "gemini",
-        buildArgs: (prompt) => ["-p", prompt, "--output-format", "stream-json"],
+        // --yolo auto-approves tool use; headless runs have no one to approve it.
+        buildArgs: (prompt, session) => [
+          "-p",
+          prompt,
+          "--output-format",
+          "stream-json",
+          "--yolo",
+          ...(session?.started ? ["--resume", "latest"] : []),
+        ],
         parseLine: parseGeminiLine,
       },
       input,

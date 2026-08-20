@@ -5,7 +5,7 @@ import { geminiAgent } from "./gemini.js"
 import { opencodeAgent } from "./opencode.js"
 import type { Agent } from "./types.js"
 
-export type { Agent, AgentEvent, RunInput } from "./types.js"
+export type { Agent, AgentEvent, AgentSession, RunInput } from "./types.js"
 
 export const AGENTS: Record<string, Agent> = {
   claude: claudeAgent,

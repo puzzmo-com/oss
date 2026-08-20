@@ -215,6 +215,8 @@ export interface SDKTimer {
   display: () => [string, string]
   /** Add penalty time in milliseconds */
   addPenalty: (ms: number) => void
+  /** Set the total penalty time in milliseconds, for games which derive it from their state */
+  setPenalty: (ms: number) => void
   /** Check if timer is paused */
   isPaused: () => boolean
   /** Check if timer has been started */
@@ -301,6 +303,9 @@ function createTimer(
     timeWithoutPenaltySecs: () => (getTime() - addedTime) / 1000,
     addPenalty: (ms: number) => {
       addedTime += ms
+    },
+    setPenalty: (ms: number) => {
+      addedTime = ms
     },
     isPaused: () => pausedDate !== undefined || startDate === undefined,
     isRunning: () => startDate !== undefined && pausedDate === undefined,
@@ -511,6 +516,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     timeWithoutPenaltySecs: () => internalTimer.timeWithoutPenaltySecs(),
     display: () => internalTimer.display(),
     addPenalty: (ms: number) => internalTimer.addPenalty(ms),
+    setPenalty: (ms: number) => internalTimer.setPenalty(ms),
     isPaused: () => internalTimer.isPaused(),
     isRunning: () => internalTimer.isRunning(),
     pause: pauseTimer,

@@ -1,10 +1,12 @@
-import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
 import { getAgent, type Agent, type AgentEvent } from "../agents/index.js"
-import { skillsPipeline } from "../skills/registry.js"
-import { fetchSkillPrompt } from "../skills/mcp-client.js"
+import type { PipelineStep } from "../skills/registry.js"
+import { prefetchSkillPrompts } from "../skills/mcp-client.js"
+import { agentIdleTimeoutMs, buildStepPrompt, commitStep, resetSession, type PipelineContext } from "../skills/step.js"
+import { verifyBuild } from "../util/exec.js"
+import { formatDuration, formatElapsed } from "../util/duration.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
 type Phase = "agent" | "build" | "commit" | "idle"
@@ -54,11 +56,6 @@ const phaseColor: Record<Phase, (s: string) => string> = {
 const ansiRe = /\x1b\[[0-9;]*[A-Za-z]/g
 const stripAnsi = (s: string) => s.replace(ansiRe, "")
 
-const buildPrompt = async (stepName: string, gameDir: string, repoContext: string): Promise<string> => {
-  const instructions = await fetchSkillPrompt(stepName, gameDir)
-  return `Follow these instructions. The game source is in the current directory.\n\n${repoContext}\n\n${instructions}`
-}
-
 /**
  * Format a non-streaming event into discrete lines. text/thinking are handled
  * separately by appendText so token deltas merge into one in-progress line.
@@ -75,6 +72,9 @@ const formatDiscreteEvent = (e: AgentEvent): string[] => {
   return []
 }
 
+/** Where a step's wall-clock went, so it's clear whether a slow run is the agent or the build */
+type StepTiming = { name: string; state: StepState; agentMs: number; buildMs: number; totalMs: number }
+
 class PipelineTUI {
   private states: StepState[]
   private currentStep = 0
@@ -87,14 +87,20 @@ class PipelineTUI {
   private sidebarWidth = 30
   private logsDir: string
   private abortController: AbortController | null = null
+  private timings: StepTiming[] = []
+  /** Accumulated inside the running step, folded into `timings` when it finishes */
+  private agentMs = 0
+  private buildMs = 0
+  private stepStartedAt: number | null = null
+  private ticker: NodeJS.Timeout | null = null
 
   constructor(
     private agent: Agent,
-    private gameDir: string,
-    private repoContext: string,
+    private ctx: PipelineContext,
+    private steps: PipelineStep[],
   ) {
-    this.states = skillsPipeline.map(() => "pending")
-    this.logsDir = path.join(gameDir, ".puzzmo", "logs")
+    this.states = steps.map(() => "pending")
+    this.logsDir = path.join(ctx.gameDir, ".puzzmo", "logs")
     fs.mkdirSync(this.logsDir, { recursive: true })
   }
 
@@ -180,7 +186,7 @@ class PipelineTUI {
     buf += moveTo(2, 1)
     buf += "│ " + bold("Migration Steps") + " ".repeat(Math.max(0, sidebarWidth - 18)) + "│"
 
-    const headerLabel = this.done ? "Done" : `${skillsPipeline[this.currentStep]?.name ?? ""} ${dim(`(${this.phase})`)}`
+    const headerLabel = this.done ? "Done" : `${this.steps[this.currentStep]?.name ?? ""} ${dim(`(${this.phase})`)}`
     const styledHeader = phaseColor[this.phase](bold(headerLabel))
     const headerVisible = stripAnsi(headerLabel).length
     buf += " " + styledHeader + " ".repeat(Math.max(0, outputWidth - headerVisible - 1)) + "│"
@@ -192,24 +198,27 @@ class PipelineTUI {
       buf += moveTo(row + 4, 1)
 
       const skillIndex = row
-      if (skillIndex < skillsPipeline.length) {
-        const skill = skillsPipeline[skillIndex]
+      if (skillIndex < this.steps.length) {
+        const skill = this.steps[skillIndex]
         const state = this.states[skillIndex]
         const isActive = skillIndex === this.currentStep && !this.done
-        const icon = stateIcon[state]
         const colorFn = stateColor[state]
-        const label = `${icon} ${skill.name}`
+        // The elapsed time sits right-aligned in the sidebar; the step name gives way to it.
+        const elapsed = this.stepDuration(skillIndex)
+        const tail = elapsed ? `${elapsed} ` : ""
+        const room = sidebarWidth - 3
+        const label = `${stateIcon[state]} ${skill.name}`.slice(0, room - tail.length - 1)
         const styled = isActive ? bold(colorFn(label)) : colorFn(label)
-        const rawLen = stripAnsi(styled).length
-        buf += "│ " + styled + " ".repeat(Math.max(0, sidebarWidth - rawLen - 3)) + "│"
-      } else if (skillIndex === skillsPipeline.length + 1) {
+        const gap = Math.max(1, room - label.length - tail.length)
+        buf += "│ " + styled + " ".repeat(gap) + dim(tail) + "│"
+      } else if (skillIndex === this.steps.length + 1) {
         const completedCount = this.states.filter((s) => s === "success").length
         const failedCount = this.states.filter((s) => s === "failed").length
         const status = this.done
           ? failedCount > 0
             ? red(`${failedCount} failure(s)`)
             : green("All complete!")
-          : dim(`${completedCount}/${skillsPipeline.length} done`)
+          : dim(`${completedCount}/${this.steps.length} done`)
         const rawLen = stripAnsi(status).length
         buf += "│ " + status + " ".repeat(Math.max(0, sidebarWidth - rawLen - 3)) + "│"
       } else {
@@ -230,12 +239,22 @@ class PipelineTUI {
     this.write(buf)
   }
 
-  private async runAgent(prompt: string): Promise<boolean> {
+  /** Runs the agent, continuing the pipeline's conversation unless `cold` asks for a fresh one. */
+  private async runAgent(prompt: string, cold = false): Promise<boolean> {
     this.abortController = new AbortController()
+    if (cold) resetSession(this.ctx.session)
+    const started = Date.now()
     let sawError = false
     let resultOk: boolean | null = null
     try {
-      for await (const event of this.agent.run({ prompt, cwd: this.gameDir, signal: this.abortController.signal })) {
+      const run = this.agent.run({
+        prompt,
+        cwd: this.ctx.gameDir,
+        signal: this.abortController.signal,
+        session: this.ctx.session,
+        idleTimeoutMs: agentIdleTimeoutMs,
+      })
+      for await (const event of run) {
         if (event.type === "error") sawError = true
         if (event.type === "result") resultOk = event.ok
         if (event.type === "text") {
@@ -254,26 +273,54 @@ class PipelineTUI {
       return false
     } finally {
       this.abortController = null
+      this.agentMs += Date.now() - started
     }
     this.lockCurrent()
+    this.appendLines([dim(`Agent run took ${formatDuration(Date.now() - started)}`)])
     if (resultOk != null) return resultOk
     return !sawError
   }
 
-  private runCmd(cmd: string): { success: boolean; output: string } {
+  /** Elapsed so far for the step in flight, final wall-clock for the ones that have finished */
+  private stepDuration(index: number): string {
+    const finished = this.timings[index]
+    if (finished) return formatDuration(finished.totalMs)
+    if (this.states[index] === "running" && this.stepStartedAt != null) return formatElapsed(Date.now() - this.stepStartedAt)
+    return ""
+  }
+
+  /** Times a step and files the result under its index, however the step exits */
+  private async runStep(stepIndex: number): Promise<boolean> {
+    this.agentMs = 0
+    this.buildMs = 0
+    const started = Date.now()
+    this.stepStartedAt = started
     try {
-      const output = execSync(cmd, { cwd: this.gameDir, encoding: "utf-8", stdio: "pipe" })
-      if (output.trim()) this.appendLines(output.trim().split("\n"))
-      return { success: true, output }
-    } catch (e: any) {
-      const output = (e.stdout || "") + (e.stderr || "") || e.message
-      if (output.trim()) this.appendLines(output.trim().split("\n"))
-      return { success: false, output }
+      return await this.executeStep(stepIndex)
+    } finally {
+      this.timings[stepIndex] = {
+        name: this.steps[stepIndex].name,
+        state: this.states[stepIndex],
+        agentMs: this.agentMs,
+        buildMs: this.buildMs,
+        totalMs: Date.now() - started,
+      }
+      this.stepStartedAt = null
+      this.render() // repaint so the row swaps its live counter for the final time
     }
   }
 
-  private async runStep(stepIndex: number): Promise<boolean> {
-    const skill = skillsPipeline[stepIndex]
+  /** Runs the project's build, echoing its output into the pane */
+  private async verify(): Promise<{ success: boolean; error?: string }> {
+    const started = Date.now()
+    const result = await verifyBuild(this.ctx.gameDir, this.ctx.buildCmd)
+    this.buildMs += Date.now() - started
+    if (result.error?.trim()) this.appendLines(result.error.trim().split("\n"))
+    return result
+  }
+
+  private async executeStep(stepIndex: number): Promise<boolean> {
+    const step = this.steps[stepIndex]
     this.states[stepIndex] = "running"
     this.currentStep = stepIndex
     this.outputLines = []
@@ -284,48 +331,51 @@ class PipelineTUI {
 
     let prompt: string
     try {
-      prompt = await buildPrompt(skill.name, this.gameDir, this.repoContext)
+      prompt = await buildStepPrompt(step, this.ctx)
     } catch (e: any) {
       this.appendLines([red(`Failed to fetch instructions: ${e.message}`)])
-      this.writeSkillLog(skill.name)
+      this.writeSkillLog(step.name)
       this.states[stepIndex] = "failed"
       return false
     }
 
     let success = await this.runAgent(prompt)
     if (!success) {
-      this.appendLines(["", dim("--- Retrying ---")])
-      success = await this.runAgent(prompt)
+      // Retry cold: whatever went wrong may have been the resumed conversation itself
+      // (an agent that can't resume, or one that wedged partway through).
+      this.appendLines(["", dim("--- Retrying in a fresh session ---")])
+      success = await this.runAgent(prompt, true)
       if (!success) {
-        this.writeSkillLog(skill.name)
+        this.writeSkillLog(step.name)
         this.states[stepIndex] = "failed"
         return false
       }
     }
 
-    this.phase = "build"
-    this.render()
-    this.appendLines([dim("Verifying build...")])
-    const buildResult = this.runCmd("npx vite build")
-    if (!buildResult.success) {
-      this.appendLines([dim("Asking agent to fix...")])
-      const fixPrompt = `The vite build failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.output}`
-      await this.runAgent(fixPrompt)
-      const retry = this.runCmd("npx vite build")
-      if (!retry.success) {
-        this.writeSkillLog(skill.name)
-        this.states[stepIndex] = "failed"
-        return false
+    if (!step.skipBuild) {
+      this.phase = "build"
+      this.render()
+      this.appendLines([dim(`Verifying build (${this.ctx.buildCmd})...`)])
+      const buildResult = await this.verify()
+      if (!buildResult.success) {
+        this.appendLines([dim("Asking agent to fix...")])
+        const fixPrompt = `The build (${this.ctx.buildCmd}) failed after the "${step.name}" step. Fix the build errors:\n\n${buildResult.error}`
+        await this.runAgent(fixPrompt)
+        const retry = await this.verify()
+        if (!retry.success) {
+          this.writeSkillLog(step.name)
+          this.states[stepIndex] = "failed"
+          return false
+        }
       }
     }
 
     this.phase = "commit"
     this.render()
-    this.runCmd("git add -A")
-    const commitResult = this.runCmd(`git commit -m "step: ${skill.name}"`)
-    this.appendLines([dim(commitResult.success ? "Committed." : "No changes to commit.")])
+    const committed = await commitStep(this.ctx.gameDir, step.name)
+    this.appendLines([dim(committed ? "Committed." : "No changes to commit.")])
 
-    this.writeSkillLog(skill.name)
+    this.writeSkillLog(step.name)
 
     this.states[stepIndex] = "success"
     this.render()
@@ -334,7 +384,22 @@ class PipelineTUI {
 
   private writeSkillLog(skillName: string) {
     const logPath = path.join(this.logsDir, `${skillName}.txt`)
-    fs.writeFileSync(logPath, this.chatLines.join("\n") + "\n")
+    const timing = `Timing: agent ${formatDuration(this.agentMs)}, build ${formatDuration(this.buildMs)}`
+    fs.writeFileSync(logPath, [...this.chatLines, "", timing].join("\n") + "\n")
+  }
+
+  /** Prints where the run's time went, once the full-screen view has been torn down */
+  private printSummary(totalMs: number) {
+    if (this.timings.length === 0) return
+    const width = Math.max(...this.timings.map((t) => t.name.length))
+    const lines = [``, bold(`Migration finished in ${formatDuration(totalMs)}`)]
+    for (const t of this.timings) {
+      const icon = stateColor[t.state](stateIcon[t.state])
+      const spent = dim(`(agent ${formatDuration(t.agentMs)}, build ${formatDuration(t.buildMs)})`)
+      lines.push(`  ${icon} ${t.name.padEnd(width)}  ${formatDuration(t.totalMs).padStart(7)}  ${spent}`)
+    }
+    lines.push(dim(`  logs: ${this.logsDir}`))
+    console.log(lines.join("\n"))
   }
 
   private setupInput() {
@@ -351,19 +416,33 @@ class PipelineTUI {
   }
 
   private cleanup() {
+    if (this.ticker) clearInterval(this.ticker)
+    this.ticker = null
     this.write(showCursor())
     if (process.stdin.isTTY) process.stdin.setRawMode(false)
     process.stdin.pause()
   }
 
   async run() {
+    const startedAll = Date.now()
     this.write(hideCursor())
     this.setupInput()
     this.render()
 
     process.stdout.on("resize", () => this.render())
 
-    for (let i = 0; i < skillsPipeline.length; i++) {
+    // Steps run for minutes at a time, so repaint on a timer to keep the elapsed column moving
+    // even while the agent is silent.
+    this.ticker = setInterval(() => this.scheduleRender(), 1000)
+    this.ticker.unref()
+
+    // Warm every skill doc up front, in parallel, so no step waits on the network mid-run.
+    await prefetchSkillPrompts(
+      this.steps.flatMap((s) => s.skills),
+      this.ctx.gameDir,
+    )
+
+    for (let i = 0; i < this.steps.length; i++) {
       const ok = await this.runStep(i)
       if (!ok) {
         this.appendLines(["", red("Pipeline stopped due to failure.")])
@@ -375,6 +454,7 @@ class PipelineTUI {
     this.done = true
     this.render()
     this.cleanup()
+    this.printSummary(Date.now() - startedAll)
   }
 }
 
@@ -401,9 +481,9 @@ const truncateVisible = (s: string, maxWidth: number): string => {
   return s.slice(0, i)
 }
 
-export const runPipelineTUI = async (agentName: string, gameDir: string, repoContext: string): Promise<void> => {
-  const agent = getAgent(agentName)
-  if (!agent) throw new Error(`Unknown agent: ${agentName}`)
-  const tui = new PipelineTUI(agent, gameDir, repoContext)
+export const runPipelineTUI = async (ctx: PipelineContext, steps: PipelineStep[]): Promise<void> => {
+  const agent = getAgent(ctx.agent)
+  if (!agent) throw new Error(`Unknown agent: ${ctx.agent}`)
+  const tui = new PipelineTUI(agent, ctx, steps)
   await tui.run()
 }

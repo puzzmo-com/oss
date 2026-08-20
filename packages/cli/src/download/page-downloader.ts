@@ -126,10 +126,10 @@ export const downloadPage = async (url: string, outputDir: string): Promise<{ ti
   // Find referenced assets (src, href, url())
   const assetRefs = extractAssetRefs(html)
 
-  for (const ref of assetRefs) {
-    const ok = await downloadAsset(ref, baseURL, srcDir, downloaded, assetContent, false)
-    if (ok) html = html.replaceAll(ref, new URL(ref, baseURL).pathname.replace(/^\//, ""))
-  }
+  const fetched = await mapWithConcurrency(assetRefs, (ref) => downloadAsset(ref, baseURL, srcDir, downloaded, assetContent, false))
+  assetRefs.forEach((ref, i) => {
+    if (fetched[i]) html = html.replaceAll(ref, new URL(ref, baseURL).pathname.replace(/^\//, ""))
+  })
 
   // Second pass: scan downloaded JS/CSS files for string literals referencing
   // paths with known asset extensions (images, fonts, audio, video).
@@ -143,9 +143,7 @@ export const downloadPage = async (url: string, outputDir: string): Promise<{ ti
 
   if (jsAssetRefs.size > 0) {
     console.log(`  Found ${jsAssetRefs.size} additional asset reference${jsAssetRefs.size === 1 ? "" : "s"} in JS/CSS files`)
-    for (const ref of jsAssetRefs) {
-      await downloadAsset(ref, baseURL, srcDir, downloaded, assetContent, true)
-    }
+    await mapWithConcurrency([...jsAssetRefs], (ref) => downloadAsset(ref, baseURL, srcDir, downloaded, assetContent, true))
   }
 
   // Write the HTML file
@@ -154,6 +152,23 @@ export const downloadPage = async (url: string, outputDir: string): Promise<{ ti
   const assetMsg = downloaded.size === 0 ? "no other assets" : `${downloaded.size} asset${downloaded.size === 1 ? "" : "s"}`
   console.log(`  Saved index.html + ${assetMsg} to ${path.relative(process.cwd(), srcDir)}/`)
   return { title: extractTitle(html) }
+}
+
+/** How many assets to fetch at once — a page's assets are otherwise one round trip each */
+const downloadConcurrency = 8
+
+/** Runs `task` over every item with a bounded number in flight, preserving input order in the results */
+const mapWithConcurrency = async <T, R>(items: T[], task: (item: T) => Promise<R>): Promise<R[]> => {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await task(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(downloadConcurrency, items.length) }, worker))
+  return results
 }
 
 /** Extracts asset references from HTML using regex */

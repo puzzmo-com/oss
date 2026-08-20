@@ -7,9 +7,12 @@ import * as p from "@clack/prompts"
 import { agentNames } from "../../agents/index.js"
 import { detectAgent } from "../../wizard/agent-detect.js"
 import { downloadPage } from "../../download/page-downloader.js"
-import { runCommand, gitCommit, isGitInstalled } from "../../util/exec.js"
-import { runSkillsPipelineTUI, runAgentWithBuildLoop, runSelectedSkills } from "../../skills/runner.js"
-import { optionalPromptSkills, type SkillDefinition } from "../../skills/registry.js"
+import { runCommand, gitCommit, isGitInstalled, resolveBuildCommand, type PackageManagerName } from "../../util/exec.js"
+import { runAgentWithBuildLoop, runSelectedSkills } from "../../skills/runner.js"
+import { runPipelineTUI } from "../../tui/pipeline.js"
+import { newSession, type PipelineContext } from "../../skills/step.js"
+import { importPipeline, optionalPromptSkills, type SkillDefinition } from "../../skills/registry.js"
+import { seedImportedGame, importedSourceDir, referenceDir } from "./seedImport.js"
 import { login } from "../login.js"
 import { getDefaultToken } from "../../util/config.js"
 import { slugify } from "../../util/slugify.js"
@@ -237,10 +240,11 @@ const buildRepoContext = (repo: RepoContext, repoType: RepoType): string => {
 type PromptStrategyArgs = {
   userPrompt: string
   displayName: string
+  buildCmd: string
 }
 
 /** Composes the prompt sent to the agent for the "from prompt" strategy */
-const buildPromptStrategyMessage = ({ userPrompt, displayName }: PromptStrategyArgs): string =>
+const buildPromptStrategyMessage = ({ userPrompt, displayName, buildCmd }: PromptStrategyArgs): string =>
   `You are scaffolding a Puzzmo game called "${displayName}" in the current directory.
 The starter is a working Vite + Puzzmo SDK Minesweeper. Replace the gameplay with the game described below.
 
@@ -251,7 +255,7 @@ Constraints:
 - Keep puzzmo.json valid (do not remove the slug or displayName fields).
 - Use the Puzzmo SDK lifecycle: gameReady → gameLoaded → on("start"|"retry") → updateGameState → gameCompleted.
 - Replace fixtures in fixtures/puzzles/ with puzzles for the new game.
-- Keep the build green (\`npx vite build\` should succeed).`
+- Keep the build green (\`${buildCmd}\` should succeed).`
 
 /** Main game create wizard */
 export const gameCreate = async (opts: CreateOptions) => {
@@ -348,15 +352,23 @@ export const gameCreate = async (opts: CreateOptions) => {
 
   const slug = opts.slug ?? slugify(name)
 
-  // Materialize template content for blank/prompt strategies (after we know the slug/name)
-  if (strategy !== "import") {
-    const templateDir = resolveTemplateDir("minesweeper")
-    if (!fs.existsSync(templateDir)) {
-      p.log.error(`Bundled template not found at ${templateDir}`)
-      process.exit(1)
-    }
-    copyTemplate(templateDir, tmpDir, { __SLUG__: slug, __DISPLAY_NAME__: name, __TEAM_ID__: opts.teamID ?? "REPLACE_ME" })
+  // Materialize the starter (after we know the slug/name). Imports get it too — porting a
+  // downloaded game into a project that already builds beats rebuilding the project by hand.
+  const templateDir = resolveTemplateDir("minesweeper")
+  if (!fs.existsSync(templateDir)) {
+    p.log.error(`Bundled template not found at ${templateDir}`)
+    process.exit(1)
   }
+  const replacements = {
+    __SLUG__: slug,
+    __DISPLAY_NAME__: name,
+    __TEAM_ID__: opts.teamID ?? "REPLACE_ME",
+    // Prettier rewrites __DISPLAY_NAME__ to bold syntax in markdown, so match that form too.
+    "**DISPLAY_NAME**": name,
+  }
+  const materialize = (from: string, to: string) => copyTemplate(from, to, replacements)
+  if (strategy === "import") seedImportedGame(tmpDir, templateDir, materialize)
+  else materialize(templateDir, tmpDir)
 
   // Step 5: Login if token provided
   if (opts.accessToken) {
@@ -410,24 +422,38 @@ export const gameCreate = async (opts: CreateOptions) => {
   }
 
   // Step 7: Strategy-specific agent work
+  const pm = packageManagerFrom(opts.pm, repo.packageManager)
+  const buildCmd = resolveBuildCommand(gameDir, pm)
+  // One context per run: the agent keeps the same conversation across every step.
+  const contextFor = (agent: string): PipelineContext => ({
+    agent,
+    gameDir,
+    repoContext: buildRepoContext(repo, repoType),
+    buildCmd,
+    session: newSession(),
+  })
+
   if (strategy === "import") {
     const selectedAgent = await pickAgent(opts.agent)
     if (selectedAgent !== "none") {
       p.log.step("Running Puzzmo migration pipeline...")
-      await runSkillsPipelineTUI(selectedAgent, gameDir, buildRepoContext(repo, repoType))
+      await runPipelineTUI(contextFor(selectedAgent), importPipeline)
+    } else {
+      p.log.info(`The downloaded game is in ${importedSourceDir}/, and a reference game is in ${referenceDir}/.`)
     }
   } else if (strategy === "prompt") {
     const selectedAgent = await pickAgent(opts.agent)
-    const message = buildPromptStrategyMessage({ userPrompt: userPrompt!, displayName: name })
+    const message = buildPromptStrategyMessage({ userPrompt: userPrompt!, displayName: name, buildCmd })
     if (selectedAgent === "none") {
       p.log.warn("No agent selected; skipping LLM customization.")
       p.note(message, "Paste this prompt into your LLM agent:")
     } else {
       // Ask which optional extras to apply up front, then run everything unattended
       const extras = await pickOptionalSkills()
+      const ctx = contextFor(selectedAgent)
 
       p.log.step("Running agent with your prompt...")
-      const result = await runAgentWithBuildLoop(selectedAgent, message, gameDir, "from-prompt")
+      const result = await runAgentWithBuildLoop(ctx, message, "from-prompt")
       if (!result.ok) {
         p.log.warn(`Agent step did not complete cleanly: ${result.reason}. The Minesweeper starter is still in place.`)
         if (result.buildError) p.note(result.buildError.trimEnd().split("\n").slice(-40).join("\n"), "Last build error")
@@ -436,7 +462,7 @@ export const gameCreate = async (opts: CreateOptions) => {
 
       if (extras.length > 0) {
         p.log.step(`Applying optional skills: ${extras.map((s) => s.name).join(", ")}`)
-        await runSelectedSkills(selectedAgent, gameDir, buildRepoContext(repo, repoType), extras)
+        await runSelectedSkills(ctx, extras)
       }
     }
   }
@@ -446,7 +472,6 @@ export const gameCreate = async (opts: CreateOptions) => {
   writeSchemaHint(gameDir, effectiveRepoRoot)
 
   // Done
-  const pm = opts.pm || repo.packageManager
   const runCmd = pm === "npm" ? "npx" : pm === "yarn" ? "yarn dlx" : "pnpm dlx"
   const relativePath = path.relative(process.cwd(), gameDir)
 
@@ -457,3 +482,7 @@ export const gameCreate = async (opts: CreateOptions) => {
 
   p.outro(`Done! Your game is in ./${relativePath}/`)
 }
+
+/** `--pm` arrives as a plain string; anything unexpected falls back to the repo's own manager */
+const packageManagerFrom = (value: string | undefined, fallback: PackageManagerName): PackageManagerName =>
+  value === "npm" || value === "yarn" || value === "pnpm" ? value : fallback

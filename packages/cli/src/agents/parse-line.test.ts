@@ -8,14 +8,19 @@ import { parseGeminiLine } from "./gemini.js"
 import { mapOpencodeEvent } from "./opencode.js"
 import type { AgentEvent } from "./types.js"
 
-/** Reads a fixture .jsonl, running `parser` over each line and keeping the non-null events. */
-const parseFixture = (name: string, parser: (line: string) => AgentEvent | null): AgentEvent[] => {
+type LineParser = (line: string) => AgentEvent | AgentEvent[] | null
+
+/** Reads a fixture .jsonl, running `parser` over each line and keeping the events it yields. */
+const parseFixture = (name: string, parser: LineParser): AgentEvent[] => {
   const raw = fs.readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), "utf-8")
   return raw
     .split("\n")
     .filter((l) => l.trim())
-    .map(parser)
-    .filter((e): e is AgentEvent => e !== null)
+    .flatMap((line) => {
+      const parsed = parser(line)
+      if (!parsed) return []
+      return Array.isArray(parsed) ? parsed : [parsed]
+    })
 }
 
 describe("parseClaudeLine (real capture)", () => {
@@ -24,10 +29,38 @@ describe("parseClaudeLine (real capture)", () => {
       { type: "system", text: "Session started" },
       { type: "text", text: "p" },
       { type: "text", text: "ong" },
-      { type: "tool_use", name: "Write", summary: "" },
+      { type: "tool_use", name: "Write", summary: "/tmp/game/ping.txt" },
       { type: "tool_result", ok: true, summary: "Created /tmp/game/ping.txt" },
       { type: "result", ok: true, costUSD: 0.061597 },
     ])
+  })
+
+  // content_block_start announces each tool with an empty `input`, so a summary can only come
+  // from the assistant message. Two Bash calls in one turn also exercise the multi-event return.
+  it("summarizes bash commands and surfaces failed tools", () => {
+    const events = parseFixture("claude-bash.jsonl", parseClaudeLine)
+    expect(events.filter((e) => e.type !== "text" && e.type !== "thinking")).toEqual([
+      { type: "system", text: "Session started" },
+      { type: "tool_use", name: "Bash", summary: "ls -la" },
+      { type: "tool_use", name: "Bash", summary: "node --version" },
+      { type: "tool_result", ok: true, summary: "(Bash completed with no output)" },
+      { type: "tool_result", ok: true, summary: "v24.19.0" },
+      { type: "tool_use", name: "Write", summary: "/tmp/game/notes.txt" },
+      { type: "tool_result", ok: true, summary: "Created /tmp/game/notes.txt" },
+      { type: "tool_use", name: "Bash", summary: "cat /nope/missing.txt" },
+      { type: "tool_result", ok: false, summary: "Exit code 1 cat: /nope/missing.txt: No such file or directory" },
+      { type: "result", ok: true, costUSD: 0.072234 },
+    ])
+  })
+
+  it("keeps multi-line commands and output on one line", () => {
+    const toolUse = parseClaudeLine(
+      JSON.stringify({
+        type: "assistant",
+        message: { content: [{ type: "tool_use", name: "Bash", input: { command: "cat <<'EOF' > a.txt\nhello\nEOF" } }] },
+      }),
+    )
+    expect(toolUse).toEqual([{ type: "tool_use", name: "Bash", summary: "cat <<'EOF' > a.txt hello EOF" }])
   })
 })
 
@@ -92,8 +125,9 @@ describe("mapOpencodeEvent (SSE objects, not JSONL)", () => {
 // Contract shared by every line-based adapter: parsing never throws, unknown
 // lines are dropped (not crashed on), and a transcript ends in exactly one result.
 describe("parser contract", () => {
-  const cases: [string, string, (line: string) => AgentEvent | null][] = [
+  const cases: [string, string, LineParser][] = [
     ["claude", "claude.jsonl", parseClaudeLine],
+    ["claude (bash)", "claude-bash.jsonl", parseClaudeLine],
     ["codex", "codex.jsonl", parseCodexLine],
     ["gemini", "gemini.jsonl", parseGeminiLine],
     ["copilot", "copilot.jsonl", parseCopilotLine],

@@ -12,7 +12,16 @@ export const copilotAgent: Agent = {
     runStreamJsonCli(
       {
         cmd: "copilot",
-        buildArgs: (prompt) => ["-p", prompt, "--output-format", "json", "--stream", "on", "--allow-all-tools"],
+        buildArgs: (prompt, session) => [
+          "-p",
+          prompt,
+          "--output-format",
+          "json",
+          "--stream",
+          "on",
+          "--allow-all-tools",
+          ...(session?.started ? ["--continue"] : []),
+        ],
         parseLine: parseCopilotLine,
       },
       input,

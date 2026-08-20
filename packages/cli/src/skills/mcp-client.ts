@@ -77,6 +77,17 @@ export const listMcpPrompts = async (gameDir: string): Promise<{ name: string; d
   }
 }
 
+/** Skill docs are immutable for the length of a run, so a retry never refetches one */
+const promptCache = new Map<string, Promise<string>>()
+
+/**
+ * Warms the cache for every skill a pipeline will need, in parallel, so steps don't
+ * each pay a round trip mid-run. Failures are left for the step itself to report.
+ */
+export const prefetchSkillPrompts = async (stepNames: string[], gameDir: string): Promise<void> => {
+  await Promise.all([...new Set(stepNames)].map((name) => fetchSkillPrompt(name, gameDir).catch(() => undefined)))
+}
+
 /** Fetches a step's instructions from the MCP server configured in .mcp.json */
 export const fetchSkillPrompt = async (stepName: string, gameDir: string): Promise<string> => {
   const config = readMcpConfig(gameDir)
@@ -85,6 +96,19 @@ export const fetchSkillPrompt = async (stepName: string, gameDir: string): Promi
   const server = Object.values(config.mcpServers)[0]
   if (!server) throw new Error("No MCP server configured in .mcp.json")
 
+  const cacheKey = `${server.url}|${stepName}`
+  const cached = promptCache.get(cacheKey)
+  if (cached) return cached
+
+  const pending = requestSkillPrompt(server, stepName)
+  promptCache.set(cacheKey, pending)
+  // A failed fetch shouldn't be remembered — the next attempt should try the network again.
+  pending.catch(() => promptCache.delete(cacheKey))
+  return pending
+}
+
+/** Performs the uncached prompts/get round trip and flattens the response to text */
+const requestSkillPrompt = async (server: { url: string; headers?: Record<string, string> }, stepName: string): Promise<string> => {
   const result = await mcpRequest(server.url, server.headers ?? {}, "prompts/get", { name: stepName })
   if (!result?.messages?.length) throw new Error(`MCP server returned no instructions for "${stepName}"`)
 

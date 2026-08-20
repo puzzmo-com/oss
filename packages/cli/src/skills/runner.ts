@@ -1,25 +1,23 @@
 import fs from "node:fs"
 import path from "node:path"
 
-import { getAgent } from "../agents/index.js"
-import { skillsPipeline, type SkillDefinition } from "./registry.js"
-import { verifyBuild, runCommand, gitCommit } from "../util/exec.js"
-import { fetchSkillPrompt } from "./mcp-client.js"
-import { runPipelineTUI } from "../tui/pipeline.js"
-
-const agentTimeoutMs = 300000 // 5 minute timeout per agent invocation
-
-/** Fetches step instructions from the MCP server and wraps them as an agent prompt */
-const buildPrompt = async (stepName: string, gameDir: string, repoContext: string): Promise<string> => {
-  const instructions = await fetchSkillPrompt(stepName, gameDir)
-  return `Follow these instructions. The game source is in the current directory.\n\n${repoContext}\n\n${instructions}`
-}
+import { getAgent, type AgentSession } from "../agents/index.js"
+import { type PipelineStep, type SkillDefinition } from "./registry.js"
+import { verifyBuild } from "../util/exec.js"
+import { formatDuration } from "../util/duration.js"
+import { agentIdleTimeoutMs, buildStepPrompt, commitStep, resetSession, type PipelineContext } from "./step.js"
 
 /**
  * Invokes an LLM agent with a prompt, streaming its text and tool activity to the console.
  * When `transcript` is provided, an ANSI-stripped copy of everything printed is appended to it.
  */
-const invokeAgent = async (agentName: string, prompt: string, cwd: string, transcript?: string[]): Promise<boolean> => {
+const invokeAgent = async (
+  agentName: string,
+  prompt: string,
+  cwd: string,
+  session?: AgentSession,
+  transcript?: string[],
+): Promise<boolean> => {
   const agent = getAgent(agentName)
   if (!agent) {
     const line = `  Unknown agent: ${agentName}`
@@ -28,6 +26,7 @@ const invokeAgent = async (agentName: string, prompt: string, cwd: string, trans
     return false
   }
 
+  const started = Date.now()
   let resultOk: boolean | null = null
   let sawError = false
   let midLine = false
@@ -55,7 +54,7 @@ const invokeAgent = async (agentName: string, prompt: string, cwd: string, trans
   }
 
   try {
-    for await (const event of agent.run({ prompt, cwd, signal: AbortSignal.timeout(agentTimeoutMs) })) {
+    for await (const event of agent.run({ prompt, cwd, session, idleTimeoutMs: agentIdleTimeoutMs })) {
       if (event.type === "text") {
         process.stdout.write(dim(event.text))
         midLine = !event.text.endsWith("\n")
@@ -71,8 +70,8 @@ const invokeAgent = async (agentName: string, prompt: string, cwd: string, trans
         printLine(`  ${dim(event.text)}`)
       } else if (event.type === "result") {
         resultOk = event.ok
-        const cost = event.costUSD != null ? ` ($${event.costUSD.toFixed(4)})` : ""
-        printLine((event.ok ? green : red)(`  Agent finished${cost}`))
+        const cost = event.costUSD != null ? `, $${event.costUSD.toFixed(4)}` : ""
+        printLine((event.ok ? green : red)(`  Agent finished in ${formatDuration(Date.now() - started)}${cost}`))
       } else if (event.type === "error") {
         sawError = true
         printLine(red(`  ${event.message}`))
@@ -85,75 +84,28 @@ const invokeAgent = async (agentName: string, prompt: string, cwd: string, trans
   endLine()
   flushBuf()
 
-  return resultOk ?? !sawError
-}
-
-/** Runs the skills pipeline with plain console output (no TUI) */
-export const runSkillsPipeline = async (agent: string, gameDir: string, repoContext: string) => {
-  const total = skillsPipeline.length
-
-  for (let i = 0; i < total; i++) {
-    const skill = skillsPipeline[i]
-    const step = i + 1
-    console.log(`[${step}/${total}] Running step: ${skill.name}`)
-
-    const prompt = await buildPrompt(skill.name, gameDir, repoContext)
-    let success = await invokeAgent(agent, prompt, gameDir)
-
-    if (!success) {
-      console.log(`  Agent failed, retrying...`)
-      success = await invokeAgent(agent, prompt, gameDir)
-      if (!success) {
-        console.error(`  Step ${skill.name} failed after retry. Stopping pipeline.`)
-        process.exit(1)
-      }
-    }
-
-    // Verify build
-    const buildResult = verifyBuild(gameDir)
-    if (!buildResult.success) {
-      console.log(`  Build failed after ${skill.name}, asking agent to fix...`)
-      const fixPrompt = `The vite build failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.error}`
-      await invokeAgent(agent, fixPrompt, gameDir)
-
-      const retryBuild = verifyBuild(gameDir)
-      if (!retryBuild.success) {
-        console.error(`  Build still failing after fix attempt. Stopping.`)
-        process.exit(1)
-      }
-    }
-
-    // Commit
-    try {
-      runCommand("git add -A", { cwd: gameDir })
-      gitCommit(`step: ${skill.name}`, { cwd: gameDir })
-      console.log(`  Committed.`)
-    } catch {
-      console.log(`  No changes to commit.`)
-    }
-  }
-
-  console.log(`\nAll skills completed!`)
-}
-
-/** Runs the skills pipeline with a split-pane TUI */
-export const runSkillsPipelineTUI = async (agent: string, gameDir: string, repoContext: string) => {
-  await runPipelineTUI(agent, gameDir, repoContext)
+  const ok = resultOk ?? !sawError
+  if (ok && session) session.started = true
+  return ok
 }
 
 /** Runs a chosen subset of skills (the optional add-ons after the prompt flow); warns but never exits on failure */
-export const runSelectedSkills = async (agent: string, gameDir: string, repoContext: string, skills: SkillDefinition[]) => {
+export const runSelectedSkills = async (ctx: PipelineContext, skills: SkillDefinition[]) => {
   const total = skills.length
+  const startedAll = Date.now()
 
   for (let i = 0; i < total; i++) {
     const skill = skills[i]
+    const startedStep = Date.now()
     console.log(`[${i + 1}/${total}] Running step: ${skill.name}`)
 
-    const prompt = await buildPrompt(skill.name, gameDir, repoContext)
-    let success = await invokeAgent(agent, prompt, gameDir)
+    const step: PipelineStep = { name: skill.name, skills: [skill.name], preamble: "Follow these instructions." }
+    const prompt = await buildStepPrompt(step, ctx)
+    let success = await invokeAgent(ctx.agent, prompt, ctx.gameDir, ctx.session)
     if (!success) {
       console.log(`  Agent failed, retrying...`)
-      success = await invokeAgent(agent, prompt, gameDir)
+      resetSession(ctx.session)
+      success = await invokeAgent(ctx.agent, prompt, ctx.gameDir, ctx.session)
     }
     if (!success) {
       console.error(`  Step ${skill.name} did not complete cleanly, skipping.`)
@@ -161,21 +113,19 @@ export const runSelectedSkills = async (agent: string, gameDir: string, repoCont
     }
 
     // Verify build; ask the agent to fix but keep going regardless
-    const buildResult = verifyBuild(gameDir)
+    const buildResult = await verifyBuild(ctx.gameDir, ctx.buildCmd)
     if (!buildResult.success) {
       console.log(`  Build failed after ${skill.name}, asking agent to fix...`)
-      const fixPrompt = `The vite build failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.error}`
-      await invokeAgent(agent, fixPrompt, gameDir)
+      const fixPrompt = `The build (${ctx.buildCmd}) failed after the "${skill.name}" step. Fix the build errors:\n\n${buildResult.error}`
+      await invokeAgent(ctx.agent, fixPrompt, ctx.gameDir, ctx.session)
     }
 
-    try {
-      runCommand("git add -A", { cwd: gameDir })
-      gitCommit(`step: ${skill.name}`, { cwd: gameDir })
-      console.log(`  Committed.`)
-    } catch {
-      console.log(`  No changes to commit.`)
-    }
+    const committed = await commitStep(ctx.gameDir, skill.name)
+    console.log(committed ? "  Committed." : "  No changes to commit.")
+    console.log(`  ${skill.name} took ${formatDuration(Date.now() - startedStep)}`)
   }
+
+  if (total > 0) console.log(`Optional skills finished in ${formatDuration(Date.now() - startedAll)}`)
 }
 
 /**
@@ -185,7 +135,8 @@ export const runSelectedSkills = async (agent: string, gameDir: string, repoCont
 export type BuildLoopResult = { ok: true; logPath: string } | { ok: false; reason: string; buildError?: string; logPath: string }
 
 /** Runs a single agent invocation, verifies the build, and commits. Used by one-shot prompt-driven flows. */
-export const runAgentWithBuildLoop = async (agent: string, prompt: string, gameDir: string, label: string): Promise<BuildLoopResult> => {
+export const runAgentWithBuildLoop = async (ctx: PipelineContext, prompt: string, label: string): Promise<BuildLoopResult> => {
+  const started = Date.now()
   const transcript: string[] = []
   // Print to the console and record the same line to the run transcript.
   const say = (line: string) => {
@@ -194,40 +145,38 @@ export const runAgentWithBuildLoop = async (agent: string, prompt: string, gameD
   }
 
   say(`Running agent: ${label}`)
-  let success = await invokeAgent(agent, prompt, gameDir, transcript)
+  let success = await invokeAgent(ctx.agent, prompt, ctx.gameDir, ctx.session, transcript)
   if (!success) {
     say(`  Agent failed, retrying...`)
-    success = await invokeAgent(agent, prompt, gameDir, transcript)
+    resetSession(ctx.session)
+    success = await invokeAgent(ctx.agent, prompt, ctx.gameDir, ctx.session, transcript)
     if (!success) {
       say(`  Agent failed after retry. Stopping.`)
-      const logPath = writeRunLog(gameDir, label, transcript)
+      const logPath = writeRunLog(ctx.gameDir, label, transcript)
       return { ok: false, reason: "the agent did not finish successfully after two attempts", logPath }
     }
   }
 
-  const buildResult = verifyBuild(gameDir)
+  const buildStarted = Date.now()
+  const buildResult = await verifyBuild(ctx.gameDir, ctx.buildCmd)
+  say(dim(`  Build took ${formatDuration(Date.now() - buildStarted)}`))
   if (!buildResult.success) {
     say(`  Build failed, asking agent to fix...`)
     recordBuildError(say, buildResult.error)
-    const fixPrompt = `The vite build failed after the "${label}" step. Fix the build errors:\n\n${buildResult.error}`
-    await invokeAgent(agent, fixPrompt, gameDir, transcript)
-    const retry = verifyBuild(gameDir)
+    const fixPrompt = `The build (${ctx.buildCmd}) failed after the "${label}" step. Fix the build errors:\n\n${buildResult.error}`
+    await invokeAgent(ctx.agent, fixPrompt, ctx.gameDir, ctx.session, transcript)
+    const retry = await verifyBuild(ctx.gameDir, ctx.buildCmd)
     if (!retry.success) {
       say(`  Build still failing after fix attempt.`)
       recordBuildError(say, retry.error)
-      const logPath = writeRunLog(gameDir, label, transcript)
-      return { ok: false, reason: "the vite build is still failing after the agent's fix attempt", buildError: retry.error, logPath }
+      const logPath = writeRunLog(ctx.gameDir, label, transcript)
+      return { ok: false, reason: "the build is still failing after the agent's fix attempt", buildError: retry.error, logPath }
     }
   }
 
-  try {
-    runCommand("git add -A", { cwd: gameDir })
-    gitCommit(`step: ${label}`, { cwd: gameDir })
-    say(`  Committed.`)
-  } catch {
-    say(`  No changes to commit.`)
-  }
-  return { ok: true, logPath: writeRunLog(gameDir, label, transcript) }
+  say((await commitStep(ctx.gameDir, label)) ? "  Committed." : "  No changes to commit.")
+  say(`  ${label} finished in ${formatDuration(Date.now() - started)}`)
+  return { ok: true, logPath: writeRunLog(ctx.gameDir, label, transcript) }
 }
 
 /** Emits captured build output via `say`, trimmed to the trailing lines that usually hold the actual error */
