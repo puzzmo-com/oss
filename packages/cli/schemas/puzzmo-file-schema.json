@@ -273,6 +273,11 @@
           "const": true,
           "description": "This leaderboard is only submitted to via a post-completion checkpoint, not during the normal completion pipeline. We use this for games which have secret metagames which occur after the game has been completed."
         },
+        "hidden": {
+          "type": "boolean",
+          "const": true,
+          "description": "This leaderboard is not shown in the default listings. Records still get posted to it as normal, but it only becomes visible for a play where the game named its stableID in `showLeaderboards` at completion. Lets a game pick which of its extra leaderboards are worth showing for a given play."
+        },
         "displayName": {
           "type": "string",
           "description": "What do we call this datum"

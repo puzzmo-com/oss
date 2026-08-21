@@ -104,6 +104,14 @@ export type GameCompletedPlay = Omit<GamePlay, "boardState" | "elapsedTimeSecs" 
 /** Things the server uses for meta-game augmentations */
 export type AugmentationConfig = {
   deeds?: Deed[] | Readonly<Deed[]>
+  /**
+   * StableIDs of leaderboards declared with `hidden: true` that this play should surface. Lets a game pick which of
+   * its extra leaderboards are worth showing for a given play. Only read at completion — ignored at checkpoints.
+   *
+   * Each stableID must belong to a leaderboard this game declared as `hidden: true` in its augmentations; anything
+   * else is dropped server-side, as is anything past the first 12.
+   */
+  showLeaderboards?: string[] | readonly string[]
 }
 
 export type CheckpointConfig = {
@@ -567,6 +575,8 @@ export type MessagesSentFromEmbed = {
     config?: {
       /** Interesting values from the game used for scoring and stats (e.g. points, time). */
       deeds?: Deed[] | readonly Deed[]
+      /** StableIDs of leaderboards declared with `hidden: true` that this play should surface. */
+      showLeaderboards?: string[] | readonly string[]
     }
   }
   /** Ask the host to show the post-game completion screen. Send after `GAME_COMPLETED`. */
