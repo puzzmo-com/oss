@@ -5,8 +5,10 @@ import { getAgent, type Agent, type AgentEvent } from "../agents/index.js"
 import type { PipelineStep } from "../skills/registry.js"
 import { prefetchSkillPrompts } from "../skills/mcp-client.js"
 import { agentIdleTimeoutMs, buildStepPrompt, commitStep, resetSession, type PipelineContext } from "../skills/step.js"
+import { collapseRepeats, foldTailRepeat, type RepeatableLine } from "../util/collapseRepeats.js"
 import { verifyBuild } from "../util/exec.js"
 import { formatDuration, formatElapsed } from "../util/duration.js"
+import { mascotLarge, mascotSmall, pickMascot, type Mascot } from "../util/mascot.js"
 
 type StepState = "pending" | "running" | "success" | "failed" | "skipped"
 type Phase = "agent" | "build" | "commit" | "idle"
@@ -80,7 +82,7 @@ class PipelineTUI {
   private currentStep = 0
   private phase: Phase = "idle"
   private done = false
-  private outputLines: string[] = []
+  private outputLines: RepeatableLine[] = []
   private currentLine = ""
   private chatLines: string[] = []
   private renderScheduled = false
@@ -136,9 +138,18 @@ class PipelineTUI {
   /** Lock the in-progress streaming line as a complete entry. */
   private lockCurrent() {
     if (this.currentLine.length === 0) return
-    this.outputLines.push(this.currentLine)
-    this.chatLines.push(stripAnsi(this.currentLine))
+    this.pushLine(this.currentLine)
     this.currentLine = ""
+  }
+
+  /**
+   * Appends one finished line to the pane, folding it into the block above when it
+   * repeats. The log keeps every line — `writeSkillLog` folds its own copy.
+   */
+  private pushLine(text: string) {
+    this.outputLines.push({ text, reps: 1 })
+    this.chatLines.push(stripAnsi(text))
+    foldTailRepeat(this.outputLines)
   }
 
   /**
@@ -166,10 +177,7 @@ class PipelineTUI {
   private appendLines(lines: string[]) {
     if (lines.length === 0) return
     this.lockCurrent()
-    for (const line of lines) {
-      this.outputLines.push(line)
-      this.chatLines.push(stripAnsi(line))
-    }
+    for (const line of lines) this.pushLine(line)
     if (this.outputLines.length > 1000) this.outputLines = this.outputLines.slice(-this.contentRows * 4)
     this.scheduleRender()
   }
@@ -193,6 +201,9 @@ class PipelineTUI {
 
     buf += moveTo(3, 1)
     buf += "├" + "─".repeat(sidebarWidth - 2) + "┼" + "─".repeat(outputWidth) + "┤"
+
+    const mascot = this.sidebarMascot()
+    const mascotTop = mascot ? contentRows - mascot.height : -1
 
     for (let row = 0; row < contentRows; row++) {
       buf += moveTo(row + 4, 1)
@@ -221,22 +232,49 @@ class PipelineTUI {
           : dim(`${completedCount}/${this.steps.length} done`)
         const rawLen = stripAnsi(status).length
         buf += "│ " + status + " ".repeat(Math.max(0, sidebarWidth - rawLen - 3)) + "│"
+      } else if (mascot && row >= mascotTop) {
+        // Art rows are exactly mascot.width columns wide, so only the right pad varies.
+        buf += "│ " + mascot.lines[row - mascotTop] + " ".repeat(Math.max(0, sidebarWidth - mascot.width - 3)) + "│"
       } else {
         buf += "│" + " ".repeat(sidebarWidth - 2) + "│"
       }
 
       const visibleCount = this.outputLines.length + (this.currentLine.length > 0 ? 1 : 0)
       const lineIndex = visibleCount - contentRows + row
-      const rawLine = lineIndex < 0 ? "" : lineIndex < this.outputLines.length ? (this.outputLines[lineIndex] ?? "") : this.currentLine
-      const truncated = truncateVisible(rawLine, outputWidth - 2)
-      const visibleLen = stripAnsi(truncated).length
-      buf += " " + truncated + " ".repeat(Math.max(0, outputWidth - visibleLen - 1)) + "│"
+      const entry = this.outputLines[lineIndex]
+      const width = outputWidth - 2
+      const rendered =
+        lineIndex < 0
+          ? ""
+          : lineIndex < this.outputLines.length
+            ? entry
+              ? displayLine(entry, width)
+              : ""
+            : truncateVisible(this.currentLine, width)
+      const visibleLen = stripAnsi(rendered).length
+      // Truncation can land before a line's own reset, so close the row explicitly —
+      // otherwise the style bleeds through the border into the next row's sidebar.
+      buf += " " + rendered + reset() + " ".repeat(Math.max(0, outputWidth - visibleLen - 1)) + "│"
     }
 
     buf += moveTo(rows, 1)
     buf += "╰" + "─".repeat(sidebarWidth - 2) + "┴" + "─".repeat(outputWidth) + "╯"
 
     this.write(buf)
+  }
+
+  /**
+   * The biggest mascot that fits in the sidebar below the step list, or null when
+   * there is no room. Reserves a blank row above it so it never abuts the status line.
+   */
+  private sidebarMascot(): Mascot | null {
+    const free = this.contentRows - (this.steps.length + 2)
+    const room = this.sidebarWidth - 3
+    for (const candidate of [mascotLarge, mascotSmall]) {
+      const art = pickMascot(candidate)
+      if (art && art.height + 1 <= free && art.width <= room) return art
+    }
+    return null
   }
 
   /** Runs the agent, continuing the pipeline's conversation unless `cold` asks for a fresh one. */
@@ -385,7 +423,7 @@ class PipelineTUI {
   private writeSkillLog(skillName: string) {
     const logPath = path.join(this.logsDir, `${skillName}.txt`)
     const timing = `Timing: agent ${formatDuration(this.agentMs)}, build ${formatDuration(this.buildMs)}`
-    fs.writeFileSync(logPath, [...this.chatLines, "", timing].join("\n") + "\n")
+    fs.writeFileSync(logPath, [...collapseRepeats(this.chatLines), "", timing].join("\n") + "\n")
   }
 
   /** Prints where the run's time went, once the full-screen view has been torn down */
@@ -456,6 +494,16 @@ class PipelineTUI {
     this.cleanup()
     this.printSummary(Date.now() - startedAll)
   }
+}
+
+/**
+ * Renders a pane line inside `width` columns, tagging it with its repeat count once it
+ * has folded. The tag is appended after truncation so a long line can't push it off the edge.
+ */
+const displayLine = (line: RepeatableLine, width: number): string => {
+  if (line.reps < 2) return truncateVisible(line.text, width)
+  const tag = ` (x ${line.reps})`
+  return truncateVisible(line.text, Math.max(0, width - tag.length)) + dim(tag)
 }
 
 /** Truncate a string to a visible width, preserving ANSI codes. */

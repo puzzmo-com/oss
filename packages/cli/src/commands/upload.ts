@@ -17,6 +17,7 @@ import {
 import { createUserGame } from "../util/createGame.js"
 import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
 import { lintPuzzmoFile } from "../util/lintPuzzmoFile.js"
+import { mascotSmall, pickMascot } from "../util/mascot.js"
 import { slugify } from "../util/slugify.js"
 
 type UploadOptions = {
@@ -235,29 +236,14 @@ const plural = (n: number, singular: string, pluralForm?: string): string => `${
 const isDefaultServer = (source: string): boolean => normalizeSource(source) === normalizeSource(defaultSource)
 
 const yellow = (s: string): string => (process.stdout.isTTY ? `\x1b[33m${s}\x1b[0m` : s)
-const blackOnYellow = (s: string): string => (process.stdout.isTTY ? `\x1b[30;43m${s}\x1b[0m` : s)
 
-const puzzmonautLines = [
-  ` ${yellow("▟████▙")}`,
-  ` ${yellow("██")}${blackOnYellow("▝ ▘ ")} ${yellow("██")}`,
-  `${yellow(" ██")}${blackOnYellow(" ▄▖")}${yellow("██")}`,
-  ` ${yellow("▝▀▀▀▀▘")}`,
-]
-
-// oxlint-disable-next-line no-control-regex
-const visualWidth = (s: string): number => s.replace(/\u001b\[[0-9;]*m/g, "").length
-
-/** Renders the puzzmonaut with message lines vertically centered to its right. */
+/** Renders the puzzmonaut with message lines vertically centered to its right, or bare text in a log. */
 const puzzmonautSays = (messages: string[]): string => {
-  const iconWidth = Math.max(...puzzmonautLines.map(visualWidth))
-  const startRow = Math.max(0, Math.floor((puzzmonautLines.length - messages.length) / 2))
-  return puzzmonautLines
-    .map((line, i) => {
-      const pad = " ".repeat(iconWidth - visualWidth(line))
-      const msg = messages[i - startRow] ?? ""
-      return `${line}${pad}  ${msg}`.trimEnd()
-    })
-    .join("\n")
+  const mascot = pickMascot(mascotSmall)
+  if (!mascot) return messages.join("\n")
+  const startRow = Math.max(0, Math.floor((mascot.height - messages.length) / 2))
+  // Every art row is exactly mascot.width columns, so the text aligns without padding.
+  return mascot.lines.map((line, i) => `${line}  ${messages[i - startRow] ?? ""}`.trimEnd()).join("\n")
 }
 
 /** Collects all files in a directory recursively */

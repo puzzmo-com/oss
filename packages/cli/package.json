@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc",
     "type-check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "demo-tui": "tsc && node scripts/demo-tui.mjs"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
