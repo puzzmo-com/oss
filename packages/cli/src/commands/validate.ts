@@ -2,6 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 
 import { discoverGames } from "../util/discoverGames.js"
+import { lintDist } from "../util/lintDist.js"
 import { lintPuzzmoFile } from "../util/lintPuzzmoFile.js"
 
 /** CLI command: puzzmo games validate [dir] — discovers every puzzmo.json under dir and validates each */
@@ -19,14 +20,21 @@ export const validate = async (dir: string) => {
     process.exit(1)
   }
 
+  let failed = 0
   for (const game of games) {
     const rel = path.relative(rootDir, game.puzzmoJsonPath) || game.puzzmoJsonPath
     const integrations = game.puzzmoFile.integrations ? Object.keys(game.puzzmoFile.integrations) : []
     const distRel = path.relative(rootDir, game.distDir) || game.distDir
-    console.log(`OK   ${game.puzzmoFile.game.slug.padEnd(24)} (${rel})`)
-    console.log(`     dist: ${distRel}`)
-    if (integrations.length) console.log(`     integrations: ${integrations.join(", ")}`)
-    for (const warning of lintPuzzmoFile(game.puzzmoFile)) console.log(`     warning: ${warning}`)
+    // The puzzmo.json can be perfect while the build it points at is not, so dist decides the verdict.
+    const distErrors = lintDist(game.distDir)
+    if (distErrors.length) failed++
+    const status = distErrors.length ? "FAIL" : "OK  "
+    const log = distErrors.length ? console.error : console.log
+    log(`${status} ${game.puzzmoFile.game.slug.padEnd(24)} (${rel})`)
+    log(`     dist: ${distRel}`)
+    if (integrations.length) log(`     integrations: ${integrations.join(", ")}`)
+    for (const e of distErrors) console.error(`     ${e}`)
+    for (const warning of lintPuzzmoFile(game.puzzmoFile)) log(`     warning: ${warning}`)
   }
 
   for (const err of errors) {
@@ -36,6 +44,7 @@ export const validate = async (dir: string) => {
     for (const e of err.errors) console.error(`     ${e}`)
   }
 
-  console.log(`\n${games.length} valid, ${errors.length} invalid`)
-  if (errors.length) process.exit(1)
+  const invalid = errors.length + failed
+  console.log(`\n${games.length - failed} valid, ${invalid} invalid`)
+  if (invalid) process.exit(1)
 }

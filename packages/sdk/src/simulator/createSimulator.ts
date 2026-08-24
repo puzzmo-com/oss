@@ -4,6 +4,7 @@ import { simulatorStyles } from "./styles"
 import { createInitialState, persistCollapsed, persistTab } from "./state"
 import { sendToGame, createMessageListener, createMessageLogger } from "./messaging"
 import { parseFixtures } from "./fixtures"
+import { simulatorBuildMarker } from "./marker"
 import {
   createCtrlView,
   createDataView,
@@ -147,6 +148,8 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   // Create the Simulator UI container
   const container = document.createElement("div")
   container.id = "simulator"
+  // Static sentinel for `puzzmo games validate`, which greps dist for a simulator that got shipped.
+  container.dataset.puzzmoBuild = simulatorBuildMarker
   container.innerHTML = `
     <style>${simulatorStyles}</style>
     <div id="simulator-panel" class="${state.isCollapsed ? "collapsed" : ""}">

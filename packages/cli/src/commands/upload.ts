@@ -16,6 +16,7 @@ import {
 } from "../util/config.js"
 import { createUserGame } from "../util/createGame.js"
 import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
+import { lintDist } from "../util/lintDist.js"
 import { lintPuzzmoFile } from "../util/lintPuzzmoFile.js"
 import { mascotSmall, pickMascot } from "../util/mascot.js"
 import { slugify } from "../util/slugify.js"
@@ -167,6 +168,10 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
     throw new Error(
       `No index.html at the root of ${distDir} — the game is served from index.html, so it can't go live without it. Check your build output.`,
     )
+
+  // These break the game once it is live, so stop before any bytes go up rather than warning after.
+  const distErrors = lintDist(distDir)
+  if (distErrors.length) throw new Error(distErrors.join("\n  "))
 
   let totalBytes = 0
   for (const file of files) totalBytes += fs.statSync(file).size
