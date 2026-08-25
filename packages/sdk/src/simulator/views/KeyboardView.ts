@@ -1,5 +1,7 @@
 import type { KeyboardConfig } from "../../types"
 import type { SimulatorContext, SimulatorView } from "../types"
+import { createDockedKeyboard, dockedKeyboardHeight, type DockedKeyboard } from "../dockedKeyboard"
+import { persistKeyboardDocked } from "../state"
 
 /** Renders a single keyboard key as an HTML button string */
 const renderKey = (char: string, config: KeyboardConfig): string => {
@@ -39,10 +41,15 @@ const renderKeyboard = (config: KeyboardConfig): string => {
 
 export function createKeyboardView(): SimulatorView {
   let currentConfig: KeyboardConfig | null = null
+  let docked: DockedKeyboard | null = null
 
-  const renderContent = (): string => {
+  const renderContent = (isDocked: boolean): string => {
     if (!currentConfig) {
       return '<div class="sim-kb-empty">No keyboard config received from game yet.<br>The game calls <code>sdk.keyboard.show(config)</code> to display a keyboard.</div>'
+    }
+    // While the dock is up it is the live keyboard; a second set of keys here would just be a copy.
+    if (isDocked) {
+      return `<div class="sim-kb-empty">Shown under the game at production size, taking ${dockedKeyboardHeight}px off the bottom.<br>Uncheck to preview the layout here instead.</div>`
     }
     return renderKeyboard(currentConfig)
   }
@@ -54,14 +61,35 @@ export function createKeyboardView(): SimulatorView {
     render() {
       return `
         <div class="keyboard-view-container">
+          <div class="simulator-field">
+            <label class="sim-settings-row">
+              <input type="checkbox" id="sim-kb-dock" />
+              <span class="simulator-label">Show keyboard under game</span>
+            </label>
+          </div>
           <div id="sim-kb-content">
-            ${renderContent()}
+            ${renderContent(false)}
           </div>
         </div>
       `
     },
 
     bind(ctx: SimulatorContext) {
+      // Created once. The Theme tab reloads the page on change, so the theme captured here holds.
+      docked ??= createDockedKeyboard({ theme: ctx.state.selectedTheme, sendToGame: ctx.sendToGame })
+      docked.setEnabled(ctx.state.keyboardDocked)
+
+      const checkbox = ctx.getElement<HTMLInputElement>("#sim-kb-dock")
+      if (checkbox) {
+        checkbox.checked = ctx.state.keyboardDocked
+        checkbox.addEventListener("change", () => {
+          ctx.state.keyboardDocked = checkbox.checked
+          persistKeyboardDocked(checkbox.checked)
+          docked?.setEnabled(checkbox.checked)
+          renderPanel(ctx)
+        })
+      }
+
       bindKeyClicks(ctx)
     },
 
@@ -70,14 +98,19 @@ export function createKeyboardView(): SimulatorView {
       const isEmpty = !data?.layout?.length || data.layout.every((r: string | null) => !r)
       currentConfig = isEmpty ? null : (data as KeyboardConfig)
 
-      const content = ctx.getElement<HTMLElement>("#sim-kb-content")
-      if (content) {
-        content.innerHTML = renderContent()
-        bindKeyClicks(ctx)
-      }
+      docked?.setConfig(currentConfig)
+      renderPanel(ctx)
 
-      ctx.updateBadge("kbd", currentConfig ? undefined : undefined)
+      // No badge update needed for the keyboard tab.
     },
+  }
+
+  /** Re-render the tab's own content (not the dock) and rebind its keys. */
+  function renderPanel(ctx: SimulatorContext) {
+    const content = ctx.getElement<HTMLElement>("#sim-kb-content")
+    if (!content) return
+    content.innerHTML = renderContent(ctx.state.keyboardDocked)
+    bindKeyClicks(ctx)
   }
 }
 

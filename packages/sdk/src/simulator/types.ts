@@ -69,6 +69,8 @@ export interface SimulatorState {
   previewKind: PreviewKind
   /** The player's settings for this game, persisted to localStorage and sent in READY_DATA */
   gameSettings: Record<string, any>
+  /** True when the Kbd tab is drawing the on-screen keyboard under the game at production size */
+  keyboardDocked: boolean
   /** The settings UI description from the game's INITIALIZE_SETTINGS, null until received */
   settingsComponents: GameSettingsUIComponents[] | null
   /** The resolved `hostContext` sent in READY_DATA: Host-tab override > config > default app context */

@@ -13,6 +13,7 @@ const storageKeys = {
   previewKind: "simulator-preview-kind",
   gameSettings: "simulator-game-settings",
   hostContext: "simulator-host-context",
+  keyboardDocked: "simulator-keyboard-docked",
 } as const
 
 /**
@@ -85,6 +86,15 @@ export function persistHostContext(hostContext: HostContext[]): void {
 
 export function clearHostContext(): void {
   localStorage.removeItem(storageKeys.hostContext)
+}
+
+/** The Kbd tab's "show keyboard under game" checkbox. Off until asked for: it takes space from the game. */
+function getStoredKeyboardDocked(): boolean {
+  return localStorage.getItem(storageKeys.keyboardDocked) === "true"
+}
+
+export function persistKeyboardDocked(docked: boolean): void {
+  localStorage.setItem(storageKeys.keyboardDocked, String(docked))
 }
 
 function getStoredGameSettings(): Record<string, any> {
@@ -174,6 +184,7 @@ export function createInitialState(config: SimulatorConfig, fixtureCategories: s
     renderContext: getStoredRenderContext(),
     previewKind: getStoredPreviewKind(),
     gameSettings: getStoredGameSettings(),
+    keyboardDocked: getStoredKeyboardDocked(),
     settingsComponents: null,
   }
 }
