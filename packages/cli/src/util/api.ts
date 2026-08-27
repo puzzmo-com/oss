@@ -12,6 +12,7 @@ export type PuzzmoFile = {
     oneliner?: string
     description?: string
     highlightColor?: string
+    iconPath?: string
   }
   // This is what we're calling 'augmentations' publicly
   integrations?: Record<string, unknown>
@@ -37,6 +38,7 @@ type InitResponse = {
   sessionID: string
   basePath: string
   integrationsChanged?: boolean
+  iconChanged?: boolean
   gameURL?: string
   versionsURL?: string
   error?: string
@@ -46,6 +48,7 @@ type CompleteResponse = {
   assetsBase: string
   versionID: string
   integrationsChanged: boolean
+  iconChanged: boolean
   gameURL: string | null
   versionsURL: string | null
   error?: string
@@ -61,6 +64,8 @@ export type UploadFilesOptions = {
   description?: string | null
   /** HTTPS repo URL to set on the GameRuntime */
   repoURL?: string | null
+  /** Contents of the SVG named by `game.iconPath`, synced onto the game */
+  iconSVG?: string | null
 }
 
 /** Wraps fetch to surface the underlying network cause (DNS, ECONNREFUSED, TLS, etc.) */
@@ -165,7 +170,7 @@ export const uploadFiles = async (
   onProgress?: UploadProgress,
   options: UploadFilesOptions = {},
 ): Promise<CompleteResponse> => {
-  const { verbose = false, description, repoURL } = options
+  const { verbose = false, description, repoURL, iconSVG } = options
   if (verbose) console.log(`  API URL: ${apiURL}`)
 
   // Step 1: Init session (includes puzzmo.json metadata)
@@ -174,7 +179,7 @@ export const uploadFiles = async (
     init = (await jsonPost(
       `${apiURL}/cliUpload`,
       token,
-      { gameSlug, sha, puzzmoFile, description, repoURL },
+      { gameSlug, sha, puzzmoFile, description, repoURL, iconSVG },
       "upload init",
       verbose,
     )) as InitResponse
@@ -199,12 +204,13 @@ export const uploadFiles = async (
   // Step 3: Complete
   const complete = (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {}, "upload complete", verbose)) as Omit<
     CompleteResponse,
-    "integrationsChanged" | "gameURL" | "versionsURL"
+    "integrationsChanged" | "iconChanged" | "gameURL" | "versionsURL"
   >
   if (verbose) console.log(`  Assets base: ${complete.assetsBase}`)
   return {
     ...complete,
     integrationsChanged: !!init.integrationsChanged,
+    iconChanged: !!init.iconChanged,
     gameURL: init.gameURL ?? null,
     versionsURL: init.versionsURL ?? null,
   }

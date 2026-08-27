@@ -14,7 +14,7 @@ import type { KeyboardConfig } from "./types"
  */
 export const defaultKeyboardConfig: KeyboardConfig = {
   layout: ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined],
-  symbols: { "↵": "Enter", "⌫": "bsp" },
+  symbols: { "↵": "enter", "⌫": "bsp" },
   highlight: ["↵", "⌫"],
   disabled: [],
   xl: [],

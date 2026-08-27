@@ -33,6 +33,7 @@ export const validate = async (dir: string) => {
     log(`${status} ${game.puzzmoFile.game.slug.padEnd(24)} (${rel})`)
     log(`     dist: ${distRel}`)
     if (integrations.length) log(`     integrations: ${integrations.join(", ")}`)
+    if (game.iconPath) log(`     icon: ${path.relative(rootDir, game.iconPath)}`)
     for (const e of distErrors) console.error(`     ${e}`)
     for (const warning of lintPuzzmoFile(game.puzzmoFile)) log(`     warning: ${warning}`)
   }
