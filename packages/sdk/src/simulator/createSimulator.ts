@@ -18,6 +18,7 @@ import {
   createFeaturesView,
   createKeyboardView,
   createSettingsView,
+  createSoundView,
 } from "./views"
 
 // Re-export types for consumers
@@ -125,6 +126,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     createFeaturesView(),
     createKeyboardView(),
     createSettingsView(),
+    createSoundView(),
     // Plugin-provided views are appended after the built-ins; they get a tab, content, message
     // delegation, and binding for free via the same machinery as the core views.
     ...(config.views ?? []),

@@ -253,6 +253,16 @@ describe("generateSimulatorCode", () => {
     expect(code).not.toContain("fixtures")
   })
 
+  it("imports and calls plugin view factories", () => {
+    const code = generateSimulatorCode(
+      { viewFactories: [{ module: "@puzzmo-com/shared/sdkPlugins", export: "createCollabSimulatorView" }] },
+      undefined,
+    )
+    expect(code).toContain('import { createCollabSimulatorView } from "@puzzmo-com/shared/sdkPlugins"')
+    expect(code).toContain("views: [createCollabSimulatorView()]")
+    expect(code).not.toContain("viewFactories")
+  })
+
   it("uses custom fixturesGlob", () => {
     const code = generateSimulatorCode({ fixturesGlob: "/data/**/*.json" }, undefined)
     expect(code).toContain("/data/**/*.json")

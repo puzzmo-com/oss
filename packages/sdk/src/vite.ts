@@ -33,6 +33,13 @@ export type PuzzmoSimulatorPluginOptions = {
    * @internal
    */
   hostContextPresets?: HostContextPreset[]
+  /**
+   * Plugin-provided simulator tabs, named rather than passed directly because this config is
+   * serialized into a virtual module. Each entry is imported and called with no arguments, so the
+   * export must be a `() => SimulatorView` factory — e.g.
+   * `{ module: "@puzzmo-com/shared/sdkPlugins", export: "createCollabSimulatorView" }`.
+   */
+  viewFactories?: { module: string; export: string }[]
 }
 
 const simulatorURL = "/@puzzmo-simulator-init.js"
@@ -104,10 +111,13 @@ export function resolveGameFromReferer(referer: string | undefined, games: Map<s
  * @internal
  */
 export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, game: GameInfo | undefined): string {
-  const { fixturesGlob: fixturesOpt, ...config } = options
+  const { fixturesGlob: fixturesOpt, viewFactories, ...config } = options
   const fixturesGlob = fixturesOpt === false ? null : (fixturesOpt ?? "/fixtures/puzzles/**/*.{json,toml}")
 
   const lines = [`import { createSimulator } from "@puzzmo/sdk/simulator"`]
+  for (const view of viewFactories ?? []) {
+    lines.push(`import { ${view.export} } from ${JSON.stringify(view.module)}`)
+  }
 
   // Load fixtures as raw strings so any text format reaches the game verbatim; the game does its own parsing.
   if (fixturesGlob) {
@@ -125,6 +135,7 @@ export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, gam
   const configEntries = Object.entries(simConfig).filter(([, v]) => v !== undefined)
   const configParts = configEntries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
   if (fixturesGlob) configParts.push("fixtures")
+  if (viewFactories?.length) configParts.push(`views: [${viewFactories.map((v) => `${v.export}()`).join(", ")}]`)
 
   lines.push(`createSimulator({ ${configParts.join(", ")} })`)
 

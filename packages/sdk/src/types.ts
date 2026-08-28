@@ -649,4 +649,9 @@ export type MessagesReceived = {
   KEYBOARD_CURSOR_CHANGE: { position: [number, number] }
   /** The player lifted their finger, ending a drag-cursor gesture. Only fires when `supportsDragCursor` is `true`. */
   KEYBOARD_CURSOR_END: object
+  /**
+   * Whether the player's settings allow audio. Games boot muted and stay that way until this
+   * arrives, so a host which never sends it (an embed) keeps them silent.
+   */
+  SOUND_ENABLED: { enabled: boolean }
 }
