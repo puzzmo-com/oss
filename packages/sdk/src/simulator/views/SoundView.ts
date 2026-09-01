@@ -16,7 +16,7 @@ export function createSoundView(): SimulatorView {
   let soundEnabled = true
 
   const renderList = (): string => {
-    if (events.length === 0) return `<div class="sound-empty">No sensory events yet. Play the game to hear from it.</div>`
+    if (events.length === 0) return `<div class="sound-empty">No cues yet. Play the game to hear from it.</div>`
     return events
       .map(
         (e) =>
@@ -49,7 +49,7 @@ export function createSoundView(): SimulatorView {
           #simulator-tab-sound .sound-toggle { font-size: 11px; display: flex; align-items: center; gap: 4px; }
         </style>
         <div class="simulator-section">
-          <div class="simulator-section-title">Sensory Events</div>
+          <div class="simulator-section-title">Cues</div>
           <div class="sound-controls">
             <label class="sound-toggle"><input type="checkbox" id="sound-enabled" ${soundEnabled ? "checked" : ""} /> Sound enabled</label>
             <button class="simulator-btn" id="sound-clear">Clear</button>
@@ -84,9 +84,7 @@ export function createSoundView(): SimulatorView {
       }
 
       if (type !== "SENSORY_EVENT") return
-      // Cues are objects; a bare string is a game still on the legacy host-resolves-it path.
-      const id = typeof data === "string" ? data : (data?.id ?? JSON.stringify(data))
-      events.unshift({ id, haptic: typeof data === "string" ? undefined : data?.haptic, time: timeNow() })
+      events.unshift({ id: data?.id ?? JSON.stringify(data), haptic: data?.haptic, time: timeNow() })
       if (events.length > 100) events.pop()
       refresh(ctx)
     },
