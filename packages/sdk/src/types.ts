@@ -546,6 +546,15 @@ export type GameSettingsUIComponents =
   /** Lays out its `content` components side by side in one row. */
   | { id: string; type: "split"; content: GameSettingsUIComponents[]; hidden?: boolean }
 
+/**
+ * The haptics a game can ask the host for. Named after the iOS generators they map onto, since
+ * that is the only platform which can render them faithfully; other hosts approximate.
+ *
+ * Restated from `availableHaptics` in `@puzzmo-com/shared/haptics` (the source of truth, and what
+ * the hosts switch on) because the SDK carries no workspace deps — keep the two in step by hand.
+ */
+export type AvailableHaptics = "selection" | "error" | "warning" | "success" | "light" | "medium" | "heavy" | "soft" | "rigid"
+
 /** Messages from the SDK to the host */
 export type MessagesSentFromEmbed = {
   /** Tells the host to send back the bootstrap data (puzzle, theme, gameplay state). Send once on startup via `sdk.gameReady()`. */
@@ -617,6 +626,15 @@ export type MessagesSentFromEmbed = {
   /** The game changed settings itself (e.g. an in-game settings screen). The host persists them for the player. */
   UPDATE_SETTINGS_FROM_EMBED: {
     settings: any
+  }
+  /**
+   * Ask the host to fire a haptic. The host owns the player's haptics setting and the device
+   * bridge, so this is a request, not a guarantee — see `sdk.haptics.play()`.
+   */
+  SENSORY_EVENT: {
+    /** The cue this haptic belongs to, for host logs and the simulator. */
+    id: string
+    haptic?: AvailableHaptics
   }
   /** Notify the host that a named checkpoint was reached (e.g. completing a sub-puzzle or bonus round). */
   HIT_CHECKPOINT: {

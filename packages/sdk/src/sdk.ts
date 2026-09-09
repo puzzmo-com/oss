@@ -12,6 +12,7 @@ import type {
   GameOverMessageUIComponent,
   KeyboardConfig,
   GameSettingsUIComponents,
+  AvailableHaptics,
 } from "./types"
 
 export type SDK = PuzzmoSDK
@@ -58,6 +59,30 @@ export interface SDKKeyboard {
   show: (config: KeyboardConfig) => void
   /** Hide the on-screen keyboard. */
   hide: () => void
+}
+
+/** Device haptics. The host owns the player's setting and the device bridge; a game only asks. */
+export interface SDKHaptics {
+  /**
+   * Ask the host to fire a haptic. Fire-and-forget: it is never awaited, never reports back, and
+   * is a no-op wherever the host can't deliver one, so a game can call it freely.
+   *
+   * Where it actually fires:
+   *
+   * - **Puzzmo's iOS app** — real UIKit haptics, via the native bridge.
+   * - **puzzmo.com on Android/desktop** — approximated with `navigator.vibrate` by the page, which is why this goes to the host rather than
+   *   vibrating from the game. Chrome blocks `navigator.vibrate` outright in cross-origin iframes (since Chrome 55), and games run in one,
+   *   so a game calling it directly is silently ignored with no way to opt in — there is no Permissions-Policy feature for it.
+   * - **Embeds** — no haptic. Our frame is cross-origin to the host page, so the block above applies to the host too, and there is no native
+   *   bridge. The cue is still forwarded to the host page on the private message stream, so a partner can action it themselves.
+   *
+   * Haptics are also off entirely when the player has turned them off, and the OS may drop them
+   * in silent/DND or on hardware without a motor.
+   *
+   * @param haptic Which feel to ask for. Named after the iOS generators; other hosts approximate.
+   * @param options `id` names the cue this haptic belongs to, for host logs and the simulator.
+   */
+  play: (haptic: AvailableHaptics, options?: { id?: string }) => void
 }
 
 /**
@@ -141,6 +166,9 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
   /** The host-rendered on-screen keyboard, for games that take text or symbol input on touch devices. */
   keyboard: SDKKeyboard
 
+  /** Device haptics, where the host can deliver them. See `SDKHaptics.play` for where that is. */
+  haptics: SDKHaptics
+
   /**
    * The raw postMessage transport to the host — an escape hatch for protocol messages the SDK
    * doesn't wrap.
@@ -166,6 +194,7 @@ export type SupportedOutgoingMessages = Pick<
   | "KEYBOARD_UPDATE_CONFIG"
   | "INITIALIZE_SETTINGS"
   | "UPDATE_SETTINGS_FROM_EMBED"
+  | "SENSORY_EVENT"
 >
 
 export type SupportedIncomingMessages = Pick<
@@ -703,6 +732,12 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
           l: [],
           supportsDragCursor: false,
         })
+      },
+    },
+
+    haptics: {
+      play: (haptic, options) => {
+        hostAPI.sendMessage("SENSORY_EVENT", { id: options?.id ?? haptic, haptic })
       },
     },
 

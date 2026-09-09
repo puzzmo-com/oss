@@ -91,6 +91,27 @@ sdk.timer.isPaused() // Check if paused
 sdk.timer.isRunning() // Check if running
 ```
 
+### Haptics
+
+```ts
+sdk.haptics.play("selection") // on placing a letter
+sdk.haptics.play("success", { id: "puzzle-solved" }) // `id` names the cue in host logs
+```
+
+Names are the iOS feedback generators: `selection`, `light`, `medium`, `heavy`, `soft`, `rigid`, `success`, `warning`, `error`.
+
+Fire-and-forget — it never reports back, and it is a no-op wherever the host can't deliver one, so never make gameplay depend on a haptic landing:
+
+| Where | What happens |
+| --- | --- |
+| Puzzmo's iOS app | Real UIKit haptics via the native bridge |
+| puzzmo.com on Android/desktop | Approximated with `navigator.vibrate` |
+| Partner embeds | No haptic — see below |
+
+The call goes to the host rather than vibrating from your game because Chrome has blocked `navigator.vibrate` in cross-origin iframes since Chrome 55, and games run in one. There is no Permissions-Policy opt-in, so calling it yourself is silently ignored. Partner embeds fire no haptic for the same reason: our frame is cross-origin to the partner's page, so the host is blocked too and there is no native bridge to fall back on. The cue is still forwarded to the partner page on the private message stream, so a partner can action it themselves.
+
+Haptics are also off entirely when the player has turned them off in their Puzzmo settings, and the OS drops them in silent/DND or on hardware with no motor.
+
 ## Theme
 
 The `theme` object from `gameReady()` contains color tokens for the current Puzzmo theme:
