@@ -175,8 +175,14 @@ sdk.keyboard.hide()
 `defaultKeyboardConfig` is a standard QWERTY layout with Enter and Backspace. Customize it by spreading:
 
 ```ts
+sdk.keyboard.show({ ...defaultKeyboardConfig,
 // Disable letters that are no longer valid given the current game state
-sdk.keyboard.show({ ...defaultKeyboardConfig, disabled: usedLetters })
+disabled: usedLetters })
+// Override inidividual keys with their own styles for emphasis
+individualKeyStyles: keyStylesFromRules([
+    { keys: ["?"], background: { backgroundColor: "#ffd54a" } },
+    { keys: usedLetters, text: { opacity: "0.4", transition: "opacity 200ms ease-out" } },
+  ]),
 ```
 
 For games with a spatial input model (e.g. selecting a grid cell by dragging across the keyboard),

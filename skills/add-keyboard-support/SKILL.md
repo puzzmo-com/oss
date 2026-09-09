@@ -86,7 +86,22 @@ The runtime shows the keyboard automatically on touch devices when the game call
    sdk.keyboard.show(keyboardConfig)
    ```
 
-7. If your game has a spatial input model (e.g. selecting a grid cell by dragging), enable
+7. To style particular keys (flashing a key, fading spent letters), set `individualKeyStyles` —
+   a map from layout character to CSS, where `text` lands on the key's label and `background` on
+   the key face. It travels in the config like `disabled`, so update it by calling `show` again.
+   `keyStylesFromRules` builds the map when a group of keys shares a style:
+
+   ```ts
+   sdk.keyboard.show({
+     ...keyboardConfig,
+     individualKeyStyles: keyStylesFromRules([
+       { keys: [hintKey], background: { backgroundColor: "#ffd54a" } },
+       { keys: getUsedLetters(gameState), text: { opacity: "0.4", transition: "opacity 200ms ease-out" } },
+     ]),
+   })
+   ```
+
+8. If your game has a spatial input model (e.g. selecting a grid cell by dragging), enable
    the drag cursor and handle the additional events:
 
    ```ts
@@ -108,6 +123,7 @@ The runtime shows the keyboard automatically on touch devices when the game call
 
 - `sdk.keyboard.show(config)` — show or update the keyboard. Pass the full config every time.
 - `sdk.keyboard.hide()` — hide the keyboard.
+- `keyStylesFromRules(rules)` — builds an `individualKeyStyles` map from `{ keys, text?, background? }` rules.
 - `sdk.on("keyboardKeyPress", handler)` — key tapped; `handler` receives `{ key: string }`.
 - `sdk.on("keyboardCursorChange", handler)` — drag cursor moved; `handler` receives `{ position: [number, number] }`.
 - `sdk.on("keyboardCursorEnd", handler)` — drag cursor released.
@@ -127,6 +143,7 @@ The runtime shows the keyboard automatically on touch devices when the game call
 | `rowPositioning`     | `("start"\|"center"\|"end")[]` | Per-row alignment                        |
 | `flexGrowSymbols`    | `string[]`                     | Keys that stretch to fill row width      |
 | `keyStyles`          | `Record<string, string>`       | CSS applied to every key face            |
+| `individualKeyStyles`| `Record<string, KeyStyles>`    | CSS for particular keys, by character    |
 | `kbdStyles`          | `Record<string, string>`       | CSS applied to the keyboard container    |
 
 ## Success Criteria

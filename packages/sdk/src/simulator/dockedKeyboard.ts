@@ -10,8 +10,10 @@ import type { KeyboardConfig, MessagesReceived, Theme } from "../types"
  * dependency, so it cannot be imported. The numbers have to be kept in step by hand.
  *
  * The wireframe styling is deliberate: only the box model is faithful, so only the box model is
- * drawn. Key icons, press animation, key repeat, haptics and the game's own `keyStyles`/`kbdStyles`
- * are all dropped rather than approximated.
+ * drawn. Key icons, press animation, key repeat, haptics and `kbdStyles` are all dropped rather
+ * than approximated. CSS the game sets on the keys themselves is the exception, both the config's
+ * blanket `keyStyles` and its per-key `individualKeyStyles`: it is applied as sent, because a game
+ * tuning it needs to see it.
  */
 
 /** Space the keys occupy. */
@@ -94,10 +96,52 @@ export function createDockedKeyboard(options: DockedKeyboardOptions): DockedKeyb
     if (getComputedStyle(root).position === "static") root.style.position = "relative"
   }
 
+  /** The key face: an outline, plus whatever CSS the game set for this key. */
+  const keyFaceStyles = (char: string, cfg: KeyboardConfig): string => {
+    const disabled = cfg.disabled.includes(char)
+    const highlight = cfg.highlight.includes(char)
+    const border = disabled
+      ? `1px dashed ${ink(theme.fg, 0.25)}`
+      : highlight
+        ? `2px solid ${ink(theme.fg, 0.75)}`
+        : `1px solid ${ink(theme.fg, 0.4)}`
+
+    return [
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
+      "width:100%",
+      "height:100%",
+      "box-sizing:border-box",
+      "border-radius:3px",
+      "overflow:hidden",
+      "background:transparent",
+      "pointer-events:none",
+      `border:${border}`,
+      cssText(cfg.individualKeyStyles?.[char]?.background),
+    ]
+      .filter(Boolean)
+      .join(";")
+  }
+
+  /** One small monospace label per key; the glyph only names the box. */
+  const keyLabelStyles = (char: string, cfg: KeyboardConfig): string =>
+    [
+      "font:11px/1 Menlo, Monaco, Consolas, monospace",
+      "letter-spacing:0.5px",
+      "text-transform:uppercase",
+      "white-space:nowrap",
+      `color:${ink(theme.fg, cfg.disabled.includes(char) ? 0.3 : 0.65)}`,
+      // Production applies the config's blanket keyStyles to the label of any non-highlight key.
+      cfg.highlight.includes(char) ? "" : cssText(cfg.keyStyles),
+      cssText(cfg.individualKeyStyles?.[char]?.text),
+    ]
+      .filter(Boolean)
+      .join(";")
+
   const renderKey = (char: string, cfg: KeyboardConfig): string => {
     const label = cfg.symbols[char] ?? char
     const disabled = cfg.disabled.includes(char)
-    const highlight = cfg.highlight.includes(char)
     const grow = cfg.flexGrowSymbols?.includes(char)
     const width = keyWidth(cfg.l.includes(char), cfg.xl.includes(char))
 
@@ -117,35 +161,8 @@ export function createDockedKeyboard(options: DockedKeyboardOptions): DockedKeyb
       .filter(Boolean)
       .join(";")
 
-    // A key is an outline: highlight keys get a heavier one, disabled keys a dashed and faded one.
-    const border = disabled
-      ? `1px dashed ${ink(theme.fg, 0.25)}`
-      : highlight
-        ? `2px solid ${ink(theme.fg, 0.75)}`
-        : `1px solid ${ink(theme.fg, 0.4)}`
-
-    const innerStyles = [
-      "display:flex",
-      "align-items:center",
-      "justify-content:center",
-      "width:100%",
-      "height:100%",
-      "box-sizing:border-box",
-      "border-radius:3px",
-      "overflow:hidden",
-      "background:transparent",
-      "pointer-events:none",
-      `border:${border}`,
-    ].join(";")
-
-    // One small monospace label per key; the glyph only names the box.
-    const textStyles = [
-      "font:11px/1 Menlo, Monaco, Consolas, monospace",
-      "letter-spacing:0.5px",
-      "text-transform:uppercase",
-      "white-space:nowrap",
-      `color:${ink(theme.fg, disabled ? 0.3 : 0.65)}`,
-    ].join(";")
+    const innerStyles = keyFaceStyles(char, cfg)
+    const textStyles = keyLabelStyles(char, cfg)
 
     return `<div class="sim-docked-kbd-key" data-key="${escapeAttr(char)}" style="${keyStyles}">
       <div class="sim-docked-kbd-key-inner" style="${innerStyles}"><div style="${textStyles}">${escapeHTML(label)}</div></div>
@@ -295,6 +312,24 @@ export function createDockedKeyboard(options: DockedKeyboardOptions): DockedKeyb
     resetGesture()
   }
 
+  /**
+   * Writes the current styles onto the keys already on screen. A style change must not rebuild the
+   * DOM: a fresh element starts at its final computed value, so any `transition` a game sets would
+   * never run and it would look like the game's CSS was wrong.
+   */
+  const restyleKeys = () => {
+    const cfg = config
+    if (!element || !cfg) return
+    element.querySelectorAll<HTMLElement>(".sim-docked-kbd-key").forEach((key) => {
+      const char = key.getAttribute("data-key")
+      const face = key.firstElementChild as HTMLElement | null
+      const label = face?.firstElementChild as HTMLElement | null
+      if (!char || !face || !label) return
+      face.style.cssText = keyFaceStyles(char, cfg)
+      label.style.cssText = keyLabelStyles(char, cfg)
+    })
+  }
+
   const sync = () => {
     if (!enabled || !config) return unmount()
     if (!element) return mount()
@@ -310,8 +345,30 @@ export function createDockedKeyboard(options: DockedKeyboardOptions): DockedKeyb
       sync()
     },
     setConfig(next) {
+      const stylingOnlyChange = element && next && config && layoutSignature(next) === layoutSignature(config)
       config = next
-      sync()
+      if (stylingOnlyChange) restyleKeys()
+      else sync()
     },
   }
 }
+
+/** Everything about a config except its per-key styling, so a styling-only update can be spotted. */
+const layoutSignature = (cfg: KeyboardConfig): string =>
+  JSON.stringify([
+    cfg.layout,
+    cfg.symbols,
+    cfg.highlight,
+    cfg.disabled,
+    cfg.xl,
+    cfg.l,
+    cfg.flexGrowSymbols,
+    cfg.rowPositioning,
+    cfg.keyStyles,
+  ])
+
+/** Serializes a style object into inline CSS, so `{ backgroundColor: "red" }` becomes `background-color:red`. */
+export const cssText = (styles?: Record<string, string>): string =>
+  Object.entries(styles ?? {})
+    .map(([prop, value]) => `${prop.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}:${escapeAttr(String(value))}`)
+    .join(";")

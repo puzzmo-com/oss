@@ -1,6 +1,6 @@
 import type { KeyboardConfig } from "../../types"
 import type { SimulatorContext, SimulatorView } from "../types"
-import { createDockedKeyboard, dockedKeyboardHeight, type DockedKeyboard } from "../dockedKeyboard"
+import { createDockedKeyboard, cssText, dockedKeyboardHeight, type DockedKeyboard } from "../dockedKeyboard"
 import { persistKeyboardDocked } from "../state"
 
 /** Renders a single keyboard key as an HTML button string */
@@ -23,7 +23,11 @@ const renderKey = (char: string, config: KeyboardConfig): string => {
     .filter(Boolean)
     .join(" ")
 
-  return `<button class="${classes}" data-key="${char}" ${isDisabled ? "disabled" : ""}>${label}</button>`
+  // Split as production does: the game's `background` CSS on the key face, its `text` CSS on the label.
+  const face = cssText(config.individualKeyStyles?.[char]?.background)
+  const text = cssText(config.individualKeyStyles?.[char]?.text)
+
+  return `<button class="${classes}" data-key="${char}" style="${face}" ${isDisabled ? "disabled" : ""}><span style="${text}">${label}</span></button>`
 }
 
 /** Renders the full keyboard HTML from a KeyboardConfig */

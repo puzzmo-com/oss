@@ -1,5 +1,5 @@
 export { createPuzzmoSDK } from "./sdk"
-export { defaultKeyboardConfig } from "./keyboard"
+export { defaultKeyboardConfig, keyStylesFromRules } from "./keyboard"
 
 export type {
   PuzzmoSDK,
@@ -33,6 +33,8 @@ export type {
   ThumbnailResult,
   ThumbnailConfig,
   KeyboardConfig,
+  KeyStyleRule,
+  KeyStyles,
   GameSettingsUIComponents,
   AvailableHaptics,
   HostContext,

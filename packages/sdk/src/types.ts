@@ -340,6 +340,38 @@ export type ThumbnailConfig = {
 }
 
 /**
+ * CSS overrides for one key face. `text` is applied to the key's label, `background` to the key
+ * itself, so a rule can recolor a key, fade it back, or animate it with a `transition`.
+ */
+export type KeyStyles = {
+  /** CSS applied to the key's label — color, fontSize, opacity, textTransform. */
+  text?: Record<string, string>
+  /** CSS applied to the key face — backgroundColor, border, boxShadow, transform, transition. */
+  background?: Record<string, string>
+}
+
+/**
+ * A styling rule for a set of keys. Pass rules through `keyStylesFromRules` to build the
+ * `individualKeyStyles` map a `KeyboardConfig` carries; every key named in `keys` gets the rule's
+ * `text` and `background` CSS, and where two rules name the same key the later one wins, property
+ * by property.
+ *
+ * @example
+ *   // Pull attention to the hint key, fade the letters the player has spent
+ *   sdk.keyboard.show({
+ *     ...config,
+ *     individualKeyStyles: keyStylesFromRules([
+ *       { keys: ["?"], background: { backgroundColor: "#ffd54a", transition: "background-color 120ms" } },
+ *       { keys: usedLetters, text: { opacity: "0.4" } },
+ *     ]),
+ *   })
+ */
+export type KeyStyleRule = KeyStyles & {
+  /** The layout characters this rule styles. */
+  keys: string[]
+}
+
+/**
  * Configuration for the Puzzmo on-screen keyboard shown on touch devices.
  *
  * Keys in the layout are single characters. Special/action keys should use non-alphabet
@@ -473,12 +505,23 @@ export type KeyboardConfig = {
 
   /**
    * CSS properties applied to every key face. Use for font overrides or color tweaks
-   * that apply uniformly across the keyboard.
+   * that apply uniformly across the keyboard. To style particular keys instead, set
+   * `individualKeyStyles`.
    *
    * @example
    *   { textTransform: "lowercase", color: "#888" }
    */
   keyStyles?: Record<string, string>
+
+  /**
+   * CSS for particular keys, keyed by the layout character: `text` lands on the key's label,
+   * `background` on the key face. Like `disabled`, this travels in the config, so update it by
+   * calling `show` again with the new map. `keyStylesFromRules` builds one from key-set rules.
+   *
+   * @example
+   *   { "?": { background: { backgroundColor: "#ffd54a" } }, a: { text: { opacity: "0.4" } } }
+   */
+  individualKeyStyles?: Record<string, KeyStyles>
 
   /**
    * CSS properties applied to the keyboard container element. Use for positioning or
