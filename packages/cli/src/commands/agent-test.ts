@@ -22,9 +22,10 @@ export const agentTest = async () => {
     initialValue: "claude",
   })
   if (p.isCancel(choice)) process.exit(0)
-  const agent = getAgent(String(choice))
+  const agentName = String(choice)
+  const agent = getAgent(agentName)
   if (!agent) {
-    p.log.error(`Unknown agent: ${choice}`)
+    p.log.error(`Unknown agent: ${agentName}`)
     process.exit(1)
   }
 

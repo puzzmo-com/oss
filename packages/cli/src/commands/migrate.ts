@@ -28,7 +28,8 @@ export const migrate = async () => {
   })
 
   if (p.isCancel(selected)) process.exit(0)
+  const promptName = String(selected)
 
-  p.log.success(`Selected: ${selected}`)
-  p.outro(`Run this skill with your agent using the prompt name "${selected}"`)
+  p.log.success(`Selected: ${promptName}`)
+  p.outro(`Run this skill with your agent using the prompt name "${promptName}"`)
 }

@@ -197,7 +197,7 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   if (result.iconChanged && iconPath) console.log(`  Icon updated from ${path.relative(game.puzzmoJsonDir, iconPath)}.`)
 
   if (result.integrationsChanged && result.versionsURL) {
-    console.log(`  Uploaded. Integrations changed — a new version has been staged for your team:`)
+    console.log(`  Uploaded. A new version has been staged for your team to try before it goes live:`)
     console.log(`    ${result.versionsURL}`)
   } else if (result.gameURL) {
     console.log(`  Uploaded — live now for your team at:`)
