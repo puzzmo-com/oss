@@ -434,13 +434,13 @@ export const modifiedNewsPaperTheme = (type: "light" | "dark", hexes: string[] |
     alt1: hexes[4] || baseTheme.alt1,
     alt2: hexes[5] || baseTheme.alt2,
     alt3: hexes[6] || baseTheme.alt3,
-    keyFG: hexes[7] || baseTheme.player,
+    keyFG: hexes[7] || baseTheme.keyFG,
     player: hexes[8] || baseTheme.player,
     playerLight: hexes[9] || baseTheme.playerLight,
     playerFG: hexes[10] || baseTheme.playerFG,
     subBrand: hexes[11] || baseTheme.subBrand,
     subBrandFG: hexes[12] || baseTheme.subBrandFG,
-    g_key: hexes[13] || baseTheme.subBrandFG,
+    g_key: hexes[13] || baseTheme.g_key,
     a_infoBG: type === "light" ? baseTheme.alwaysLight : baseTheme.alwaysDark,
   }
   return theme
