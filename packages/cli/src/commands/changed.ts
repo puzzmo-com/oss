@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 
-import { findTokensForTeam, getTokens, resolveServerForTeam, sourceToURL } from "../util/config.js"
+import { findTokensForTeam, getTokens, resolveServerForTeam, sourceToURL, tokenHelp } from "../util/config.js"
 import { type DiscoveredGame, discoverGames } from "../util/discoverGames.js"
 import { fetchTeamGameVersions, type GameVersions } from "../queries/gameRuntimes.js"
 
@@ -40,7 +40,7 @@ export const changed = async (dir: string, options: ChangedOptions = {}) => {
   const { json = false, list = false, matrix = false, against = "latest", includeUncommitted = false } = options
 
   if (getTokens().length === 0) {
-    console.error("Not logged in. Run `puzzmo login <token>` or set PUZZMO_TOKEN.")
+    console.error(`Not logged in. Run \`puzzmo login <token>\` or set PUZZMO_TOKEN.\n${tokenHelp}`)
     process.exit(1)
   }
 

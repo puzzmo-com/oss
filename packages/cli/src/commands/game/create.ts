@@ -14,7 +14,7 @@ import { newSession, type PipelineContext } from "../../skills/step.js"
 import { importPipeline, optionalPromptSkills, type SkillDefinition } from "../../skills/registry.js"
 import { seedImportedGame, importedSourceDir, referenceDir } from "./seedImport.js"
 import { login } from "../login.js"
-import { getDefaultToken } from "../../util/config.js"
+import { decodeTokenPayload, getDefaultToken, getTokens, tokenHelp, type TokenEntry } from "../../util/config.js"
 import { slugify } from "../../util/slugify.js"
 import { detectRepoContext, type RepoContext, type RepoType } from "./detectRepo.js"
 
@@ -32,9 +32,9 @@ export type CreateOptions = {
   prompt?: string
 }
 
-/** Writes .mcp.json with dev server config */
-const writeMcpConfig = (dir: string) => {
-  const token = getDefaultToken()
+/** Writes .mcp.json with dev server config, authed as the game's team when we have its token */
+const writeMcpConfig = (dir: string, teamToken: string | undefined) => {
+  const token = teamToken ?? getDefaultToken()
   const mcpConfig = {
     mcpServers: {
       "workshop.puzzmo.com": {
@@ -48,9 +48,9 @@ const writeMcpConfig = (dir: string) => {
 }
 
 /** Sets up a standalone new repo for the game */
-const setupNewRepo = (gameDir: string) => {
+const setupNewRepo = (gameDir: string, teamToken: string | undefined) => {
   fs.writeFileSync(path.join(gameDir, ".gitignore"), ["node_modules", "dist", ".DS_Store", ".yarn", ".pnp.*", ".puzzmo", ""].join("\n"))
-  writeMcpConfig(gameDir)
+  writeMcpConfig(gameDir, teamToken)
 
   if (!fs.existsSync(path.join(gameDir, ".git"))) {
     runCommand("git init", { cwd: gameDir })
@@ -60,7 +60,7 @@ const setupNewRepo = (gameDir: string) => {
 }
 
 /** Places a game inside an existing repo's parent folder (games/, packages/, etc.) */
-const setupRepoGame = (tmpDir: string, slug: string, repoRoot: string, parentFolder: string): string => {
+const setupRepoGame = (tmpDir: string, slug: string, repoRoot: string, parentFolder: string, teamToken: string | undefined): string => {
   const parentDir = path.join(repoRoot, parentFolder)
   if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true })
 
@@ -70,7 +70,7 @@ const setupRepoGame = (tmpDir: string, slug: string, repoRoot: string, parentFol
 
   // Write .mcp.json at repo root if not already present
   const mcpPath = path.join(repoRoot, ".mcp.json")
-  if (!fs.existsSync(mcpPath)) writeMcpConfig(repoRoot)
+  if (!fs.existsSync(mcpPath)) writeMcpConfig(repoRoot, teamToken)
 
   runCommand("git add -A", { cwd: repoRoot })
   gitCommit(`New game: ${slug}`, { cwd: repoRoot })
@@ -352,6 +352,13 @@ export const gameCreate = async (opts: CreateOptions) => {
 
   const slug = opts.slug ?? slugify(name)
 
+  // Step 5: Login if token provided, then pick the team the game belongs to
+  if (opts.accessToken) {
+    p.log.step("Logging in...")
+    await login(opts.accessToken)
+  }
+  const team = await pickTeam(opts.teamID)
+
   // Materialize the starter (after we know the slug/name). Imports get it too — porting a
   // downloaded game into a project that already builds beats rebuilding the project by hand.
   const templateDir = resolveTemplateDir("minesweeper")
@@ -362,19 +369,13 @@ export const gameCreate = async (opts: CreateOptions) => {
   const replacements = {
     __SLUG__: slug,
     __DISPLAY_NAME__: name,
-    __TEAM_ID__: opts.teamID ?? "REPLACE_ME",
+    __TEAM_ID__: team?.teamID ?? "REPLACE_ME",
     // Prettier rewrites __DISPLAY_NAME__ to bold syntax in markdown, so match that form too.
     "**DISPLAY_NAME**": name,
   }
   const materialize = (from: string, to: string) => copyTemplate(from, to, replacements)
   if (strategy === "import") seedImportedGame(tmpDir, templateDir, materialize)
   else materialize(templateDir, tmpDir)
-
-  // Step 5: Login if token provided
-  if (opts.accessToken) {
-    p.log.step("Logging in...")
-    login(opts.accessToken)
-  }
 
   // Step 6: Place files
   let gameDir: string
@@ -384,7 +385,7 @@ export const gameCreate = async (opts: CreateOptions) => {
     gameDir = path.resolve(slug)
     if (fs.existsSync(gameDir)) fs.rmSync(gameDir, { recursive: true })
     fs.renameSync(tmpDir, gameDir)
-    setupNewRepo(gameDir)
+    setupNewRepo(gameDir, team?.token)
     repoType = "standalone"
   } else {
     if (!repo.repoRoot) {
@@ -418,7 +419,7 @@ export const gameCreate = async (opts: CreateOptions) => {
       }
     }
 
-    gameDir = setupRepoGame(tmpDir, slug, repo.repoRoot, parentFolder)
+    gameDir = setupRepoGame(tmpDir, slug, repo.repoRoot, parentFolder, team?.token)
   }
 
   // Step 7: Strategy-specific agent work
@@ -486,3 +487,32 @@ export const gameCreate = async (opts: CreateOptions) => {
 /** `--pm` arrives as a plain string; anything unexpected falls back to the repo's own manager */
 const packageManagerFrom = (value: string | undefined, fallback: PackageManagerName): PackageManagerName =>
   value === "npm" || value === "yarn" || value === "pnpm" ? value : fallback
+
+type TeamChoice = { teamID: string; token?: string }
+
+/** Resolves the game's team: --teamID if given, else the only saved team, else a prompt across saved teams */
+const pickTeam = async (teamID: string | undefined): Promise<TeamChoice | null> => {
+  const teams = new Map<string, TokenEntry>()
+  for (const entry of getTokens()) {
+    const entryTeamID = decodeTokenPayload(entry.token)?.teamID
+    if (entryTeamID && !teams.has(entryTeamID)) teams.set(entryTeamID, entry)
+  }
+
+  if (teamID) return { teamID, token: teams.get(teamID)?.token }
+  if (teams.size === 0) {
+    p.log.warn(`Not logged in, so puzzmo.json gets a placeholder teamID you'll need to fill in.\n${tokenHelp}`)
+    return null
+  }
+  if (teams.size === 1) {
+    const [[onlyTeamID, entry]] = teams
+    p.log.info(`Creating the game for team ${entry.teamName ?? onlyTeamID}.`)
+    return { teamID: onlyTeamID, token: entry.token }
+  }
+
+  const selected = await p.select({
+    message: "Which team is this game for?",
+    options: [...teams].map(([id, entry]) => ({ value: id, label: entry.teamName ?? id, hint: `${id} on ${entry.source}` })),
+  })
+  if (p.isCancel(selected)) process.exit(0)
+  return { teamID: selected, token: teams.get(selected)?.token }
+}

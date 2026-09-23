@@ -6,12 +6,14 @@ import * as p from "@clack/prompts"
 
 import { GameNotFoundError, uploadFiles } from "../util/api.js"
 import {
+  decodeTokenPayload,
   defaultSource,
   findTokensForTeam,
   getTokens,
   normalizeSource,
   resolveServerForTeam,
   sourceToURL,
+  tokenHelp,
   type TokenEntry,
 } from "../util/config.js"
 import { createUserGame } from "../util/createGame.js"
@@ -54,7 +56,7 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
   const autoCreate = options.createMissing ?? false
 
   if (getTokens().length === 0) {
-    console.error("Not logged in. Run `puzzmo login <token>` or set PUZZMO_TOKEN.")
+    console.error(`Not logged in. Run \`puzzmo login <token>\` or set PUZZMO_TOKEN.\n${tokenHelp}`)
     process.exit(1)
   }
 
@@ -111,7 +113,7 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
       const matches = findTokensForTeam(teamID)
       const message =
         matches.length === 0
-          ? `No saved token for team ${teamID}. Run \`puzzmo login <token>\` (use \`--source\` if the token is for a non-default server).`
+          ? `No saved token for team ${teamID}. Run \`puzzmo login <token>\` (use \`--source\` if the token is for a non-default server).\n${describeSavedTeams()}`
           : `Token for team ${teamID} is registered against ${matches.map((m) => m.source).join(", ")} but none of those servers are reachable.`
       console.error(`\n${prefix}Uploading ${slug} from ${distLabel}\n  ${message}`)
       results.push({ ok: false, slug, error: message })
@@ -416,4 +418,15 @@ const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** Lists the teams the saved tokens belong to, so a teamID mismatch in puzzmo.json is easy to spot */
+const describeSavedTeams = (): string => {
+  const tokens = getTokens()
+  if (!tokens.length) return `  No tokens are saved.\n  ${tokenHelp}`
+  const lines = tokens.map((t) => {
+    const teamID = decodeTokenPayload(t.token)?.teamID ?? "(unreadable token)"
+    return `    - ${t.teamName ? `${t.teamName} (${teamID})` : teamID} on ${t.source}`
+  })
+  return `  Saved tokens are for:\n${lines.join("\n")}`
 }

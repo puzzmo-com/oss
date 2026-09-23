@@ -7,11 +7,19 @@ const configPath = path.join(configDir, "config.json")
 
 export const defaultSource = "https://api.puzzmo.com"
 
+/** The Workshop: where teams manage their games and mint CLI tokens */
+export const workshopURL = "https://workshop.puzzmo.com"
+
+/** Where tokens come from. Appended to any message about a missing, unusable or wrong-team token. */
+export const tokenHelp = `Tokens live in the Workshop at ${workshopURL}/dashboard — open your team, then Settings → Access Tokens.`
+
 export type TokenEntry = {
   /** Server identifier (e.g. "api.puzzmo.com" or "localhost:8911") */
   source: string
   /** The pzt- prefixed JWT issued by that server */
   token: string
+  /** The team's display name, looked up at login. Absent for env var tokens or when the lookup failed. */
+  teamName?: string
 }
 
 type Config = { tokens: TokenEntry[] }
@@ -32,11 +40,11 @@ const writeConfig = (config: Config) => {
 }
 
 /** Saves a token for `source`, replacing any existing entry for that same source */
-export const addToken = (source: string, token: string) => {
+export const addToken = (source: string, token: string, teamName?: string) => {
   const normalized = normalizeSource(source)
   const { tokens } = readConfig()
   const remaining = tokens.filter((t) => normalizeSource(t.source) !== normalized)
-  remaining.push({ source: normalized, token })
+  remaining.push({ source: normalized, token, ...(teamName ? { teamName } : {}) })
   writeConfig({ tokens: remaining })
 }
 
