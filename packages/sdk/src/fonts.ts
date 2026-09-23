@@ -33,7 +33,7 @@ function fontFaceRules(fontNames: ThumbnailFontName[]): string {
   return fontNames
     .map((name) => {
       const url = fontURLMap[name]
-      return `@font-face { font-family: "${name}"; src: url("${url}"); }`
+      return `@font-face { font-family: "${name}"; src: url("${url}"); font-display: swap; }`
     })
     .filter(Boolean)
     .join("\n")

@@ -13,7 +13,7 @@ Add an `integrations` field to `puzzmo.json` that configures leaderboards and ot
 
    ```json
    {
-     "$schema": "https://dev.puzzmo.com/schema/puzzmo-file-schema.json",
+     "$schema": "https://workshop.puzzmo.com/schema/puzzmo-file-schema.json",
      "game": {
        "displayName": "Your Game",
        "slug": "GAMESLUG",

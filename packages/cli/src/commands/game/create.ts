@@ -37,9 +37,9 @@ const writeMcpConfig = (dir: string) => {
   const token = getDefaultToken()
   const mcpConfig = {
     mcpServers: {
-      "dev.puzzmo.com": {
+      "workshop.puzzmo.com": {
         type: "http",
-        url: "https://dev.puzzmo.com/api/mcp",
+        url: "https://workshop.puzzmo.com/api/mcp",
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       },
     },

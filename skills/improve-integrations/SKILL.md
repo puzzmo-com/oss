@@ -1,13 +1,13 @@
 ---
 name: improve-integrations
-description: Edit the `integrations` block in puzzmo.json (leaderboards, notables, etc.) using live game context from the dev.puzzmo.com MCP
+description: Edit the `integrations` block in puzzmo.json (leaderboards, notables, etc.) using live game context from the workshop.puzzmo.com MCP
 ---
 
 # Improve Integrations
 
 The `integrations` field in `puzzmo.json` configures leaderboards, notables, and other meta-game features driven by the deeds your game emits on completion. This skill walks you through changing it with live context from Puzzmo's servers.
 
-Does not require the `dev.puzzmo.com` MCP server to be configured. The MCP tools take the team access token as an input — don't need use the token in the MCP client config.
+Does not require the `workshop.puzzmo.com` MCP server to be configured. The MCP tools take the team access token as an input — don't need use the token in the MCP client config.
 
 The users access tokens live in `~/.puzzmo/config.json` — `pzt-`-prefixed JWTs. Production tokens can be used on localhost servers, but not the other way around. To find the right one:
 
@@ -17,7 +17,7 @@ The users access tokens live in `~/.puzzmo/config.json` — `pzt-`-prefixed JWTs
 
 - Call the `list_accessible_games` MCP tool with all of them as the `tokens` array. The response tells you which token is valid and what games each one can manage (correlated by index, with the last 6 characters of the token echoed back as `tokenSuffix`).
 
-- Use the matching token as the `token` argument to `get_integrations_context` and `validate_integrations` going forward. If none of the tokens is valid for the user's game, ask the user to log in to dev.puzzmo.com and generate a new one.
+- Use the matching token as the `token` argument to `get_integrations_context` and `validate_integrations` going forward. If none of the tokens is valid for the user's game, ask the user to log in to workshop.puzzmo.com and generate a new one.
 
 ## Steps
 

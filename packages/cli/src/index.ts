@@ -17,7 +17,7 @@ const loginCommand = defineCommand({
     description: "Save a CLI auth token. Multiple tokens can be stored, one per --source server.",
   },
   args: {
-    token: { type: "positional", description: "The pzt- token from dev.puzzmo.com", required: true },
+    token: { type: "positional", description: "The pzt- token from workshop.puzzmo.com", required: true },
     source: { type: "string", description: "Server this token belongs to", default: defaultSource },
   },
   run: ({ args }) => login(args.token, args.source),
@@ -80,7 +80,7 @@ const gamesCommand = defineCommand({
 })
 
 const migrateCommand = defineCommand({
-  meta: { name: "migrate", description: "List and select migration skills from dev.puzzmo.com" },
+  meta: { name: "migrate", description: "List and select migration skills from workshop.puzzmo.com" },
   run: () => migrate(),
 })
 

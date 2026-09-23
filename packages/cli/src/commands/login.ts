@@ -5,13 +5,13 @@ import { defaultSource, addToken, decodeTokenPayload, normalizeSource } from "..
 /** Saves a CLI token to ~/.puzzmo/config.json under the given source server */
 export const login = (token: string, source: string = defaultSource) => {
   if (!token.startsWith("pzt-")) {
-    p.log.error("Invalid CLI token. Generate one from dev.puzzmo.com.")
+    p.log.error("Invalid CLI token. Generate one from workshop.puzzmo.com.")
     process.exit(1)
   }
 
   const payload = decodeTokenPayload(token)
   if (!payload?.teamID) {
-    p.log.error("Could not decode the team from this token. Make sure you're using a token from dev.puzzmo.com.")
+    p.log.error("Could not decode the team from this token. Make sure you're using a token from workshop.puzzmo.com.")
     process.exit(1)
   }
 

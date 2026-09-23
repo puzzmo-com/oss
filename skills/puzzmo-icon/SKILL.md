@@ -1,13 +1,13 @@
 ---
 name: puzzmo-icon
-description: Use this skill when the user wants to "design a Puzzmo icon", "make a game icon", "create an SVG icon for Puzzmo", or asks for help producing an icon that meets the dev.puzzmo.com Icon modal requirements.
+description: Use this skill when the user wants to "design a Puzzmo icon", "make a game icon", "create an SVG icon for Puzzmo", or asks for help producing an icon that meets the workshop.puzzmo.com Icon modal requirements.
 ---
 
 # Puzzmo Game Icon
 
 A Puzzmo game icon is a **two-color SVG** stored at 28×28 and **recolored at runtime** for every surface it appears on. There is no opportunity for shading, gradients, or accent colors — only foreground (`#000000`) and background (`#FFFFFF`) are allowed, and both get swapped per surface. Design accordingly.
 
-The canonical UI is the Icon modal in the dev.puzzmo.com developer portal (where you paste or upload the SVG for your game); the server re-validates every uploaded SVG before accepting it, so the rules below are enforced regardless of what the modal shows.
+The canonical UI is the Icon modal in Workshop (where you paste or upload the SVG for your game); the server re-validates every uploaded SVG before accepting it, so the rules below are enforced regardless of what the modal shows.
 
 ## Hard rules (server-validated)
 
@@ -128,6 +128,6 @@ When designing a new icon, **fetch 4-6 existing ones first** to study the visual
 
 ## References
 
-- Upload/preview UI: the Icon modal in the dev.puzzmo.com developer portal.
+- Upload/preview UI: the Icon modal in Workshop.
 - Recolor endpoint: `https://api.puzzmo.com/gameIcon` (accepts `slug`, `size`, `fg`, `bg`).
 - Game pages: `https://puzzmo.com/game/{slug}`.

@@ -2,7 +2,7 @@ import { Validator, type Schema } from "@cfworker/json-schema"
 
 import type { PuzzmoFile } from "./api.js"
 
-const schemaURL = "https://dev-dj9e.onrender.com/schema/puzzmo-file-schema.json" //"https://dev.puzzmo.com/schema/puzzmo-file-schema.json"
+const schemaURL = "https://dev-dj9e.onrender.com/schema/puzzmo-file-schema.json" //"https://workshop.puzzmo.com/schema/puzzmo-file-schema.json"
 
 let cachedValidator: Validator | undefined
 
