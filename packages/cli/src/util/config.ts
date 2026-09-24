@@ -107,9 +107,6 @@ const dedupeTokens = (tokens: TokenEntry[]): TokenEntry[] => {
   })
 }
 
-/** Best-guess token for clients that don't care which server it points at (e.g. .mcp.json scaffolding) */
-export const getDefaultToken = (): string | undefined => getTokens()[0]?.token
-
 type TokenPayload = { teamID?: string; createdByID?: string; iat?: number }
 
 /** Decodes a `pzt-<jwt>` token (without verifying) and returns its payload, or null on failure */
