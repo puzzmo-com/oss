@@ -12,6 +12,7 @@ export default defineConfig({
         "simulator/standalone": resolve(__dirname, "src/simulator/standalone.ts"),
         fonts: resolve(__dirname, "src/fonts.ts"),
         svgJSX: resolve(__dirname, "src/svgJSX.ts"),
+        "pico8/index": resolve(__dirname, "src/pico8/index.ts"),
         vite: resolve(__dirname, "src/vite.ts"),
       },
       formats: ["es", "cjs"],
@@ -21,7 +22,7 @@ export default defineConfig({
       },
     },
     rolldownOptions: {
-      external: ["vite", "lz-string", "path", "fs"],
+      external: ["vite", "lz-string", "path", "fs", "child_process"],
       output: {
         globals: {},
       },

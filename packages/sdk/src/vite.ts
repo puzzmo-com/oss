@@ -5,6 +5,8 @@ import fs from "fs"
 import type { HostContext } from "./types"
 import type { HostContextPreset } from "./simulator/types"
 
+export { puzzmoPico8, type PuzzmoPico8PluginOptions } from "./pico8/vitePlugin"
+
 export type PuzzmoSimulatorPluginOptions = {
   /** Whether to auto-start the game after READY (default: true) */
   autoStart?: boolean

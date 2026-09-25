@@ -44,6 +44,11 @@
       "import": "./dist/svgJSX.js",
       "require": "./dist/svgJSX.cjs"
     },
+    "./pico8": {
+      "types": "./dist/pico8/index.d.ts",
+      "import": "./dist/pico8/index.js",
+      "require": "./dist/pico8/index.cjs"
+    },
     "./vite": {
       "types": "./dist/vite.d.ts",
       "import": "./dist/vite.js",

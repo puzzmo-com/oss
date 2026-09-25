@@ -18,7 +18,7 @@ import { decodeTokenPayload, getTokens, tokenHelp, type TokenEntry } from "../..
 import { slugify } from "../../util/slugify.js"
 import { detectRepoContext, type RepoContext, type RepoType } from "./detectRepo.js"
 
-export type Strategy = "import" | "blank" | "prompt"
+export type Strategy = "import" | "blank" | "prompt" | "pico8"
 
 export type CreateOptions = {
   name?: string
@@ -30,6 +30,8 @@ export type CreateOptions = {
   pm?: string
   strategy?: Strategy
   prompt?: string
+  /** An existing .p8 to start a PICO-8 game from */
+  cart?: string
 }
 
 /** Writes .mcp.json pointing at the Workshop MCP server */
@@ -192,6 +194,20 @@ const copyTemplate = (sourceDir: string, targetDir: string, replacements: Record
   }
 }
 
+/**
+ * Swaps the PICO-8 template's example cart for one the player already has. The bridge needs `#include puzzmo.lua`
+ * before anything calls it, so that's added at the top of the cart's code when it's missing. The calls to
+ * `pz_init()` and `pz_update()` depend on how the cart is written, so those are left to the person.
+ */
+export const adoptPico8Cart = (source: string, target: string): { addedInclude: boolean } => {
+  let cart = fs.readFileSync(source, "utf-8")
+  if (!cart.includes("__lua__")) throw new Error(`${source} doesn't look like a PICO-8 cart (there's no __lua__ section)`)
+  const addedInclude = !/^\s*#include\s+puzzmo\.lua/im.test(cart)
+  if (addedInclude) cart = cart.replace(/__lua__\r?\n/, (lua) => `${lua}#include puzzmo.lua\n`)
+  fs.writeFileSync(target, cart)
+  return { addedInclude }
+}
+
 /** Picks an agent interactively, returning the agent id or "none" */
 const pickAgent = async (preselected?: string): Promise<string> => {
   const supported = new Set(agentNames())
@@ -277,6 +293,7 @@ export const gameCreate = async (opts: CreateOptions) => {
       message: "How would you like to create your game?",
       options: [
         { value: "blank" as const, label: "Blank game (Minesweeper template)" },
+        { value: "pico8" as const, label: "PICO-8 game (a cart, plus the bridge to Puzzmo)" },
         { value: "import" as const, label: "Import from an existing URL (uses an LLM to migrate)" },
         { value: "prompt" as const, label: "From a prompt (Builds on template + LLM customizations)" },
       ],
@@ -310,6 +327,7 @@ export const gameCreate = async (opts: CreateOptions) => {
 
   let importedTitle: string | undefined
   let userPrompt: string | undefined
+  let cartPath: string | undefined
 
   if (strategy === "import") {
     let url = opts.url
@@ -322,6 +340,28 @@ export const gameCreate = async (opts: CreateOptions) => {
     const { title } = await downloadPage(url, tmpDir)
     s.stop("Download complete.")
     importedTitle = title
+  } else if (strategy === "pico8") {
+    cartPath = opts.cart
+    if (cartPath === undefined && !opts.strategy) {
+      const answer = (await p.text({
+        message: "Path to a .p8 cart you already have (leave empty to start from an example)",
+        placeholder: "~/pico-8/carts/mygame.p8",
+        validate: (v) => (v && !fs.existsSync(expandHome(v)) ? "Can't find that file" : undefined),
+      })) as string
+      if (p.isCancel(answer)) process.exit(0)
+      cartPath = answer || undefined
+    }
+    if (cartPath) {
+      cartPath = path.resolve(expandHome(cartPath))
+      if (!fs.existsSync(cartPath)) {
+        p.log.error(`Can't find the cart at ${cartPath}`)
+        process.exit(1)
+      }
+      importedTitle = path
+        .basename(cartPath, ".p8")
+        .replace(/[-_]+/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    }
   } else if (strategy === "prompt") {
     userPrompt = opts.prompt
     if (!userPrompt) {
@@ -359,7 +399,7 @@ export const gameCreate = async (opts: CreateOptions) => {
 
   // Materialize the starter (after we know the slug/name). Imports get it too — porting a
   // downloaded game into a project that already builds beats rebuilding the project by hand.
-  const templateDir = resolveTemplateDir("minesweeper")
+  const templateDir = resolveTemplateDir(strategy === "pico8" ? "pico8" : "minesweeper")
   if (!fs.existsSync(templateDir)) {
     p.log.error(`Bundled template not found at ${templateDir}`)
     process.exit(1)
@@ -374,6 +414,22 @@ export const gameCreate = async (opts: CreateOptions) => {
   const materialize = (from: string, to: string) => copyTemplate(from, to, replacements)
   if (strategy === "import") seedImportedGame(tmpDir, templateDir, materialize)
   else materialize(templateDir, tmpDir)
+
+  if (cartPath) {
+    const { addedInclude } = adoptPico8Cart(cartPath, path.join(tmpDir, "cart", "game.p8"))
+    p.note(
+      [
+        ...(addedInclude ? ["Added `#include puzzmo.lua` to the top of your cart's code. Then, in cart/game.p8:"] : ["In cart/game.p8:"]),
+        "  - call pz_init() in _init, and pz_update() first thing in _update",
+        "  - wait for pz.ready, then build the level from pz.puzzle",
+        "  - take input while pz.started is true and pz.paused is false",
+        "  - pz_save(str) after each move, pz_complete(points, str) when it's solved",
+        "  - pz_finished() when your victory animation is done",
+        "The README walks through each of these.",
+      ].join("\n"),
+      "Your cart is in, a few hooks left to add",
+    )
+  }
 
   // Step 6: Place files
   let gameDir: string
@@ -475,12 +531,20 @@ export const gameCreate = async (opts: CreateOptions) => {
   const relativePath = path.relative(process.cwd(), gameDir)
 
   p.note(
-    [`cd ${relativePath}`, `${runCmd} vite        # Start development server`, `${runCmd} vite build  # Build for production`].join("\n"),
+    [
+      `cd ${relativePath}`,
+      `${runCmd} vite        # Start development server`,
+      `${runCmd} vite build  # Build for production`,
+      ...(strategy === "pico8" ? ["", "Then open cart/game.p8 in PICO-8: saving it reloads the game in the simulator."] : []),
+    ].join("\n"),
     "Next steps",
   )
 
   p.outro(`Done! Your game is in ./${relativePath}/`)
 }
+
+/** Expands a leading `~` in a path typed into a prompt, which the shell didn't get the chance to. */
+const expandHome = (p: string) => (p.startsWith("~") ? path.join(process.env.HOME ?? "", p.slice(1)) : p)
 
 /** `--pm` arrives as a plain string; anything unexpected falls back to the repo's own manager */
 const packageManagerFrom = (value: string | undefined, fallback: PackageManagerName): PackageManagerName =>

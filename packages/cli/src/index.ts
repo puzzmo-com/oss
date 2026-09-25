@@ -87,7 +87,8 @@ const migrateCommand = defineCommand({
 const gameCreateCommand = defineCommand({
   meta: { name: "create", description: "Scaffold a new Puzzmo game project" },
   args: {
-    strategy: { type: "enum", options: ["import", "blank", "prompt"], description: "How to seed the new game" },
+    strategy: { type: "enum", options: ["import", "blank", "prompt", "pico8"], description: "How to seed the new game" },
+    cart: { type: "string", description: "An existing .p8 cart to start from (used with --strategy pico8)" },
     prompt: { type: "string", description: "Game description (used with --strategy prompt)" },
     name: { type: "string", description: "Game display name" },
     slug: { type: "string", description: "Game slug (defaults to a slugified --name)" },
@@ -108,6 +109,7 @@ const gameCreateCommand = defineCommand({
       agent: args.agent,
       accessToken: args.token,
       pm: args.pm,
+      cart: args.cart,
     }),
 })
 
