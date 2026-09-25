@@ -107,20 +107,16 @@ export async function createPico8Game(
  * this for you. The cart's half is `puzzmo.lua`, which the
  * `puzzmoPico8()` vite plugin writes next to your cart.
  *
- * The bridge runs the SDK lifecycle for you: it answers the cart's boot with the board (via `onBoot`), calls
- * `gameLoaded()` once the cart has it, and passes start, pause, resume and retry through to the cart. What's left for
- * your code is the game: what the board looks like in bytes, and what the cart's messages mean.
+ * The bridge runs the SDK lifecycle for you: it answers the cart's boot with the puzzle and progress, calls
+ * `gameLoaded()` once the cart has them, passes start, pause, resume and retry through to the cart, and turns the
+ * cart's `pz_save()`, `pz_deed()` and `pz_complete()` into SDK calls. Reach for it over `createPico8Game` when you
+ * need something from `gameReady()` first, like the theme.
  *
  * ```ts
  * const sdk = createPuzzmoSDK()
- * const { puzzleString, inputString, completed } = await sdk.gameReady()
+ * const { puzzleString, inputString, completed, theme } = await sdk.gameReady()
  *
- * const bridge = createPico8Bridge({
- *   sdk,
- *   completed,
- *   onBoot: (send) => send(SETUP, [remaining]),
- *   onMessage: (op, payload, send) => { ... },
- * })
+ * createPico8Bridge({ sdk, puzzleString, inputString, completed, palette: [theme.g_bg, theme.g_bgAlt] })
  * ```
  */
 export function createPico8Bridge(options: Pico8BridgeOptions): Pico8Bridge {
