@@ -38,6 +38,17 @@ puzzmo games validate
 
 > The older `puzzmo upload` and `puzzmo validate` (without `games`) still work as aliases, but the `puzzmo games …` forms are preferred.
 
+### `puzzmo puzzles upload <path> --game <slug>`
+
+Add puzzle files to the end of a game's puzzle pool. `path` is a single file or a directory of them. The daily scheduler takes files in filename order, so name them to sort in the order they should run.
+
+```bash
+puzzmo puzzles upload puzzles/october --game my-game
+puzzmo puzzles upload puzzles/october --game my-game --dry-run
+```
+
+Every file is validated before any are uploaded; `--dry-run` stops after validation. Files are sent in batches of at most 100 files and ~900KB.
+
 ### `puzzmo game create [token]`
 
 Interactive wizard to create a new Puzzmo game project.

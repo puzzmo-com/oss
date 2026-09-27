@@ -7,6 +7,7 @@ import { type ChangedAgainst, changed } from "./commands/changed.js"
 import { gameCreate } from "./commands/game/create.js"
 import { login } from "./commands/login.js"
 import { migrate } from "./commands/migrate.js"
+import { puzzlesUpload } from "./commands/puzzles.js"
 import { upload } from "./commands/upload.js"
 import { validate } from "./commands/validate.js"
 import { defaultSource } from "./util/config.js"
@@ -79,6 +80,21 @@ const gamesCommand = defineCommand({
   subCommands: { changed: changedCommand, upload: uploadCommand, validate: validateCommand },
 })
 
+const puzzlesUploadCommand = defineCommand({
+  meta: { name: "upload", description: "Add puzzle files to the end of a game's puzzle pool" },
+  args: {
+    path: { type: "positional", description: "A puzzle file, or a directory of them", required: true },
+    game: { type: "string", description: "The game slug to upload puzzles for", required: true },
+    "dry-run": { type: "boolean", description: "Validate the files without uploading them" },
+  },
+  run: ({ args }) => puzzlesUpload(args.path, { game: args.game, dryRun: args["dry-run"] }),
+})
+
+const puzzlesCommand = defineCommand({
+  meta: { name: "puzzles", description: "Manage the puzzles scheduled for your games" },
+  subCommands: { upload: puzzlesUploadCommand },
+})
+
 const migrateCommand = defineCommand({
   meta: { name: "migrate", description: "List and select migration skills from workshop.puzzmo.com" },
   run: () => migrate(),
@@ -145,6 +161,7 @@ const main = defineCommand({
   subCommands: {
     login: loginCommand,
     games: gamesCommand,
+    puzzles: puzzlesCommand,
     migrate: migrateCommand,
     game: gameCommand,
     upload: uploadAlias,

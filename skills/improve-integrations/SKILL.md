@@ -11,7 +11,7 @@ Does not require the `workshop.puzzmo.com` MCP server to be configured. The MCP 
 
 The users access tokens live in `~/.puzzmo/config.json` — `pzt-`-prefixed JWTs. Production tokens can be used on localhost servers, but not the other way around. To find the right one:
 
-- Read the file and collect every `pwt-` token you see.
+- Read the file and collect every `pzt-` token you see.
 
 - extract teamID from the JWT's data (the middle part, base64url-decoded, is a JSON object containing `teamID` and other info) to see if it matches the teamID for the game in question (in the puzzmo.json). If it is not set, or does not end in ":team" then you should continue and update the puzzmo.json after using `list_accessible_games` to find a team with the game slug.
 
