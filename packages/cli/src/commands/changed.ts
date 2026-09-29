@@ -63,7 +63,7 @@ export const changed = async (dir: string, options: ChangedOptions = {}) => {
     process.exit(1)
   }
 
-  const { games, errors: discoveryErrors } = await discoverGames(rootDir, { requireDist: false, requireIcon: false })
+  const { games, errors: discoveryErrors } = await discoverGames(rootDir, { requireDist: false, requireLinkedFiles: false })
   if (!games.length && !discoveryErrors.length) {
     console.error(`No puzzmo.json files found under ${rootDir}`)
     process.exit(1)

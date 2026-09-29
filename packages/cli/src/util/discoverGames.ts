@@ -27,6 +27,8 @@ export type DiscoveredGame = {
   distDir: string
   /** Absolute path to the icon SVG named by `game.iconPath`, or null when the file sets no icon */
   iconPath: string | null
+  /** Absolute path to the help Markdown named by `game.helpPath`, or null when the file sets no help */
+  helpPath: string | null
 }
 
 /** A puzzmo.json that was found but could not be used (invalid JSON, schema errors, missing dist) */
@@ -46,13 +48,16 @@ export type DiscoveryResult = {
 export type DiscoverOptions = {
   /** Require each game to have a non-empty dist folder (default true). Set false for commands that run before a build. */
   requireDist?: boolean
-  /** Require `game.iconPath` to point at a file (default true). Set false for commands that only read puzzmo.json metadata. */
-  requireIcon?: boolean
+  /**
+   * Require `game.iconPath` and `game.helpPath` to point at files (default true). Set false for commands that only read puzzmo.json
+   * metadata.
+   */
+  requireLinkedFiles?: boolean
 }
 
 /** Walks `rootDir` looking for puzzmo.json files, validates each, and resolves their dist directory */
 export const discoverGames = async (rootDir: string, options: DiscoverOptions = {}): Promise<DiscoveryResult> => {
-  const { requireDist = true, requireIcon = true } = options
+  const { requireDist = true, requireLinkedFiles = true } = options
   const root = path.resolve(rootDir)
   const puzzmoJsonPaths = findPuzzmoJsonFiles(root)
 
@@ -80,10 +85,14 @@ export const discoverGames = async (rootDir: string, options: DiscoverOptions = 
     const puzzmoJsonDir = path.dirname(puzzmoJsonPath)
     const distDir = resolveDistDir(puzzmoFile, puzzmoJsonDir, root)
 
-    // The icon is checked here rather than at upload time so `validate` catches a stale path too.
+    // The icon and help are checked here rather than at upload time so `validate` catches a stale path too.
     const iconPath = puzzmoFile.game.iconPath ? path.resolve(puzzmoJsonDir, puzzmoFile.game.iconPath) : null
-    if (requireIcon && iconPath && !isFile(iconPath))
+    if (requireLinkedFiles && iconPath && !isFile(iconPath))
       fileErrors.push(`Icon file not found for ${puzzmoFile.game.slug}: "${puzzmoFile.game.iconPath}" (${iconPath}) does not exist.`)
+
+    const helpPath = puzzmoFile.game.helpPath ? path.resolve(puzzmoJsonDir, puzzmoFile.game.helpPath) : null
+    if (requireLinkedFiles && helpPath && !isFile(helpPath))
+      fileErrors.push(`Help file not found for ${puzzmoFile.game.slug}: "${puzzmoFile.game.helpPath}" (${helpPath}) does not exist.`)
 
     if (requireDist) {
       if (!distDir) {
@@ -104,7 +113,7 @@ export const discoverGames = async (rootDir: string, options: DiscoverOptions = 
       continue
     }
 
-    games.push({ puzzmoJsonPath, puzzmoJsonDir, puzzmoFile, distDir: distDir ?? "", iconPath })
+    games.push({ puzzmoJsonPath, puzzmoJsonDir, puzzmoFile, distDir: distDir ?? "", iconPath, helpPath })
   }
 
   return { games, errors }

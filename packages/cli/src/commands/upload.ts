@@ -161,7 +161,7 @@ type UploadOneOptions = {
 /** Uploads a single discovered game; throws on failure */
 const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Promise<GameSuccess> => {
   const { credential, apiURL, sha, description, repoURL, verbose } = opts
-  const { puzzmoFile, distDir, iconPath } = game
+  const { puzzmoFile, distDir, iconPath, helpPath } = game
   const gameSlug = puzzmoFile.game.slug
 
   const files = collectFiles(distDir)
@@ -193,10 +193,17 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
     (batch, totalBatches, uploaded) => {
       console.log(`    Batch ${batch}/${totalBatches} done (${plural(uploaded, "file")} uploaded)`)
     },
-    { verbose, description, repoURL, iconSVG: iconPath ? fs.readFileSync(iconPath, "utf-8") : null },
+    {
+      verbose,
+      description,
+      repoURL,
+      iconSVG: iconPath ? fs.readFileSync(iconPath, "utf-8") : null,
+      helpMD: helpPath ? fs.readFileSync(helpPath, "utf-8") : null,
+    },
   )
 
   if (result.iconChanged && iconPath) console.log(`  Icon updated from ${path.relative(game.puzzmoJsonDir, iconPath)}.`)
+  if (result.helpChanged && helpPath) console.log(`  In-game help updated from ${path.relative(game.puzzmoJsonDir, helpPath)}, live now.`)
 
   if (result.integrationsChanged && result.versionsURL) {
     console.log(`  Uploaded. A new version has been staged for your team to try before it goes live:`)

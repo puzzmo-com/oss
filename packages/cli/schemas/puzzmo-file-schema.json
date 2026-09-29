@@ -40,6 +40,10 @@
             "iconPath": {
               "type": "string",
               "description": "Path to the game's icon SVG, relative to this file (e.g. \"./icon.svg\"). Synced to the game on every upload when present. The icon is recolored at runtime, so it must be two-color: #000000 for the foreground, #FFFFFF for the background, with width, height and viewBox attributes, and under 8,000 characters."
+            },
+            "helpPath": {
+              "type": "string",
+              "description": "Path to the game's how-to-play Markdown, relative to this file (e.g. \"./help.md\"). Synced to the game's in-game help on every upload when present, replacing anything edited in Workshop. Must not be empty or the untouched placeholder template, and under 20,000 characters."
             }
           },
           "required": ["displayName", "slug", "teamID"],

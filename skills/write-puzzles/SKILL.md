@@ -18,7 +18,7 @@ The user's access tokens live in `~/.puzzmo/config.json` as `pzt-`-prefixed JWTs
 1. Call `get_puzzle_schedule` with the token and `gameSlug`.
    - If `isScheduled` is false, nothing drains the pool. Tell the user to ask Puzzmo to set up a community pool schedule, then stop.
    - `poolFilenames` are the files already waiting. `poolLastsUntil` is the last day they cover; new uploads start the day after.
-   - `unfilledDates` are days the scheduler has already passed without a puzzle. Uploading does not fill them on its own: after uploading, tell the user to press "Run scheduler" on the game's Pool section in Workshop, which fills them from the pool first (and so moves `poolLastsUntil` earlier).
+   - `unfilledDates` are days the scheduler has already passed without a puzzle. Uploading does not fill them on its own: after uploading, tell the user to press "Run scheduler" in the Scheduling section of the game's page in Workshop, which fills them from the pool first (and so moves `poolLastsUntil` earlier).
    - Work out how many puzzles are needed with the user, e.g. enough for `unfilledDates` plus the next month past `poolLastsUntil`.
 
 2. Learn the puzzle format.
@@ -27,7 +27,7 @@ The user's access tokens live in `~/.puzzmo/config.json` as `pzt-`-prefixed JWTs
 
 3. Write the puzzles as files in the game's repo (e.g. `puzzles/2026-10/`), so the user can review and edit them.
    - Name files so they sort in the order they should be played, e.g. `2026-10-01-harbour.txt`. Pool files already waiting sort by upload time, so new files always go after them.
-   - Front matter is optional. When used it must include `"_v": 1`; `variant.slug` must be one of the remixes from `get_puzzle_format`.
+   - Don't add front matter (a `---` JSON block at the top of the file). Puzzmo only reads it for its own internal teams and strips it unread for everyone else.
    - Vary difficulty and theme across the batch the way the existing puzzles do.
 
 4. Check the puzzle bodies with the game itself: run its parser or tests over every new file, and fix anything it rejects. If the game has no way to check a puzzle, write a small script which loads each file through the game's parsing code.
