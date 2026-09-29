@@ -163,62 +163,17 @@ export type BootstrapGameData = {
   }
   /** The currently signed-in Puzzmo user, or null when the viewer is anonymous. */
   currentUser: BootstrapCurrentUser | null
-  /** Result of starting a new GamePlay or resuming the player's existing one. */
-  startOrFindGameplay: {
-    /** The GamePlay record to bootstrap the game with. */
-    gamePlayed: {
-      /** Serialized game-specific board state. */
-      boardState: string
-      /** ID of the user who owns this gameplay. */
-      ownerID: string
-      /** True when the viewer owns the underlying puzzle (vs. viewing someone else's). */
-      viewerOwnsPuzzle: boolean
-      /** Whether the player has finished the puzzle. */
-      completed: boolean
-      /** When this GamePlay was created. */
-      createdAt: string
-
-      /** Points awarded for this gameplay (0 until completion). */
-      pointsAwarded: number
-      /** Seconds added to the clock (e.g. from hint penalties or time bonuses). */
-      additionalTimeAddedSecs: number
-      /** ElapsedTimeSecs + additionalTimeAddedSecs, precomputed for convenience. */
-      combinedTimeSecs: number
-      /** Seconds the player has spent solving (clock time, excluding penalties/bonuses). */
-      elapsedTimeSecs: number
-
-      /** GamePlay db row ID. */
-      id: string
-      /** URL-safe identifier for this gameplay. */
-      slug: string
-
-      /** The puzzle being played. */
-      puzzle: {
-        /** Puzzle row ID. */
-        id: string
-        /** Editor-assigned name; null for untitled puzzles. */
-        name?: string | null
-        /** Serialized puzzle definition; opaque to the host and parsed by the game bundle. */
-        puzzle: string
-        /** Metadata for the game bundle that renders this puzzle. */
-        game: any
-        /** Most recent daily schedule entry that uses this puzzle, if any. */
-        mostRecentDaily?: {
-          daily?: {
-            /** A date key like "2023-04-01" */
-            dateKey?: string
-            /** Whether this daily is for today. If not true then its an archived game of some sort. */
-            isToday?: boolean
-          }
-        } | null
-      }
-    }
-  }
+  /** The game being run, and the one version of it this player is served. */
+  game: BootstrapGame
+  /** The play session: the gameplay and the puzzle it is for. Absent for play which has no session. */
+  session?: BootstrapSession
+  /** Server-computed per-player data for this game, also available via `getViewerMetadata()`. */
+  viewerMetadata?: unknown
   /** Color scheme and design tokens the game should render with. */
   theme: Theme
   /** Structured context the host provides to the game. */
   hostContext: HostContext[]
-  /** Version string for the host<->game runtime contract; bumped on breaking changes. */
+  /** The host<->game runtime contract the host agreed to, answering the one the game declared in READY. */
   appRuntimeContract: string
   /**
    * Physical safe-area insets (CSS px) of the host viewport, e.g. the iOS home-indicator gap. Games render
@@ -226,6 +181,95 @@ export type BootstrapGameData = {
    * edge. `env(safe-area-inset-*)` reads 0 inside the game iframe, so the host measures and passes them here.
    */
   safeAreaInsets?: { top: number; right: number; bottom: number; left: number }
+}
+
+/**
+ * The game being run. Mirrors how Puzzmo stores it: a game, the version of it this player is served,
+ * the runtime that version pins, and the build of that runtime.
+ */
+export type BootstrapGame = {
+  /** Game row ID. */
+  id: string
+  /** URL slug, e.g. "typeshift". */
+  slug: string
+  /** Immutable, globally unique identifier for the game. */
+  stableSlug: string
+  /** Display name, e.g. "Typeshift". */
+  displayName: string
+  /** The game version served to this player: the staged one for your team, the live one for everyone else. */
+  version: {
+    /** GameVersion row ID. */
+    id: string
+    /** Optional human-readable label for the version. */
+    label: string | null
+    /** Capability bits for the game's features. */
+    featuresArr: readonly number[]
+    /** Bitwise game flags. */
+    flagsArr: readonly number[]
+    /** The runtime this version pins. */
+    runtime: {
+      /** GameRuntime row ID. */
+      id: string
+      /** The build served from this runtime, null when nothing has been uploaded. */
+      version: {
+        /** GameRuntimeVersion row ID. */
+        id: string
+        /** The git SHA the build was made from. */
+        assetsSha: string
+        /** URL prefix the build's files are served from. */
+        assetsBaseURL: string
+      } | null
+    }
+  }
+}
+
+/** The gameplay and the puzzle it is for. */
+export type BootstrapSession = {
+  /** The GamePlay record to bootstrap the game with. */
+  gameplay: {
+    /** Serialized game-specific board state. */
+    boardState: string
+    /** ID of the user who owns this gameplay. */
+    ownerID: string
+    /** True when the viewer owns the underlying puzzle (vs. viewing someone else's). */
+    viewerOwnsPuzzle: boolean
+    /** Whether the player has finished the puzzle. */
+    completed: boolean
+    /** When this GamePlay was created. */
+    createdAt: string
+
+    /** Points awarded for this gameplay (0 until completion). */
+    pointsAwarded: number
+    /** Seconds added to the clock (e.g. from hint penalties or time bonuses). */
+    additionalTimeAddedSecs: number
+    /** ElapsedTimeSecs + additionalTimeAddedSecs, precomputed for convenience. */
+    combinedTimeSecs: number
+    /** Seconds the player has spent solving (clock time, excluding penalties/bonuses). */
+    elapsedTimeSecs: number
+
+    /** GamePlay db row ID. */
+    id: string
+    /** URL-safe identifier for this gameplay. */
+    slug: string
+  }
+  /** The puzzle being played. */
+  puzzle: {
+    /** Puzzle row ID. */
+    id: string
+    /** Editor-assigned name; null for untitled puzzles. */
+    name?: string | null
+    /** Serialized puzzle definition; opaque to the host and parsed by the game bundle. */
+    puzzle: string
+    /** Most recent daily schedule entry that uses this puzzle, if any. */
+    mostRecentDaily?: {
+      daily?: {
+        /** A date key like "2023-04-01" */
+        dateKey?: string
+        /** Whether this daily is for today. If not true then its an archived game of some sort. */
+        isToday?: boolean
+      }
+    } | null
+  }
 }
 
 /** The subset of the Puzzmo user that's exposed to games at bootstrap. */
@@ -601,7 +645,11 @@ export type AvailableHaptics = "selection" | "error" | "warning" | "success" | "
 /** Messages from the SDK to the host */
 export type MessagesSentFromEmbed = {
   /** Tells the host to send back the bootstrap data (puzzle, theme, gameplay state). Send once on startup via `sdk.gameReady()`. */
-  READY: object
+  /**
+   * The game is ready for its data. `runtimeContract` is the contract the game was built against,
+   * which the host answers with in READY_DATA's `appRuntimeContract`. Absent means "1.0".
+   */
+  READY: { runtimeContract?: string }
   /** Signals that the game has finished loading and is ready to start. The host will respond with `START_GAME`. */
   READY_GAME_LOADED: { state: any; gameRuntimeContract: string; embedRuntimeContract: string }
   /** Persist the current in-progress game state to the API. Call this after every meaningful player action. */

@@ -30,7 +30,7 @@ const probePlugin: SDKPlugin<"probe", { fire: (msg: string) => void; received: s
     return {
       fire: (msg) => ctx.send("PROBE_MESSAGE", msg),
       received,
-      bootstrapID: () => ctx.bootstrap()?.startOrFindGameplay?.gamePlayed?.id ?? null,
+      bootstrapID: () => ctx.bootstrap()?.session?.gameplay?.id ?? null,
     }
   },
 }

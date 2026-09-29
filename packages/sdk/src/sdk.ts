@@ -1,3 +1,4 @@
+import { normalizeReadyData } from "./bootstrapPayload"
 import { createGameAnalytics, setupLinkTracking, type GameAnalyticsTracker } from "./analytics"
 import type { PluginAPIs, SDKPlugin, SDKPluginContext } from "./plugins"
 import type {
@@ -392,6 +393,13 @@ function createHostAPI() {
   return { sendMessage, onMessage }
 }
 
+/**
+ * The host<->game contract this SDK is built against, declared in READY and READY_GAME_LOADED.
+ * Stays "1.0" until every host supporting "1.1" is deployed: an older puzzmo.com reloads when it
+ * sees a contract it doesn't know.
+ */
+const sdkRuntimeContract = "1.0"
+
 const hostAPI = createHostAPI()
 
 /** Creates a Puzzmo SDK instance for communicating with the Puzzmo host */
@@ -401,9 +409,9 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   let readyData: MessagesReceived["READY_DATA"] | null = null
   let readyDataResolve: ((data: MessagesReceived["READY_DATA"]) => void) | null = null
 
-  const getGameplay = () => readyData?.startOrFindGameplay?.gamePlayed
+  const getGameplay = () => readyData?.session?.gameplay
   const getGameplayID = () => getGameplay()?.id ?? null
-  const getPuzzleString = () => getGameplay()?.puzzle.puzzle ?? null
+  const getPuzzleString = () => readyData?.session?.puzzle.puzzle ?? null
   const getBoardState = () => getGameplay()?.boardState ?? null
   const getTheme = () => readyData?.theme ?? null
   const getCompleted = () => getGameplay()?.completed ?? false
@@ -498,15 +506,15 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   })
 
   hostAPI.onMessage("READY_DATA", (data) => {
-    const bootstrapData = data as MessagesReceived["READY_DATA"]
+    const bootstrapData = normalizeReadyData(data as MessagesReceived["READY_DATA"])
     readyData = bootstrapData
 
-    const gamePlayed = bootstrapData.startOrFindGameplay?.gamePlayed
+    const gamePlayed = bootstrapData.session?.gameplay
 
     // userState.gameSettings is a map keyed by game slug; older records can hold the
     // value as a JSON string rather than an object
     if (currentSettings === null) {
-      const gameSlug = gamePlayed?.puzzle?.game?.slug
+      const gameSlug = bootstrapData.game.slug
       let saved = gameSlug ? bootstrapData.userState?.gameSettings?.[gameSlug] : null
       if (typeof saved === "string") {
         try {
@@ -569,7 +577,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     plugins: pluginAPIs as PluginAPIs<Plugins>,
 
     gameReady: async (): Promise<GameReadyResult> => {
-      hostAPI.sendMessage("READY", {})
+      hostAPI.sendMessage("READY", { runtimeContract: sdkRuntimeContract })
 
       if (getPuzzleString()) {
         const inputString = getBoardState()
@@ -615,7 +623,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
     gameLoaded: (state: any = {}) => {
       hostAPI.sendMessage("READY_GAME_LOADED", {
         state,
-        gameRuntimeContract: "1.0",
+        gameRuntimeContract: sdkRuntimeContract,
         embedRuntimeContract: "1.0",
       })
       trackAnalyticsEvent("READY_GAME_LOADED")

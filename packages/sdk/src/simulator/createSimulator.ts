@@ -1,4 +1,4 @@
-import type { BootstrapGameData, MessagesReceived } from "../types"
+import type { BootstrapGame, BootstrapGameData, MessagesReceived } from "../types"
 import type { SimulatorConfig, SimulatorContext, SimulatorState, SimulatorView, TabName, FixtureImports } from "./types"
 import { simulatorStyles } from "./styles"
 import { createInitialState, persistCollapsed, persistTab } from "./state"
@@ -446,6 +446,20 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
 
   // Create READY_DATA payload
   const createReadyData = (puzzle: string): BootstrapGameData => {
+    const gameplay = {
+      additionalTimeAddedSecs: 0,
+      boardState: state.currentInputStr,
+      combinedTimeSecs: 0,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      elapsedTimeSecs: 0,
+      id: `simulator-gameplay-${Date.now()}`,
+      ownerID: "simulator-owner",
+      pointsAwarded: 0,
+      slug: "simulator-game",
+      viewerOwnsPuzzle: true,
+    }
+    const simulatorPuzzle = { id: "simulator-puzzle", name: "Proto Jig Puzzle", puzzle, mostRecentDaily: null }
     return {
       userState: {
         // Keyed by game slug, matching the shape real hosts send
@@ -461,32 +475,8 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
         type: "User",
         roles: "",
       },
-      startOrFindGameplay: {
-        gamePlayed: {
-          additionalTimeAddedSecs: 0,
-          boardState: state.currentInputStr,
-          combinedTimeSecs: 0,
-          completed: false,
-          createdAt: new Date().toISOString(),
-          elapsedTimeSecs: 0,
-          id: `simulator-gameplay-${Date.now()}`,
-          ownerID: "simulator-owner",
-          pointsAwarded: 0,
-          slug: "simulator-game",
-          viewerOwnsPuzzle: true,
-          puzzle: {
-            id: "simulator-puzzle",
-            name: "Proto Jig Puzzle",
-            puzzle,
-            game: {
-              displayName: "Proto Game",
-              jsPath: "",
-              slug: "proto-game",
-            },
-            mostRecentDaily: null,
-          },
-        },
-      },
+      game: simulatorGame,
+      session: { gameplay, puzzle: simulatorPuzzle },
       theme: state.selectedTheme,
       // Resolved in createInitialState: Host-tab override > config.hostContext > default app context.
       hostContext: state.hostContext,
@@ -495,12 +485,12 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   }
 
   // Handle READY message from game - send READY_DATA with puzzle
-  const handleReady = async () => {
+  const handleReady = async (appRuntimeContract: string) => {
     updateStatus("Loading puzzle...", "waiting")
 
     try {
       const puzzle = await loadPuzzle()
-      const readyData = createReadyData(puzzle)
+      const readyData = { ...createReadyData(puzzle), appRuntimeContract }
 
       updateStatus("Sending READY_DATA...", "waiting")
       wrappedSendToGame("READY_DATA", readyData)
@@ -539,7 +529,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     // Handle core messages
     if (type === "READY") {
       console.log("Simulator: Received READY from game")
-      handleReady()
+      handleReady(data?.runtimeContract === "1.1" ? "1.1" : "1.0")
       return
     }
 
@@ -620,4 +610,13 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   }
 
   return simulatorInstance
+}
+
+/** The game the simulator stands in for, with placeholder IDs since nothing is stored */
+const simulatorGame: BootstrapGame = {
+  id: "simulator-game",
+  slug: "proto-game",
+  stableSlug: "proto-game",
+  displayName: "Proto Game",
+  version: { id: "simulator-version", label: null, featuresArr: [0], flagsArr: [0], runtime: { id: "simulator-runtime", version: null } },
 }

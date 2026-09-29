@@ -32,7 +32,7 @@ export interface SDKTimer {
 
 /**
  * The bootstrap payload exposed to plugins. `currentUser` is typed for convenience; the rest of the
- * host payload (`startOrFindGameplay`, `theme`, `hostContext`, …) is reachable via the index
+ * host payload (`game`, `session`, `theme`, `hostContext`, …) is reachable via the index
  * signature so this stays self-contained and doesn't have to restate the full `BootstrapGameData`.
  */
 export interface SDKPluginBootstrap {

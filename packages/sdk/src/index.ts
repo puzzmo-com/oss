@@ -26,6 +26,8 @@ export type {
   PersistedDeed,
   GameOverMessageUIComponent,
   BootstrapGameData,
+  BootstrapGame,
+  BootstrapSession,
   BootstrapCurrentUser,
   MessagesReceived,
   MessagesSentFromEmbed,

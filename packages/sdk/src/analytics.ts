@@ -107,14 +107,15 @@ const resolveAnalyticsEndpoint = (): { apiRoot: string; enabled: boolean } => {
 
 /** Derive the analytics context from the host's bootstrap data, or null if a game isn't present. */
 const buildAnalyticsContext = (readyData: BootstrapGameData | null, apiRoot: string): GameAnalyticsContext | null => {
-  const gameplay = readyData?.startOrFindGameplay?.gamePlayed
-  if (!gameplay) return null
+  const session = readyData?.session
+  if (!session) return null
 
-  const puzzle: any = gameplay.puzzle
+  const gameplay = session.gameplay
+  const puzzle: any = session.puzzle
   const hostContext: any[] = (readyData?.hostContext as any[]) ?? []
 
   return {
-    gameSlug: puzzle.game?.slug ?? "unknown",
+    gameSlug: readyData?.game?.slug || "unknown",
     puzzleID: puzzle.id,
     gameplayOwnerID: gameplay.ownerID || readyData?.userState?.id || "unknown",
     apiRoot,
@@ -145,9 +146,7 @@ const bringsOwnRuntimeFlag = 1 << 9
  * here avoids double-counting for games that don't bring their own runtime.
  */
 const gameBringsOwnRuntime = (readyData: BootstrapGameData | null): boolean => {
-  const game: any = readyData?.startOrFindGameplay?.gamePlayed?.puzzle?.game
-  const flags = game?.flagsArr
-  const flagValue = Array.isArray(flags) ? (flags[0] ?? 0) : typeof flags === "number" ? flags : 0
+  const flagValue = readyData?.game?.version.flagsArr[0] ?? 0
   return (flagValue & bringsOwnRuntimeFlag) === bringsOwnRuntimeFlag
 }
 
