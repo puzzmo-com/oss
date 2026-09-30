@@ -427,7 +427,7 @@ export type KeyStyleRule = KeyStyles & {
  *
  *   const config: KeyboardConfig = {
  *     layout: ["qwertyuiop", "asdfghjkl", "↵zxcvbnm⌫", undefined],
- *     symbols: { "↵": "Enter", "⌫": "bsp" },
+ *     symbols: { "↵": "enter", "⌫": "bsp" },
  *     highlight: ["↵", "⌫"],
  *     disabled: [],
  *     xl: [],

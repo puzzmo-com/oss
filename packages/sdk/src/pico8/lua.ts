@@ -20,7 +20,7 @@ export const puzzmoLua = `-- puzzmo.lua: connects your cart to
 -- pz.completed already solved
 --
 -- pz_save(str)       save progress
--- pz_deed(id,n)      a stat for
+-- pz_deed(id,n,keep) a stat for
 --                    leaderboards
 -- pz_complete(n,str) solved! with
 --                    n points
