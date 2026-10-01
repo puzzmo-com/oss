@@ -1,0 +1,92 @@
+# THIS FILE BELONGS IN puzzmo-com/oss, AT .github/workflows/publish-codegen.yml
+#
+# It lives here so it sits next to the crate it builds, but it does not run in the monorepo.
+# OSS-Sync.yml mirrors packages/* and crates/* into puzzmo-com/oss and deliberately does not
+# touch .github/ there (pushing workflow files needs a token with the `workflow` scope, and
+# breaking the sync over that is not worth it). So this is a copy-once file: add it to the
+# OSS repo by hand, and only revisit it when the build matrix changes.
+#
+# Why the OSS repo and not the monorepo: these binaries go to public npm so that a fresh
+# monorepo clone can install them without any auth. puzzmo-com/oss is public and already has
+# npm trusted publishing (OIDC) plus provenance working for @puzzmo/sdk and friends; the
+# monorepo is private and holds no npm credentials.
+name: Publish codegen binaries to npm
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "crates/puzzmo-codegen/**"
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: darwin-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform: darwin-x64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux-x64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            platform: linux-arm64
+            linker: gcc-aarch64-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: win32-x64
+            exe: .exe
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Add the Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install the cross linker
+        if: matrix.linker
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.linker }}
+
+      - name: Build
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: cargo build --release --manifest-path crates/Cargo.toml --target ${{ matrix.target }}
+
+      - name: Upload the binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: crates/target/${{ matrix.target }}/release/puzzmo-codegen${{ matrix.exe }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required for npm trusted publishing (OIDC) and provenance.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download every platform binary
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+
+      # Picks one version for all five packages and publishes them together. A partial
+      # build fails the script rather than leaving the packages on different versions.
+      - name: Publish one package per platform
+        run: node packages/codegen/scripts/publishPlatformPackages.mjs

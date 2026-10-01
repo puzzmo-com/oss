@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+// Thin launcher for the native binary. Exits 3 when no binary exists for this
+// platform, which callers should read as "no fast path", not as a failure.
+const { spawnSync } = require("node:child_process")
+
+const { resolveBinary } = require("../resolve.js")
+
+const binary = resolveBinary()
+if (!binary) {
+  console.error("puzzmo-codegen: no prebuilt binary for this platform, falling back to the slow path")
+  process.exit(3)
+}
+
+const { status, error } = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" })
+if (error) {
+  console.error(`puzzmo-codegen: could not run ${binary}: ${error.message}`)
+  process.exit(3)
+}
+
+process.exit(status ?? 3)
