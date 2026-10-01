@@ -18,10 +18,10 @@
     "test:native": "cargo test --release --manifest-path ../../crates/Cargo.toml"
   },
   "optionalDependencies": {
-    "@puzzmo/codegen-darwin-arm64": "0.0.1",
-    "@puzzmo/codegen-darwin-x64": "0.0.1",
-    "@puzzmo/codegen-linux-arm64": "0.0.1",
-    "@puzzmo/codegen-linux-x64": "0.0.1",
-    "@puzzmo/codegen-win32-x64": "0.0.1"
+    "@puzzmo/codegen-darwin-arm64": "0.0.2",
+    "@puzzmo/codegen-darwin-x64": "0.0.2",
+    "@puzzmo/codegen-linux-arm64": "0.0.2",
+    "@puzzmo/codegen-linux-x64": "0.0.2",
+    "@puzzmo/codegen-win32-x64": "0.0.2"
   }
 }
