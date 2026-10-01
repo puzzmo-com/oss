@@ -4,22 +4,31 @@ Native front end for the API codegen pipeline. The Rust lives in [`crates/puzzmo
 
 **You do not need Rust to work in this repo.** The binary arrives through `yarn install` as a per-platform npm package, the same way `oxlint`, `oxfmt` and `relay-compiler` already do. Nothing in `yarn build`, `yarn test` or `yarn type-check` compiles it.
 
-## What it does today
+## What it does
 
-One command, `gate`, which answers "does `yarn workspace api script regenerate` have anything to do?" in about 10ms, without booting Node:
+The whole codegen pipeline. `yarn workspace api script regenerate` is now a scheduler over seven
+native steps, and a cold run takes about 1.3s rather than the 18s it used to.
 
 ```
-puzzmo-codegen gate [--quiet]
+puzzmo-codegen gate [--quiet]        # is anything stale?
+puzzmo-codegen run <step> [--check]  # run one step, or check it would change nothing
 ```
 
-| Exit | Meaning                                                  |
-| ---- | -------------------------------------------------------- |
-| 0    | Every codegen artifact is up to date                     |
-| 1    | Something is stale (the steps are listed on stderr)      |
-| 2    | The gate itself failed — do **not** read this as "clean" |
-| 3    | No binary for this platform (from the JS launcher only)  |
+`gate` answers in about 10ms without booting Node, which is what makes it usable from a git hook.
+The steps are `prisma-enums`, `api-schema`, `shared-flags`, `shared-stats-runtime`, `sdl-codegen`,
+`studio-json-schemas` and `expression-schemas`; `run` with no arguments lists them.
 
-`.husky/post-merge` uses this to regenerate automatically after a pull. The slow path is the same `regenerate` script as before, so a missing binary costs speed, never correctness.
+| Exit | Meaning                                                     |
+| ---- | ----------------------------------------------------------- |
+| 0    | Up to date, or the step succeeded                           |
+| 1    | Something is stale, or `--check` found a difference         |
+| 2    | The command itself failed — do **not** read this as "clean" |
+| 3    | No binary for this platform (from the JS launcher only)     |
+| 4    | The binary crashed or was signalled (JS launcher only)      |
+
+`.husky/post-merge` runs the gate and regenerates when it reports stale. Without a binary the hook
+falls back to printing a reminder, which is the only place that degrades gracefully — every other
+caller needs the binary, because there is no JavaScript implementation left.
 
 ## How the steps are defined
 
@@ -27,11 +36,21 @@ puzzmo-codegen gate [--quiet]
 
 **Adding or changing a codegen step means editing the manifest**, not just the TypeScript. The hashing in [`hash.rs`](../../crates/puzzmo-codegen/src/hash.rs) and `regenCache.ts` must stay byte-compatible — they hash each file's repo-relative path followed by its contents, over a sorted list.
 
-That byte-compatibility is **transitional scaffolding, not a permanent rule**. The plan is for the steps to move into the crate one at a time until the TypeScript pipeline is deleted; at that point `regenCache.ts` goes with it, the manifest has a single reader, and the constraint disappears. Don't design around keeping the two hashers in step forever — design around deleting one of them.
+Both sides must also agree on which files a glob matches: `*` does not cross a `/` and dotfiles are
+skipped, matching node's `glob`. They are still two implementations of one rule, so a change to
+either needs the other.
+
+Every step additionally hashes `packages/codegen/package.json`. The crate source alone is not
+enough: developers run the published binary, which lags the crate until the version pin is bumped,
+so without the pin in the hash a step would re-run with an old binary and cache the stale output as
+fresh.
 
 The gate treats a missing input as "stale" rather than an error, because `api-schema.graphql` is one step's output and another's input. That means a typo in the manifest degrades into "regenerate runs every time" instead of a crash, so the tests in `crates/puzzmo-codegen/tests/manifest.rs` are what actually catch typos. They run in CI.
 
-Note what changes when the TypeScript goes: today a missing binary costs speed, because every caller has a slower JS route. Once that route is gone, a missing binary means codegen cannot run at all, and the five published targets become a hard floor rather than an optimisation. They cover every environment in use today (all the repo's images are glibc — `node:26-bookworm-slim`, playwright `noble`); musl/Alpine is the one uncovered case, and nothing here uses it.
+With no JavaScript implementation left, the five published targets are a hard floor rather than an
+optimisation. They cover every environment in use today — all the repo's images are glibc
+(`node:26-bookworm-slim`, playwright `noble`). musl/Alpine is the one uncovered case and nothing
+here uses it.
 
 ## Working on the Rust
 
@@ -74,6 +93,6 @@ That split is deliberate. `@puzzmo-com/*` lives on GitHub Packages, which requir
 
 Publishing from the public OSS repo also means no npm credential is needed anywhere: that repo uses npm trusted publishing (OIDC), which is why `npm publish --provenance` works there with no token at all. Provenance additionally wants a public source repo, so this would not work cleanly from the monorepo even with a token.
 
-Nothing sensitive leaves the repo: the binary reads [`regenerate.manifest.json`](../../apps/api.puzzmo.com/scripts/lib/regenerate.manifest.json) and your sources at runtime and embeds neither. The next thing to move into it, sdl-codegen, is already open source through the same sync.
+Nothing sensitive leaves the repo: the binary reads [`regenerate.manifest.json`](../../apps/api.puzzmo.com/scripts/lib/regenerate.manifest.json) and your sources at runtime and embeds neither.
 
 No `.yarnrc.yml` change is needed: with no `npmScopes` configured, `@puzzmo/*` resolves to the default public registry already.

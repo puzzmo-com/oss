@@ -1,7 +1,7 @@
 //! Loads regenerate.manifest.json and resolves each step's globs to concrete files.
 
 use anyhow::{Context, Result};
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -70,7 +70,13 @@ fn expand(root: &Path, pattern: &str) -> Result<Vec<String>> {
         return Ok(if path.is_file() { vec![pattern.to_string()] } else { vec![] });
     }
 
-    let glob = Glob::new(pattern).with_context(|| format!("bad glob {pattern}"))?.compile_matcher();
+    // literal_separator keeps `*` from crossing `/`, matching how the glob package behaves on
+    // the TypeScript side; without it `src/*.ts` would also match `src/a/b.ts`.
+    let glob = GlobBuilder::new(pattern)
+        .literal_separator(true)
+        .build()
+        .with_context(|| format!("bad glob {pattern}"))?
+        .compile_matcher();
     let base = root.join(literal_prefix(pattern));
     if !base.is_dir() {
         return Ok(vec![]);
@@ -79,7 +85,11 @@ fn expand(root: &Path, pattern: &str) -> Result<Vec<String>> {
     let mut found = Vec::new();
     let walk = WalkDir::new(&base)
         .into_iter()
-        .filter_entry(|e| e.file_name() != "node_modules" && e.file_name() != ".git");
+        // node's glob skips dotfiles unless asked; match that so the two hash the same set.
+        .filter_entry(|e| {
+            let name = e.file_name().to_str().unwrap_or_default();
+            name != "node_modules" && !name.starts_with('.')
+        });
 
     for entry in walk {
         let entry = entry.context("walking the repo")?;
@@ -108,7 +118,11 @@ fn is_glob(s: &str) -> bool {
 fn build_globset(patterns: &[String]) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for p in patterns {
-        builder.add(Glob::new(p).with_context(|| format!("bad exclude glob {p}"))?);
+        let glob = GlobBuilder::new(p)
+            .literal_separator(true)
+            .build()
+            .with_context(|| format!("bad exclude glob {p}"))?;
+        builder.add(glob);
     }
     builder.build().context("building exclude globset")
 }

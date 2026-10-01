@@ -10,9 +10,19 @@ name = "puzzmo-codegen"
 path = "src/main.rs"
 
 [dependencies]
+graphql-parser = "0.4"
+oxc_allocator = "0.152"
+oxc_ast = "0.152"
+oxc_parser = "0.152"
+oxc_span = "0.152"
 anyhow = "1"
 globset = "0.4"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
 walkdir = "2"
+
+[dev-dependencies]
+graphql-parser = "0.4"
+json-schema-diff = "0.1"
+serde_json = "1"

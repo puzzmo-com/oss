@@ -1,6 +1,6 @@
 //! The staleness check: decides whether `regenerate` has anything to do, without booting Node.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::Path;
 
 use crate::hash::hash_files;
@@ -22,10 +22,15 @@ pub fn check(root: &Path) -> Result<Report> {
     let mut stale = Vec::new();
 
     for step in &manifest.steps {
+        // The key becomes a filename under the cache directory, so a separator in it would
+        // write outside that directory.
+        if step.key.contains('/') || step.key.contains('\\') || step.key.contains("..") {
+            anyhow::bail!("manifest step key `{}` is not usable as a filename", step.key);
+        }
         let inputs = step.resolve_inputs(root)?;
         let hash = hash_files(root, &inputs)?;
 
-        if !step.outputs_exist(root) || cached_hash(root, &step.key).as_deref() != Some(hash.as_str()) {
+        if !step.outputs_exist(root) || cached_hash(root, &step.key)?.as_deref() != Some(hash.as_str()) {
             stale.push(step.key.clone());
         }
     }
@@ -34,10 +39,12 @@ pub fn check(root: &Path) -> Result<Report> {
 }
 
 /// The hash recorded by the last successful run of a step, if any.
-fn cached_hash(root: &Path, key: &str) -> Option<String> {
-    // Read-and-discard-errors rather than exists-then-read: a file vanishing mid-check
-    // (concurrent run, partial node_modules clean) should read as a miss, not an error.
-    std::fs::read_to_string(root.join(CACHE_DIR).join(format!("{key}.hash")))
-        .ok()
-        .map(|s| s.trim().to_string())
+fn cached_hash(root: &Path, key: &str) -> Result<Option<String>> {
+    // A missing file means the step has never run. Anything else -- permissions, a bad
+    // encoding -- is surfaced rather than silently reported as stale on every run.
+    match std::fs::read_to_string(root.join(CACHE_DIR).join(format!("{key}.hash"))) {
+        Ok(text) => Ok(Some(text.trim().to_string())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).with_context(|| format!("reading the cached hash for {key}")),
+    }
 }

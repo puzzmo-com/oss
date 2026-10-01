@@ -1,9 +1,10 @@
 // Finds the puzzmo-codegen binary for this machine.
 //
 // Order: a local cargo build (for whoever is editing the Rust), then the prebuilt
-// binary yarn installed for this platform. Returns null when neither exists, which
-// callers must treat as "no fast path available" rather than an error -- the binary
-// is an optimisation, and every caller has a slower route that still works.
+// binary yarn installed for this platform. Returns null when neither exists.
+//
+// Only the post-merge gate can carry on without it, by falling back to printing a reminder.
+// Every other caller needs the binary, because there is no JavaScript implementation left.
 const { existsSync } = require("node:fs")
 const { join } = require("node:path")
 
