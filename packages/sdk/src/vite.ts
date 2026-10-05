@@ -3,7 +3,7 @@ import { build } from "vite"
 import path from "path"
 import fs from "fs"
 import type { HostContext } from "./types"
-import type { HostContextPreset } from "./simulator/types"
+import type { HostContextPreset, SimulatorIntegrations } from "./simulator/types"
 
 export { puzzmoPico8, type PuzzmoPico8PluginOptions } from "./pico8/vitePlugin"
 
@@ -55,6 +55,8 @@ export type GameInfo = {
   displayName: string
   /** Vite-root-relative path to app bundle entry, if it exists */
   appBundlePath: string | null
+  /** `integrations` from the puzzmo.json, passed to simulator tabs that preview them */
+  integrations?: SimulatorIntegrations
 }
 
 /**
@@ -78,7 +80,8 @@ export function discoverGames(viteRoot: string): Map<string, GameInfo> {
         const relative = path.relative(viteRoot, bundleEntry)
         appBundle = "/" + relative.split(path.sep).join("/")
       }
-      games.set(data.game.slug, { dir, slug: data.game.slug, displayName: data.game.displayName, appBundlePath: appBundle })
+      const integrations = data.integrations && typeof data.integrations === "object" ? data.integrations : undefined
+      games.set(data.game.slug, { dir, slug: data.game.slug, displayName: data.game.displayName, appBundlePath: appBundle, integrations })
     } catch {
       // skip invalid files
     }
@@ -133,7 +136,11 @@ export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, gam
     lines.push(`}).catch(() => {})`)
   }
 
-  const simConfig = { ...config, ...(game?.slug ? { slug: game.slug } : {}) }
+  const simConfig = {
+    ...config,
+    ...(game?.slug ? { slug: game.slug } : {}),
+    ...(game?.integrations ? { integrations: game.integrations } : {}),
+  }
   const configEntries = Object.entries(simConfig).filter(([, v]) => v !== undefined)
   const configParts = configEntries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
   if (fixturesGlob) configParts.push("fixtures")
@@ -179,6 +186,17 @@ export function puzzmoSimulator(options: PuzzmoSimulatorPluginOptions = {}): Plu
     },
 
     configureServer(server) {
+      // Re-read puzzmo.json on edit and reload the page so the simulator picks up its changes
+      for (const g of games.values()) server.watcher.add(path.join(g.dir, "puzzmo.json"))
+      server.watcher.on("change", (file) => {
+        if (path.basename(file) !== "puzzmo.json") return
+        games = discoverGames(viteRoot)
+        for (const mod of server.moduleGraph.idToModuleMap.values()) {
+          if (mod.id?.startsWith("\0" + virtualID)) server.moduleGraph.invalidateModule(mod)
+        }
+        server.ws.send({ type: "full-reload" })
+      })
+
       server.middlewares.use("/oauth/callback", (_req, res) => {
         res.setHeader("Content-Type", "text/html")
         res.end(`<!DOCTYPE html>

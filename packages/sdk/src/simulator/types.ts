@@ -30,6 +30,34 @@ export interface SimulatorConfig {
    * a second player. Each view's `id` becomes its tab id, so keep them unique.
    */
   views?: SimulatorView[]
+  /** The game's puzzmo.json `integrations`, for tabs that preview them (e.g. Cklst renders `checklists`) */
+  integrations?: SimulatorIntegrations
+}
+
+/** Loosely typed puzzmo.json `integrations`; only the parts a simulator tab reads are spelled out. */
+export interface SimulatorIntegrations {
+  checklists?: SimulatorChecklist[]
+  [key: string]: unknown
+}
+
+/** Mirrors `ChecklistAugmentation` in packages/shared/hostAPI.d.ts, kept local because the SDK is standalone. */
+export interface SimulatorChecklist {
+  stableID: string
+  type: string
+  title?: string
+  instructionsVisibleFromItemIndex?: number
+  items: SimulatorChecklistItem[]
+}
+
+/** Mirrors `ChecklistAugmentationItem` in packages/shared/hostAPI.d.ts. */
+export interface SimulatorChecklistItem {
+  title?: string
+  subtitle?: string
+  expandMD?: string
+  targetCount?: number
+  incrementExp?: string
+  filterExp?: string
+  liveUpdate?: boolean
 }
 
 export type TabName = string

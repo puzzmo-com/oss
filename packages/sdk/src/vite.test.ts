@@ -92,6 +92,14 @@ describe("discoverGames", () => {
     expect(game.appBundlePath).toBeNull()
   })
 
+  it("reads integrations", () => {
+    const checklists = [{ stableID: "my-game:tutorial", type: "tutorial", items: [{ title: "Move", incrementExp: "moves" }] }]
+    tmpRoot = createTempTree({
+      "puzzmo.json": JSON.stringify({ game: { slug: "my-game", displayName: "My Game" }, integrations: { checklists } }),
+    })
+    expect(discoverGames(tmpRoot).get("my-game")!.integrations).toEqual({ checklists })
+  })
+
   it("discovers multiple games in subdirectories", () => {
     tmpRoot = createTempTree({
       "games/alpha/puzzmo.json": puzzmoJson("alpha", "Alpha"),
@@ -237,6 +245,13 @@ describe("generateSimulatorCode", () => {
     const game: GameInfo = { dir: "/tmp/foo", slug: "my-game", displayName: "My Game", appBundlePath: null }
     const code = generateSimulatorCode({}, game)
     expect(code).toContain('slug: "my-game"')
+  })
+
+  it("includes integrations when the game has them", () => {
+    const integrations = { checklists: [{ stableID: "my-game:tutorial", type: "tutorial", items: [] }] }
+    const game: GameInfo = { dir: "/tmp/foo", slug: "my-game", displayName: "My Game", appBundlePath: null, integrations }
+    const code = generateSimulatorCode({}, game)
+    expect(code).toContain(`integrations: ${JSON.stringify(integrations)}`)
   })
 
   it("includes app bundle import when game has one", () => {
