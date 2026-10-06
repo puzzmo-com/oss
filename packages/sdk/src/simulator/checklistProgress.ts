@@ -1,6 +1,13 @@
+import { compile } from "angular-expressions"
+
 import type { SimulatorChecklistItem } from "./types"
 
-// A local port of apps/api.puzzmo.com/src/lib/tutorial/tutorialProgress.ts, keep the two in sync.
+// A port of the production checklist pipeline for the SDK simulator. The source of truth is:
+// - apps/puzzmo.com/src/components/gameplay/PlayGameIframe.tsx: `onComplete` / `onCheckpoint` deed sanitizing
+// - apps/api.puzzmo.com/src/lib/completion/gameCompletedUtils.ts: `getDeedsFromCompletion`
+// - apps/api.puzzmo.com/src/lib/expressions/scopes.ts: `getScopeFromDeedsForGame`
+// - apps/api.puzzmo.com/src/lib/tutorial/tutorialProgress.ts: `advanceTutorialIndex` / `itemIsComplete`
+// When this disagrees with those files, they win; update this to match.
 
 export type ChecklistMode = "checkpoint" | "completion"
 
@@ -11,13 +18,54 @@ export interface ItemEvaluation {
   error?: string
 }
 
-/** Builds the expression scope from deeds the same way the API's `getScopeFromDeedsForGame` does. */
-export const scopeFromDeeds = (deeds: unknown): Record<string, any> => {
+export interface SimulatorDeed {
+  id: string
+  value?: unknown
+}
+
+/** Mirrors `maxPersistedDeedsForExternalGames` in the API's gameCompletedUtils.ts. */
+export const maxPersistedDeedsForExternalGames = 3
+
+/** Cleans deeds the way puzzmo.com's PlayGameIframe and the API's `getDeedsFromCompletion` do, collecting what was dropped. */
+export const sanitizeDeeds = (deeds: unknown, mode: ChecklistMode): { deeds: SimulatorDeed[]; warnings: string[] } => {
+  const warnings: string[] = []
+  if (deeds !== undefined && !Array.isArray(deeds)) warnings.push("deeds is not an array, the host ignores it")
+
+  const valid: (SimulatorDeed & { persist?: boolean })[] = []
+  for (const [index, deed] of (Array.isArray(deeds) ? deeds : []).entries()) {
+    if (deed == null || typeof deed.id !== "string") {
+      warnings.push(`deed ${index} has no string id, the host drops it`)
+      continue
+    }
+    if (mode === "checkpoint") {
+      valid.push({ id: deed.id, value: deed.value })
+      continue
+    }
+    if (deed.value === undefined || deed.value === null) continue
+    valid.push({ id: deed.id, value: typeof deed.value === "number" ? Math.floor(deed.value) : deed.value, persist: deed.persist === true })
+  }
+
+  if (mode === "checkpoint") return { deeds: valid, warnings }
+
+  // The API splits persisted deeds off and truncates them for non-Puzzmo teams, so the extras leave the scope too
+  const persisted = valid.filter((deed) => deed.persist)
+  const temporary = valid.filter((deed) => !deed.persist)
+  const dropped = persisted.splice(maxPersistedDeedsForExternalGames)
+  if (dropped.length) {
+    warnings.push(
+      `only ${maxPersistedDeedsForExternalGames} persisted deeds are kept, dropped: ${dropped.map((deed) => deed.id).join(", ")}`,
+    )
+  }
+
+  return { deeds: [...persisted, ...temporary].map(({ id, value }) => ({ id, value })), warnings }
+}
+
+/** Builds the expression scope like the API's `getScopeFromDeedsForGame`; the host strips `name`, so only `id` counts. */
+export const scopeFromDeeds = (deeds: SimulatorDeed[]): Record<string, any> => {
   const scope: Record<string, any> = {}
-  if (!Array.isArray(deeds)) return scope
-  for (const deed of deeds as { id: string; name?: string; value?: any }[]) {
+  for (const deed of deeds) {
     if (deed.value === undefined) continue
-    scope[camelize(deed.name ?? deed.id)] = deed.value
+    scope[camelize(deed.id)] = deed.value
   }
   return scope
 }
@@ -25,10 +73,10 @@ export const scopeFromDeeds = (deeds: unknown): Record<string, any> => {
 /** Evaluates one item against the deed scope, mirroring `itemIsComplete` in the API. */
 export const evaluateItem = (item: SimulatorChecklistItem, scope: Record<string, any>): ItemEvaluation => {
   try {
-    if (item.filterExp && !evalExp(item.filterExp, scope)) return { complete: false, value: 0 }
+    if (item.filterExp && !compile(item.filterExp)(scope)) return { complete: false, value: 0 }
     if (!item.incrementExp) return { complete: false, value: 0 }
 
-    let res = evalExp(item.incrementExp, scope)
+    let res = compile(item.incrementExp)(scope)
     if (typeof res === "boolean") res = res ? 1 : 0
     if (typeof res === "undefined") res = 0
     if (typeof res !== "number" || isNaN(res)) throw new Error(`incrementExp must return a number, undefined or boolean, got ${res}`)
@@ -58,28 +106,6 @@ export const advanceChecklist = (config: {
   }
 
   return { index, head: index < items.length ? head : undefined }
-}
-
-/** Runs an expression with scope keys as locals; unknown identifiers read as undefined like angular-expressions. */
-const evalExp = (exp: string, scope: Record<string, any>): any => {
-  const keys = Object.keys(scope).filter(isParamName)
-  try {
-    return new Function(...keys, `"use strict"; return (${exp})`)(...keys.map((k) => scope[k]))
-  } catch (error) {
-    if (error instanceof ReferenceError) return undefined
-    throw error
-  }
-}
-
-/** Whether a scope key can be a strict-mode parameter, so a deed named `class` or `eval` can't break every item. */
-const isParamName = (key: string) => {
-  if (!/^[A-Za-z_$][\w$]*$/.test(key)) return false
-  try {
-    new Function(key, '"use strict"')
-    return true
-  } catch {
-    return false
-  }
 }
 
 const camelize = (s: string) => s.replace(/-./g, (x) => x[1].toUpperCase())

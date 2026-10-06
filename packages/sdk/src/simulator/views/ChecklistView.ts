@@ -1,4 +1,4 @@
-import { advanceChecklist, scopeFromDeeds, type ChecklistMode, type ItemEvaluation } from "../checklistProgress"
+import { advanceChecklist, sanitizeDeeds, scopeFromDeeds, type ChecklistMode, type ItemEvaluation } from "../checklistProgress"
 import type { SimulatorChecklist, SimulatorChecklistItem, SimulatorContext, SimulatorView } from "../types"
 
 interface ChecklistRun {
@@ -14,6 +14,7 @@ export function createChecklistView(checklists: SimulatorChecklist[]): Simulator
   let slug: string | null = null
   let newlyCompleted = 0
   let lastSource: string | undefined
+  let lastWarnings: string[] = []
 
   const storageKey = (stableID: string) => `simulator-checklist:${slug ?? "game"}:${stableID}`
 
@@ -88,6 +89,7 @@ export function createChecklistView(checklists: SimulatorChecklist[]): Simulator
         </div>
         ${lastSource ? `<div class="checklist-footer">last eval: ${escapeHTML(lastSource)}</div>` : ""}
         ${error ? `<div class="checklist-error">${escapeHTML(error)}</div>` : ""}
+        ${lastWarnings.map((warning) => `<div class="checklist-error">${escapeHTML(warning)}</div>`).join("")}
       </div>`
   }
 
@@ -110,8 +112,10 @@ export function createChecklistView(checklists: SimulatorChecklist[]): Simulator
 
   const evaluate = (ctx: SimulatorContext, deeds: unknown, mode: ChecklistMode, source: string) => {
     let advanced = 0
-    const scope = scopeFromDeeds(deeds)
+    const sanitized = sanitizeDeeds(deeds, mode)
+    const scope = scopeFromDeeds(sanitized.deeds)
     lastSource = source
+    lastWarnings = sanitized.warnings
 
     for (const checklist of checklists) {
       const index = runs.get(checklist.stableID)?.index ?? 0
@@ -150,6 +154,7 @@ export function createChecklistView(checklists: SimulatorChecklist[]): Simulator
           runs.set(resetID, { index: 0 })
           saveIndex(resetID, 0)
           lastSource = undefined
+          lastWarnings = []
           newlyCompleted = 0
           ctx.updateBadge("checklist", 0)
         } else if (helpKey) {

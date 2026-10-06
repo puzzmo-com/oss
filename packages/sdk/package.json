@@ -84,6 +84,7 @@
     "lz-string": "^1.5.0"
   },
   "devDependencies": {
+    "angular-expressions": "1.5.1",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

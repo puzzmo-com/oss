@@ -1,15 +1,58 @@
 import { describe, it, expect } from "vitest"
 
-import { advanceChecklist, evaluateItem, scopeFromDeeds } from "./checklistProgress"
+import { advanceChecklist, evaluateItem, sanitizeDeeds, scopeFromDeeds } from "./checklistProgress"
 
 describe("scopeFromDeeds", () => {
-  it("camelizes ids, prefers name, and skips undefined values", () => {
+  it("camelizes ids and skips undefined values", () => {
     const scope = scopeFromDeeds([
       { id: "flush-count", value: 2 },
-      { id: "x", name: "named-deed", value: true },
       { id: "missing", value: undefined },
     ])
-    expect(scope).toEqual({ flushCount: 2, namedDeed: true })
+    expect(scope).toEqual({ flushCount: 2 })
+  })
+
+  it("ignores name, which puzzmo.com strips before the API sees it", () => {
+    const { deeds } = sanitizeDeeds([{ id: "x", name: "named-deed", value: 1 }], "checkpoint")
+    expect(scopeFromDeeds(deeds)).toEqual({ x: 1 })
+  })
+})
+
+describe("sanitizeDeeds", () => {
+  it("drops deeds without a string id and warns", () => {
+    const result = sanitizeDeeds([null, { value: 1 }, { id: "ok", value: 1 }], "checkpoint")
+    expect(result.deeds).toEqual([{ id: "ok", value: 1 }])
+    expect(result.warnings).toHaveLength(2)
+  })
+
+  it("warns when deeds is not an array", () => {
+    expect(sanitizeDeeds({ id: "x" }, "checkpoint")).toEqual({ deeds: [], warnings: [expect.stringContaining("not an array")] })
+    expect(sanitizeDeeds(undefined, "completion")).toEqual({ deeds: [], warnings: [] })
+  })
+
+  it("keeps checkpoint values untouched", () => {
+    expect(sanitizeDeeds([{ id: "moves", value: 2.9 }], "checkpoint").deeds).toEqual([{ id: "moves", value: 2.9 }])
+  })
+
+  it("floors numbers and drops null values on completion", () => {
+    const { deeds } = sanitizeDeeds(
+      [
+        { id: "moves", value: 2.9 },
+        { id: "gone", value: null },
+        { id: "won", value: true },
+      ],
+      "completion",
+    )
+    expect(deeds).toEqual([
+      { id: "moves", value: 2 },
+      { id: "won", value: true },
+    ])
+  })
+
+  it("keeps only the first persisted deeds for external games on completion", () => {
+    const input = ["a", "b", "c", "d"].map((id) => ({ id, value: 1, persist: true }))
+    const result = sanitizeDeeds([...input, { id: "temp", value: 1 }], "completion")
+    expect(result.deeds.map((deed) => deed.id)).toEqual(["a", "b", "c", "temp"])
+    expect(result.warnings).toEqual([expect.stringContaining("dropped: d")])
   })
 })
 
@@ -41,6 +84,10 @@ describe("evaluateItem", () => {
 
   it("ignores deeds named after reserved words instead of failing every item", () => {
     expect(evaluateItem({ incrementExp: "moves" }, { moves: 1, class: 1, eval: 1 })).toEqual({ complete: true, value: 1 })
+  })
+
+  it("cannot reach JS globals, matching the API's angular-expressions sandbox", () => {
+    expect(evaluateItem({ incrementExp: "Math.max(moves, 5)" }, { moves: 1 })).toEqual({ complete: false, value: 0 })
   })
 
   it("never completes an item without incrementExp", () => {
