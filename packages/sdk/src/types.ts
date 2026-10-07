@@ -325,7 +325,10 @@ export type ServerConfigHostContext = {
   type: "server-config"
   /** The URL of the multiplayer server */
   multiplayerServerURL?: string
-  /** The URL of the singleplayer server */
+  /**
+   * The print app the crossword embed's Print button opens, e.g. https://print.puzzmo.com.
+   * https://games-u7ii.onrender.com keeps the legacy print link
+   */
   printServerURL?: string
 }
 
