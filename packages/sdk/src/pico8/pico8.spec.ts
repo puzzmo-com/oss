@@ -223,6 +223,28 @@ describe("createPico8Bridge, for a game written in Lua", () => {
     )
   })
 
+  it("lets the page edit the points and deeds before completing", () => {
+    const { sdk, cart, run } = setup({
+      editCompletion: ({ points, deeds }) => ({
+        points: points * 100,
+        deeds: deeds.map((d) => (d.id === "score" ? { ...d, value: d.value * 100 } : d)),
+      }),
+    })
+    cart.channel.send(CartOp.DEED, [39, 16, 1, ...text("score")]) // 10000, shown in the cart as 1,000,000
+    cart.channel.send(CartOp.DEED, [0, 2, 1, ...text("escapes")])
+    cart.channel.send(CartOp.COMPLETE, [39, 16])
+    run()
+    expect(sdk.gameCompleted).toHaveBeenCalledWith(
+      { inputString: "", pointsAwarded: 1_000_000, completed: true },
+      {
+        deeds: [
+          { id: "score", value: 1_000_000, persist: true },
+          { id: "escapes", value: 2, persist: true },
+        ],
+      },
+    )
+  })
+
   it("forgets progress on a retry", () => {
     const { sdk, cart, run } = setup({ puzzleString: "p", inputString: "old", completed: true })
     sdk.emit("retry")

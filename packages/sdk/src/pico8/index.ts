@@ -40,6 +40,11 @@ export type Pico8BridgeOptions = {
   onRetry?: () => void
   /** The cart called `pz_finished()`. Defaults to `sdk.showCompletionScreen([])`. */
   onFinished?: () => void
+  /**
+   * Edits the cart's points and deeds on their way to `gameCompleted()`. PICO-8 numbers stop at 32767, so a cart with
+   * bigger scores keeps them divided down (drawing "00" on the end), and this is where to put the zeros back.
+   */
+  editCompletion?: (completion: { points: number; deeds: Deed[] }) => { points: number; deeds: Deed[] }
   /** Log every message, both ways, to the console. Handy while you're getting started. */
   debug?: boolean
   /** The shared bytes. Defaults to the page's `pico8_gpio` array, creating it if needed. */
@@ -188,8 +193,10 @@ export function createPico8Bridge(options: Pico8BridgeOptions): Pico8Bridge {
     } else if (op === CartOp.COMPLETE) {
       if (state.completed) return
       const [hi = 0, lo = 0] = payload
+      const fromCart = { points: hi * 256 + lo, deeds: state.deeds }
+      const { points, deeds } = options.editCompletion ? options.editCompletion(fromCart) : fromCart
       // The SDK adds the time and points deeds itself, from its own timer
-      sdk.gameCompleted({ inputString: state.progress, pointsAwarded: hi * 256 + lo, completed: true }, { deeds: state.deeds })
+      sdk.gameCompleted({ inputString: state.progress, pointsAwarded: points, completed: true }, { deeds })
       state.completed = true
       state.deeds = []
     } else if (op >= firstGameOp) {
