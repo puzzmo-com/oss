@@ -307,8 +307,6 @@ export type EmbedHostContext = {
   noUI?: boolean
   /** The embed record driving this page, when known. */
   embedID?: string
-  /** Puzzle strings for bonus puzzles playable after the main puzzle. */
-  bonusPuzzles?: string[]
   /** Game-specific embed settings keyed by game slug (e.g. `crossword: {...}`). */
   [gameSlug: string]: unknown
 }
