@@ -29,6 +29,7 @@ Files that live only in this repo and are safe to edit:
 | `packages/create-puzzmo`    | `create-puzzmo`            | Yes          |
 | `packages/obebel`           | `@puzzmo-com/obebel`       | Yes          |
 | `packages/belay`            | `@puzzmo-com/belay`        | No (private) |
+| `packages/tapped`           | `@puzzmo/tapped`           | No (private) |
 | `packages/sdl-codegen`      | `@sdl-codegen/node`        | No (private) |
 
 ## Publishing
