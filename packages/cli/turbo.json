@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Hashes the Relay output (compiled before turbo runs) rather than the schema, so only a schema change
+    // which alters what this package selects reruns these
+    "build": {
+      "inputs": ["$TURBO_EXTENDS$", "src/queries/__generated__/**"]
+    },
+    "type-check": {
+      "inputs": ["$TURBO_DEFAULT$", "src/queries/__generated__/**"]
+    },
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "src/queries/__generated__/**"]
+    }
+  }
+}
