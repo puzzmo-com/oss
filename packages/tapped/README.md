@@ -66,6 +66,12 @@ registerSSRHandler({
 startServer(fastify, config.port)
 ```
 
+`registerSSRHandler` also takes:
+
+- `cache` — an in-process cache of finished pages (`keyFor`, `ttlMs`, `maxEntries`), only for pages whose HTML is identical for every request it keys together
+- `allReadyGraceMs` — how long to hold the stream after the shell is ready, waiting for every Suspense boundary. A boundary still pending when streaming starts is sent as its fallback and swapped in by script, so when loaders have already fetched everything a short wait writes the whole page in place. Defaults to `0`
+- `onRequestComplete` — called once per request with its outcome and phase timings
+
 ### SSR Entry Point
 
 Create a `tappedServerModule.ts` file that exports functions matching the expected interface:

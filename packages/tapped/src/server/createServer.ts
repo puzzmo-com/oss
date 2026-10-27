@@ -118,6 +118,12 @@ export interface RegisterSSRHandlerOptions {
   /** In-process cache of fully-rendered pages, for routes whose HTML is identical across requests. */
   cache?: SSRCacheOptions
   /**
+   * How long to hold the stream after the shell is ready, waiting for every Suspense boundary. A
+   * boundary still pending when streaming starts is sent as its fallback and revealed by script, so
+   * a page whose data was all preloaded loses nothing by waiting. Defaults to 0: stream at once.
+   */
+  allReadyGraceMs?: number
+  /**
    * Called once per request with how the document was produced and what each phase cost. Tapped
    * measures these anyway for the Server-Timing header; this is the seam for recording them.
    * Never throws into the request — an observer that throws is logged and ignored.
@@ -135,12 +141,14 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
     config,
     productionServerModulePath,
     cache,
+    allReadyGraceMs = 0,
     templatePath = "./index.html",
     onRequestComplete,
   } = options
   const { isProduction, base, graphQLURL, abortDelay = 10000, isDev } = config
 
-  const ssrCache = new Map<string, { html: string; expires: number }>()
+  // routePath is kept with the page so a hit is reported against the route that rendered it
+  const ssrCache = new Map<string, { html: string; expires: number; routePath?: string }>()
 
   // Dev-only devtools: /_tapped renders the resolved route graph, /_tapped.json serves it for tooling.
   // Requires the app's server module to export getRoutes(); production never registers these routes.
@@ -188,7 +196,7 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
     if (cacheKey) {
       const hit = ssrCache.get(cacheKey)
       if (hit && hit.expires > Date.now()) {
-        report("cache-hit", 200)
+        report("cache-hit", 200, { routeMatch: { route: { path: hit.routePath } } })
         return applyDocumentCacheHeaders(reply).code(200).header("Content-Type", "text/html").header("x-ssr-cache", "hit").send(hit.html)
       }
       if (hit) ssrCache.delete(cacheKey)
@@ -270,6 +278,142 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
       let didError = false
       const renderStart = performance.now()
 
+      // A boundary still pending when the stream starts goes out as its fallback, to be swapped in by
+      // script later. Waiting (up to allReadyGraceMs) for everything lets it be written in place instead.
+      let shellReady = false
+      let allReady = false
+      let streaming = false
+      let graceTimer: ReturnType<typeof setTimeout> | undefined
+
+      const startStreaming = () => {
+        if (streaming || reply.raw.destroyed) return
+        streaming = true
+        debugLog("starting to stream")
+        reply.hijack()
+        const response = reply.raw
+
+        // Shell errors never get here (onShellError answers them). A boundary that errored is client
+        // rendered by React on hydration, so the page is still a 200; didError only keeps it out of the cache.
+        response.statusCode = 200
+        response.setHeader("Content-Type", "text/html")
+        for (const [key, value] of Object.entries(documentCacheHeaders)) response.setHeader(key, value)
+
+        context.timings = { ...context.timings, render: performance.now() - renderStart }
+        const timing = serverTimingValue(context.timings, context.timings.render)
+        if (timing) response.setHeader("Server-Timing", timing)
+        if (context.responseHeaders) {
+          for (const [key, value] of Object.entries(context.responseHeaders)) response.setHeader(key, value as string)
+        }
+
+        // Mirror every chunk we stream into a buffer so the finished page can
+        // be stored in the SSR cache (only when this request is cacheable).
+        const captured: Buffer[] | null = cacheKey ? [] : null
+        const writeOut = (data: string | Buffer) => {
+          response.write(data)
+          captured?.push(Buffer.from(data))
+        }
+
+        writeOut(htmlStart)
+
+        if (context.headHTML) writeOut(context.headHTML)
+
+        const { helmet } = context.helmetContext
+        if (helmet) {
+          writeOut(helmet.title.toString())
+          writeOut(helmet.priority.toString())
+          writeOut(helmet.meta.toString())
+          writeOut(helmet.link.toString())
+          writeOut(helmet.script.toString())
+        }
+
+        const { styleXSheet } = context
+        const css = styleXSheet.getCSS()
+        if (css && isDev) {
+          writeOut(`<style data-stylex="true">${css}</style>`)
+        } else {
+          writeOut(`<!-- No StyleX CSS to inject in non-dev env -->`)
+        }
+
+        writeOut(bodyStart)
+
+        debugLog("About to serialize record source and loader data...")
+        const { environment, loaderData } = context
+
+        const recordSource = environment.getStore().getSource()
+        const recordData = recordSource.toJSON()
+        debugLog("Record source keys:", Object.keys(recordData).slice(0, 20) + "...")
+        debugLog("Record source sample:", JSON.stringify(recordData).substring(0, 200) + "...")
+        debugLog("Loader data:", JSON.stringify(loaderData).substring(0, 200) + "...")
+
+        const transformStream = new Transform({
+          transform(chunk, encoding, callback) {
+            response.write(chunk, encoding)
+            captured?.push(Buffer.from(chunk))
+            callback()
+          },
+          final(callback) {
+            writeOut(`<script>window.__RECORD_SOURCE = ${safeJsonStringify(recordData)}</script>`)
+
+            const serializableLoaderData = loaderData
+              ? {
+                  graphql: loaderData.graphql,
+                  variables: loaderData.variables,
+                }
+              : null
+
+            writeOut(`<script>window.__LOADER_DATA = ${safeJsonStringify(serializableLoaderData)}</script>`)
+
+            writeOut(`<script>window.__APP_CONFIG = ${safeJsonStringify(context.appConfig || {})}</script>`)
+
+            // Dev-only: re-emit the full StyleX sheet. Lazy route/mdx modules register their rules
+            // after the shell's <style data-stylex> block has flushed, and a cold dev server's
+            // aggregated stylex.css misses them too, leaving late rules absent until an HMR update.
+            if (isDev) {
+              const lateCSS = context.styleXSheet.getCSS()
+              if (lateCSS) writeOut(`<style data-stylex="late">${lateCSS}</style>`)
+            }
+
+            captured?.push(Buffer.from(htmlEnd))
+            response.end(htmlEnd)
+            report(didError ? "error" : "ssr", response.statusCode, context)
+
+            if (cache && cacheKey && captured && !didError && response.statusCode === 200) {
+              const routePath = context.routeMatch?.route?.path
+              ssrCache.set(cacheKey, { html: Buffer.concat(captured).toString("utf8"), expires: Date.now() + cache.ttlMs, routePath })
+              const maxEntries = cache.maxEntries ?? 50
+              while (ssrCache.size > maxEntries) {
+                const oldest = ssrCache.keys().next().value
+                if (oldest === undefined) break
+                ssrCache.delete(oldest)
+              }
+            }
+
+            callback()
+          },
+        })
+
+        pipe(transformStream)
+      }
+
+      // The grace timer calls this from a bare setTimeout, where a throw would be uncaught and kill the process.
+      const startStreamingSafely = () => {
+        try {
+          startStreaming()
+        } catch (error) {
+          console.error("SSR stream setup failed:", error)
+          abort()
+          const response = reply.raw
+          if (!response.headersSent) {
+            response.statusCode = 500
+            response.setHeader("Content-Type", "text/html")
+            response.end("<h1>Something went wrong</h1>")
+          } else {
+            response.destroy(error as Error)
+          }
+          report("error", 500, context, error)
+        }
+      }
+
       const { pipe, abort } = renderWouterApp(context, {
         // React flushes the shell once buffered output passes progressiveChunkSize (~12.8KB
         // default) and defers any unfinished Suspense boundary as a JS-revealed (`$RC`) chunk.
@@ -287,111 +431,15 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
           }
         },
         onShellReady() {
-          debugLog("onShellReady called - starting to stream")
-          reply.hijack()
-          const response = reply.raw
-
-          response.statusCode = didError ? 500 : 200
-          response.setHeader("Content-Type", "text/html")
-          for (const [key, value] of Object.entries(documentCacheHeaders)) response.setHeader(key, value)
-
-          context.timings = { ...context.timings, render: performance.now() - renderStart }
-          const timing = serverTimingValue(context.timings, context.timings.render)
-          if (timing) response.setHeader("Server-Timing", timing)
-          if (context.responseHeaders) {
-            for (const [key, value] of Object.entries(context.responseHeaders)) response.setHeader(key, value as string)
-          }
-
-          // Mirror every chunk we stream into a buffer so the finished page can
-          // be stored in the SSR cache (only when this request is cacheable).
-          const captured: Buffer[] | null = cacheKey ? [] : null
-          const writeOut = (data: string | Buffer) => {
-            response.write(data)
-            captured?.push(Buffer.from(data))
-          }
-
-          writeOut(htmlStart)
-
-          if (context.headHTML) writeOut(context.headHTML)
-
-          const { helmet } = context.helmetContext
-          if (helmet) {
-            writeOut(helmet.title.toString())
-            writeOut(helmet.priority.toString())
-            writeOut(helmet.meta.toString())
-            writeOut(helmet.link.toString())
-            writeOut(helmet.script.toString())
-          }
-
-          const { styleXSheet } = context
-          const css = styleXSheet.getCSS()
-          if (css && isDev) {
-            writeOut(`<style data-stylex="true">${css}</style>`)
-          } else {
-            writeOut(`<!-- No StyleX CSS to inject in non-dev env -->`)
-          }
-
-          writeOut(bodyStart)
-
-          debugLog("About to serialize record source and loader data...")
-          const { environment, loaderData } = context
-
-          const recordSource = environment.getStore().getSource()
-          const recordData = recordSource.toJSON()
-          debugLog("Record source keys:", Object.keys(recordData).slice(0, 20) + "...")
-          debugLog("Record source sample:", JSON.stringify(recordData).substring(0, 200) + "...")
-          debugLog("Loader data:", JSON.stringify(loaderData).substring(0, 200) + "...")
-
-          const transformStream = new Transform({
-            transform(chunk, encoding, callback) {
-              response.write(chunk, encoding)
-              captured?.push(Buffer.from(chunk))
-              callback()
-            },
-            final(callback) {
-              writeOut(`<script>window.__RECORD_SOURCE = ${safeJsonStringify(recordData)}</script>`)
-
-              const serializableLoaderData = loaderData
-                ? {
-                    graphql: loaderData.graphql,
-                    variables: loaderData.variables,
-                  }
-                : null
-
-              writeOut(`<script>window.__LOADER_DATA = ${safeJsonStringify(serializableLoaderData)}</script>`)
-
-              writeOut(`<script>window.__APP_CONFIG = ${safeJsonStringify(context.appConfig || {})}</script>`)
-
-              // Dev-only: re-emit the full StyleX sheet. Lazy route/mdx modules register their rules
-              // after the shell's <style data-stylex> block has flushed, and a cold dev server's
-              // aggregated stylex.css misses them too, leaving late rules absent until an HMR update.
-              if (isDev) {
-                const lateCSS = context.styleXSheet.getCSS()
-                if (lateCSS) writeOut(`<style data-stylex="late">${lateCSS}</style>`)
-              }
-
-              captured?.push(Buffer.from(htmlEnd))
-              response.end(htmlEnd)
-              report(didError ? "error" : "ssr", response.statusCode, context)
-
-              if (cache && cacheKey && captured && !didError && response.statusCode === 200) {
-                ssrCache.set(cacheKey, { html: Buffer.concat(captured).toString("utf8"), expires: Date.now() + cache.ttlMs })
-                const maxEntries = cache.maxEntries ?? 50
-                while (ssrCache.size > maxEntries) {
-                  const oldest = ssrCache.keys().next().value
-                  if (oldest === undefined) break
-                  ssrCache.delete(oldest)
-                }
-              }
-
-              callback()
-            },
-          })
-
-          pipe(transformStream)
+          shellReady = true
+          if (allReady || !allReadyGraceMs) startStreamingSafely()
+          else graceTimer = setTimeout(startStreamingSafely, allReadyGraceMs)
         },
         onAllReady() {
           debugLog("onAllReady called - all content ready")
+          allReady = true
+          clearTimeout(graceTimer)
+          if (shellReady) startStreamingSafely()
         },
         onError(error: any) {
           didError = true
@@ -407,6 +455,7 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
       // otherwise every request leaks a 10s timer until it fires.
       reply.raw.once("close", () => {
         clearTimeout(abortTimer)
+        clearTimeout(graceTimer)
         // A stream the client walked away from never reaches response.end, so this is the only
         // place it gets counted. Reporting is idempotent, so a completed response no-ops here.
         report("aborted", reply.raw.statusCode, context)
