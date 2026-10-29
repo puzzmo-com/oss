@@ -147,7 +147,7 @@ export const createWouterSSRContext = async <TAppConfig = Record<string, unknown
     // A slow upstream that blows the preload timeout is not fatal: fall back to CSR so the client can fetch the data,
     // rather than 500ing the page. Any other loader failure is a real error and still surfaces.
     if (isPreloadTimeoutError(error)) {
-      console.warn("SSR: Preload timed out, serving client shell (CSR) for", pathname)
+      console.warn(`SSR: ${error.operationName} timed out after ${error.timeoutMs}ms, serving client shell (CSR) for ${pathname}`)
       csrFallback = "timeout"
     } else {
       console.error("SSR: Failed to load data", error)

@@ -294,6 +294,8 @@ import ReactDOM from "react-dom/client"
 import { RecordSource } from "relay-runtime"
 
 const recordSource = new RecordSource(window.__RECORD_SOURCE)
+// Carries only the loader's query variables — the data itself is in the record source,
+// and the compiled query is already in the client bundle
 const loaderData = window.__LOADER_DATA
 
 ReactDOM.hydrateRoot(

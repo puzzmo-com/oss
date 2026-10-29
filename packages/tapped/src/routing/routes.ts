@@ -1,5 +1,6 @@
 import { parse } from "regexparam"
 
+import { isPreloadTimeoutError } from "../relay/loader.js"
 import { RouteMatch, WouterRoute } from "./types.js"
 
 /** Matches a pathname against a list of routes and returns the matched route with parameters */
@@ -40,7 +41,8 @@ export const loadRouteData = async (
   try {
     return await match.route.loader({ request, params: match.params, signal, context })
   } catch (error) {
-    console.error("Route loader error:", error)
+    // A timeout is the intended CSR fallback, logged by the SSR handler; only real failures are errors here
+    if (!isPreloadTimeoutError(error)) console.error("Route loader error:", error)
     throw error
   }
 }

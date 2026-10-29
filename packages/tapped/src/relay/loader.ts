@@ -1,6 +1,6 @@
 import type { Environment } from "react-relay"
 import ReactRelay from "react-relay"
-import { CacheConfig, GraphQLTaggedNode, OperationType } from "relay-runtime"
+import { CacheConfig, GraphQLTaggedNode, OperationType, getRequest } from "relay-runtime"
 
 import { PreloadedData } from "./types.js"
 
@@ -11,8 +11,11 @@ export class PreloadTimeoutError extends Error {
   /** Duck-type marker: instanceof fails across the vite-ssrLoadModule/node module boundary, so checks use this instead. */
   readonly isPreloadTimeoutError = true
 
-  constructor(public readonly timeoutMs: number) {
-    super(`preload: GraphQL fetch timed out after ${timeoutMs}ms`)
+  constructor(
+    public readonly timeoutMs: number,
+    public readonly operationName: string,
+  ) {
+    super(`preload: ${operationName} timed out after ${timeoutMs}ms`)
     this.name = "PreloadTimeoutError"
   }
 }
@@ -60,7 +63,7 @@ export const preload = async <TQuery extends OperationType>(
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutHandle = setTimeout(() => {
       abortController.abort()
-      reject(new PreloadTimeoutError(timeoutMs))
+      reject(new PreloadTimeoutError(timeoutMs, getRequest(graphql).params.name))
     }, timeoutMs)
   })
 

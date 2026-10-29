@@ -354,12 +354,9 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
           final(callback) {
             writeOut(`<script>window.__RECORD_SOURCE = ${safeJsonStringify(recordData)}</script>`)
 
-            const serializableLoaderData = loaderData
-              ? {
-                  graphql: loaderData.graphql,
-                  variables: loaderData.variables,
-                }
-              : null
+            // Variables only: the compiled query (loaderData.graphql) is the full ConcreteRequest —
+            // query text and normalization AST, tens of KB — and the client already has it in its bundle
+            const serializableLoaderData = loaderData ? { variables: loaderData.variables } : null
 
             writeOut(`<script>window.__LOADER_DATA = ${safeJsonStringify(serializableLoaderData)}</script>`)
 

@@ -26,6 +26,7 @@ export const useSSRData = <TQuery extends OperationType = OperationType>(): Prel
   const context = useContext(SSRContext)
 
   if (!context?.loaderData && typeof window !== "undefined") {
+    // The server serializes only `variables` — the query and its compiled artifact are bundle-side
     const windowLoaderData = (window as any).__LOADER_DATA as PreloadedData<TQuery> | null | undefined
     debugLog("Using window.__LOADER_DATA:", windowLoaderData)
     if (windowLoaderData) {
