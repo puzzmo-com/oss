@@ -374,7 +374,7 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
             response.end(htmlEnd)
             report(didError ? "error" : "ssr", response.statusCode, context)
 
-            if (cache && cacheKey && captured && !didError && response.statusCode === 200) {
+            if (cache && cacheKey && captured && !didError && !context.uncacheable && response.statusCode === 200) {
               const routePath = context.routeMatch?.route?.path
               ssrCache.set(cacheKey, { html: Buffer.concat(captured).toString("utf8"), expires: Date.now() + cache.ttlMs, routePath })
               const maxEntries = cache.maxEntries ?? 50

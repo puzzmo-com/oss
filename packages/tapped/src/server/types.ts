@@ -55,6 +55,11 @@ export interface WouterContext<TAppConfig = Record<string, unknown>> {
   headHTML?: string
   /** The matched route's `placeholder()`, for the root element of a client-rendered response. */
   placeholder?: Placeholder | null
+  /**
+   * Set by the consumer's server module when this render must not be stored in the SSR page cache,
+   * for something only the loaded data can tell — e.g. a page for a tenant that does not exist.
+   */
+  uncacheable?: boolean
 }
 
 export interface ServerConfig {
@@ -75,6 +80,14 @@ export interface CreateContextOptions<TAppConfig = Record<string, unknown>> {
   reply: FastifyReply
   /** So that the SSR renderer can find the correct route */
   routes: WouterRoute[]
+  /**
+   * An optional URL prefix that route patterns never contain (a locale, a tenant), as an anchored
+   * pattern (e.g. `/^\/[a-z]{2}-[A-Z]{2}(?=\/|$)/`). A pathname carrying it is matched against
+   * `routes` with the prefix removed, mirroring a client router whose location hook strips it before
+   * its own matching. Only matching uses the stripped path: the rendered app, middleware and document
+   * hooks still receive the request's own pathname.
+   */
+  optionalPathPrefix?: RegExp
   /** Adds support for a root request for app bootrstrapping */
   rootBootstrappingLoader?: (args: {
     params: {}

@@ -75,7 +75,7 @@ export const createWouterSSRContext = async <TAppConfig = Record<string, unknown
   const url = new URL(req.url, `${req.protocol}://${req.headers.host}`)
   const pathname = url.pathname
 
-  const routeMatch = matchRoute(pathname, routes)
+  const routeMatch = matchRoute(stripOptionalPrefix(pathname, options.optionalPathPrefix), routes)
 
   // One abort signal per request: fires when the client disconnects, and is threaded into the loader
   // fetch Request + LoaderArgs so abandoned work is actually cancelled.
@@ -160,6 +160,9 @@ export const createWouterSSRContext = async <TAppConfig = Record<string, unknown
 
   return { ...baseContext, loaderData, responseHeaders, csrFallback, headHTML: renderHeadTags(await headTags) }
 }
+
+/** The pathname with the consumer's `optionalPathPrefix` removed for route matching; never below "/". */
+const stripOptionalPrefix = (pathname: string, prefix: RegExp | undefined) => (prefix ? pathname.replace(prefix, "") || "/" : pathname)
 
 /**
  * Awaits an optional document hook, degrading to `fallback` if it throws. Head tags and placeholders

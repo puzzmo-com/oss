@@ -68,7 +68,7 @@ startServer(fastify, config.port)
 
 `registerSSRHandler` also takes:
 
-- `cache` — an in-process cache of finished pages (`keyFor`, `ttlMs`, `maxEntries`), only for pages whose HTML is identical for every request it keys together
+- `cache` — an in-process cache of finished pages (`keyFor`, `ttlMs`, `maxEntries`), only for pages whose HTML is identical for every request it keys together. `keyFor` is synchronous and sees only the request; when only the loaded data can tell a render must not be stored (an unknown tenant, say), the server module sets `uncacheable: true` on the context it returns and the finished page is served but never cached
 - `allReadyGraceMs` — how long to hold the stream after the shell is ready, waiting for every Suspense boundary. A boundary still pending when streaming starts is sent as its fallback and swapped in by script, so when loaders have already fetched everything a short wait writes the whole page in place. Defaults to `0`
 - `onRequestComplete` — called once per request with its outcome and phase timings
 
@@ -168,6 +168,29 @@ export const createWouterRoutes = (environment: Environment): WouterRoute[] => [
 Separately from explicit `"spa"` routes, when a route's `preload` blows its timeout the server falls back to the
 same client-shell response instead of 500ing. The response carries `x-ssr-fallback: spa` or `x-ssr-fallback: timeout`
 so you can tell which happened from the Network panel.
+
+### Prefixed URLs
+
+An app whose client router strips a URL prefix before matching (a locale, a tenant) can give
+`createWouterSSRContext` an `optionalPathPrefix` so the server resolves those URLs to the same routes:
+
+```typescript
+createWouterSSRContext({
+  // "/en-GB/about" is matched as "/about"; the app still renders with the real pathname
+  optionalPathPrefix: /^\/[a-z]{2}-[A-Z]{2}(?=\/|$)/,
+  // ...
+})
+```
+
+The pattern must be anchored to the start of the pathname. Only route matching sees the stripped
+path — middleware, document hooks and the rendered app all receive the request's own pathname,
+mirroring a client router that strips the prefix in its location hook rather than in its route
+patterns. A prefixed pathname whose stripped form matches no route falls through to the catch-all,
+exactly like its unprefixed twin.
+
+When the prefix names something data has to validate (a tenant that may not exist), the slugs are
+visitor-supplied and unbounded — an app using the SSR page cache should mark renders for unknown
+ones uncacheable (see below) so they cannot fill or evict the cache.
 
 ### Middleware
 
