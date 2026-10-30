@@ -24,7 +24,7 @@ export type LinkClickedInfo = {
 }
 
 type UserType = "anon" | "user" | "paid"
-type RuntimeType = "puzzmo_com" | "iframe" | "simple_embed" | "app_embed" | "ios_native"
+type RuntimeType = "puzzmo_com" | "iframe" | "simple_embed" | "app_embed" | "ios_native" | "msn"
 
 /** Everything the events endpoint needs to attribute an event, mirrors the runtime's context. */
 export type GameAnalyticsContext = {
@@ -106,13 +106,14 @@ const resolveAnalyticsEndpoint = (): { apiRoot: string; enabled: boolean } => {
 }
 
 /** Derive the analytics context from the host's bootstrap data, or null if a game isn't present. */
-const buildAnalyticsContext = (readyData: BootstrapGameData | null, apiRoot: string): GameAnalyticsContext | null => {
+export const buildAnalyticsContext = (readyData: BootstrapGameData | null, apiRoot: string): GameAnalyticsContext | null => {
   const session = readyData?.session
   if (!session) return null
 
   const gameplay = session.gameplay
   const puzzle: any = session.puzzle
   const hostContext: any[] = (readyData?.hostContext as any[]) ?? []
+  const embedContext = hostContext.find((hc) => hc?.type === "embed")
 
   return {
     gameSlug: readyData?.game?.slug || "unknown",
@@ -123,9 +124,10 @@ const buildAnalyticsContext = (readyData: BootstrapGameData | null, apiRoot: str
     runtimeType: getRuntimeType(hostContext),
     userID: readyData?.currentUser?.id,
     teamSlug: puzzle.team?.slug || undefined,
-    partnerSlug: hostContext.find((hc) => hc?.type === "embed")?.partner?.slug || undefined,
+    // Embeds carry their partner in the embed context; partner pages on puzzmo.com send it top-level
+    partnerSlug: embedContext?.partner?.slug || readyData?.partnerSlug || undefined,
     dailyDateKey: puzzle.mostRecentDaily?.daily?.dateKey,
-    embedID: hostContext.find((hc) => hc?.type === "embed")?.embedID || undefined,
+    embedID: embedContext?.embedID || undefined,
   }
 }
 
@@ -152,7 +154,8 @@ const gameBringsOwnRuntime = (readyData: BootstrapGameData | null): boolean => {
 
 /** Derive the runtime bucket from host context, mirroring the runtime's getRuntimeType. */
 const getRuntimeType = (hostContext: any[]): RuntimeType => {
-  if (hostContext.find((hc) => hc?.type === "embed")) return "iframe"
+  const embed = hostContext.find((hc) => hc?.type === "embed")
+  if (embed) return embed.host === "msn" ? "msn" : "iframe"
 
   const app = hostContext.find((hc) => hc?.type === "app")
   if (app?.host === "__embed") return "simple_embed"

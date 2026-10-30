@@ -173,6 +173,8 @@ export type BootstrapGameData = {
   theme: Theme
   /** Structured context the host provides to the game. */
   hostContext: HostContext[]
+  /** The partner sub-site the game is played on (e.g. a puzzmo.com/+/sfgate page), unset on plain puzzmo.com. */
+  partnerSlug?: string
   /** The host<->game runtime contract the host agreed to, answering the one the game declared in READY. */
   appRuntimeContract: string
   /**
@@ -307,6 +309,8 @@ export type EmbedHostContext = {
   noUI?: boolean
   /** The embed record driving this page, when known. */
   embedID?: string
+  /** A platform outside Puzzmo's own embeds hosting the game, e.g. "msn" for MSN Play. */
+  host?: "msn"
   /** Game-specific embed settings keyed by game slug (e.g. `crossword: {...}`). */
   [gameSlug: string]: unknown
 }
