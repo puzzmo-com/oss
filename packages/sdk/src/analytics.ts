@@ -39,7 +39,12 @@ export type GameAnalyticsContext = {
   partnerSlug?: string
   dailyDateKey?: string
   embedID?: string
+  /** Defaults to the device the game is running on, see detectDeviceType in ./gameTracker */
+  deviceType?: DeviceType
 }
+
+/** Matches the device_type column in ClickHouse, the API classifies events which leave it out */
+export type DeviceType = "unknown" | "mobile" | "tablet" | "desktop"
 
 export type GameAnalyticsTracker = {
   /** Map an outgoing host message to its analytics event(s), if any. */

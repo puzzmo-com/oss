@@ -1,4 +1,4 @@
-import type { GameAnalyticsContext, LinkClickedInfo } from "./analytics"
+import type { DeviceType, GameAnalyticsContext, LinkClickedInfo } from "./analytics"
 
 /**
  * Game analytics event-firing logic for the SDK.
@@ -66,7 +66,7 @@ const sendGameAnalyticsEvent = async (
 
 export const createGameAnalyticsTracker = (context: GameAnalyticsContext) => {
   const state: GameAnalyticsState = {
-    context,
+    context: { ...context, deviceType: context.deviceType ?? detectDeviceType() },
     updateCount: 0,
     startTime: new Date(),
     tracked: {
@@ -132,4 +132,25 @@ export const createGameAnalyticsTracker = (context: GameAnalyticsContext) => {
     trackEvent,
     trackLinkClick,
   }
+}
+
+/**
+ * The kind of device the game runs on, judged by the whole device rather than the game's frame. A copy of
+ * detectDeviceType in @puzzmo-com/clickhouse/deviceType, kept dependency-free for the published SDK.
+ */
+const detectDeviceType = (): DeviceType => {
+  if (typeof navigator === "undefined" || typeof window === "undefined") return "unknown"
+  const userAgent = navigator.userAgent
+
+  // iPadOS Safari reports itself as a Mac, so only a touchscreen gives it away
+  if (/iPad/.test(userAgent) || (/Macintosh/.test(userAgent) && navigator.maxTouchPoints > 1)) return "tablet"
+  const mobileHint = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData?.mobile
+  if (/iPhone|iPod/.test(userAgent) || mobileHint) return "mobile"
+  // Android phones carry "Mobile", Android tablets leave it out
+  if (/Android/.test(userAgent)) return /Mobile/.test(userAgent) ? "mobile" : "tablet"
+  if (/Mobile|Windows Phone/.test(userAgent)) return "mobile"
+
+  // Anything else whose main input is touch, sized by the screen's short side
+  if (window.matchMedia?.("(pointer: coarse)").matches) return Math.min(screen.width, screen.height) < 600 ? "mobile" : "tablet"
+  return "desktop"
 }
