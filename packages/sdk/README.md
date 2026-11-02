@@ -64,10 +64,24 @@ Creates an SDK instance. Options:
 
 | Method                    | Description                                                               |
 | ------------------------- | ------------------------------------------------------------------------- |
-| `sdk.gameReady()`         | Async. Signals readiness, returns puzzle data and theme.                  |
+| `sdk.gameReady()`         | Async. Signals readiness, returns the boot mode, puzzle data and theme.   |
 | `sdk.gameLoaded(state?)`  | Signals game UI is ready. Host will send `start`.                         |
 | `sdk.on(event, handler)`  | Listen for events: `start`, `pause`, `resume`, `retry`, `settingsUpdate`. |
 | `sdk.off(event, handler)` | Remove an event listener.                                                 |
+
+### Repeat play
+
+A game opted into repeat play is booted with no puzzle session. `gameReady()` then resolves with
+`mode: "repeatable"`. A game that makes its own boards gets an empty `puzzleString`; a game whose puzzles come
+from a pool gets the first one, with its `puzzleKey`, and asks the host for more. Games never fetch puzzles
+themselves.
+
+| Method                                    | Description                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| `sdk.storage.get()`                       | The game's own per-player payload from boot, or null. Repeat play only for now.       |
+| `sdk.storage.set(state, stateVersion?)`   | Replace that payload (64 KB, whole document, last write wins).                        |
+| `sdk.completeRepeatableRun(run, config?)` | Report a finished run; the timer keeps going for the next one.                        |
+| `sdk.requestPuzzle({ buckets, exclude })` | Another puzzle from the pool, or from `buckets`; `exclude` is the game's recent keys. |
 
 ### Game State
 
@@ -102,11 +116,11 @@ Names are the iOS feedback generators: `selection`, `light`, `medium`, `heavy`, 
 
 Fire-and-forget — it never reports back, and it is a no-op wherever the host can't deliver one, so never make gameplay depend on a haptic landing:
 
-| Where | What happens |
-| --- | --- |
-| Puzzmo's iOS app | Real UIKit haptics via the native bridge |
-| puzzmo.com on Android/desktop | Approximated with `navigator.vibrate` |
-| Partner embeds | No haptic — see below |
+| Where                         | What happens                             |
+| ----------------------------- | ---------------------------------------- |
+| Puzzmo's iOS app              | Real UIKit haptics via the native bridge |
+| puzzmo.com on Android/desktop | Approximated with `navigator.vibrate`    |
+| Partner embeds                | No haptic — see below                    |
 
 The call goes to the host rather than vibrating from your game because Chrome has blocked `navigator.vibrate` in cross-origin iframes since Chrome 55, and games run in one. There is no Permissions-Policy opt-in, so calling it yourself is silently ignored. Partner embeds fire no haptic for the same reason: our frame is cross-origin to the partner's page, so the host is blocked too and there is no native bridge to fall back on. The cue is still forwarded to the partner page on the private message stream, so a partner can action it themselves.
 

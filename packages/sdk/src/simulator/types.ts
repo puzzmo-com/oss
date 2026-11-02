@@ -88,6 +88,8 @@ export interface SimulatorState {
   puzzleData: string | null
   originalPuzzle: string
   currentInputStr: string
+  /** The game's own per-player payload, as the real host would hold it. Null until the game writes one. */
+  userStorage: { state: string; stateVersion: number } | null
   /** The puzzle string applied from the Data tab, persisted across reloads. Null when unset. */
   appliedPuzzleOverride: string | null
   /** The board state applied from the Data tab, persisted across reloads. Null when unset. */

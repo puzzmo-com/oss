@@ -28,10 +28,19 @@ export interface PuzzmoSDKOptions<Plugins extends readonly SDKPlugin[] = []> {
 /** The bootstrap info a game needs to set up its board, returned by `sdk.gameReady()`. */
 export type GameReadyResult = {
   /**
-   * The serialized puzzle for this gameplay, in the game's own format. Null when the host sent no
-   * play session, e.g. for a mode with no puzzle.
+   * "puzzle" when the host booted a puzzle session, "repeatable" when it booted the game alone for repeat
+   * play. A repeatable game either makes its own boards or is handed one from its pool, and keeps its
+   * state in `storage`.
+   */
+  mode: "puzzle" | "repeatable"
+  /**
+   * The serialized puzzle, in the game's own format. Null when the host sent none: a repeatable game
+   * that makes its own boards, or another mode with no puzzle. In repeatable mode it is the first
+   * puzzle from the game's pool.
    */
   puzzleString: string | null
+  /** The pool key of a repeatable game's puzzle, to pass back with `completeRepeatableRun`. Null otherwise. */
+  puzzleKey: string | null
   /** The player's saved in-progress board state from a previous session, or null when starting fresh. */
   inputString: string | null
   /** The host's current display theme, so the game can match the surrounding page. */
@@ -40,6 +49,31 @@ export type GameReadyResult = {
   completed: boolean
   /** The raw bootstrap payload from the host: user state, the gameplay record, host context, etc. */
   readyData: MessagesReceived["READY_DATA"] | null
+}
+
+/** Another puzzle from the game's pool, as `sdk.requestPuzzle()` resolves it. */
+export type SDKPoolPuzzle = { puzzleKey: string; puzzleString: string }
+
+/** What `sdk.storage.get()` hands back: the payload as the game last wrote it, with the version it wrote it under. */
+export type SDKStoredState = { state: string; stateVersion: number }
+
+/**
+ * The game's own per-player store: unlocks, meta progression, an in-flight repeatable run. Opaque to
+ * the host, whole-document, last write wins, 64 KB serialised. Not tied to a puzzle or a gameplay, so
+ * it is there for play that has neither. Settings stay in `settings`; this is for durable game state.
+ * Only kept in repeatable mode for now: a puzzle session's host does not save it, so writes there last
+ * only until the page reloads.
+ */
+export interface SDKStorage {
+  /** The payload the host handed over at boot, or null when this player has never written one. */
+  get: () => SDKStoredState | null
+  /**
+   * Replace the stored payload. The host throttles the write and flushes on page hide, so calling
+   * this on every move is fine; what the player loses in a crash is a couple of seconds. The
+   * `stateVersion` is the game's own schema number, for migrating old payloads on read. Throws for a
+   * state over 64 KB or a `stateVersion` below 1, which the host would refuse.
+   */
+  set: (state: string, stateVersion?: number) => void
 }
 
 /** Player-facing game settings, rendered by the host's settings panel and persisted per-user, per-game. */
@@ -171,6 +205,28 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
   /** Player-facing game settings, rendered in the host's settings panel and persisted per-user, per-game. */
   settings: SDKSettings
 
+  /** The game's own durable per-player state, opaque to the host. See `SDKStorage`. */
+  storage: SDKStorage
+
+  /**
+   * Report a finished run of a repeatable (Anytime) mode. Unlike `gameCompleted()` there is no gameplay behind it: the host records the run
+   * against the player's counters for this game and nothing more. One page hosts many runs, so the SDK timer is not concluded; pass
+   * `elapsedTimeSecs` for the run, else the timer's time since the previous run (or since it started, for the first) is used.
+   * `config.deeds` ride along as they do on completion.
+   */
+  completeRepeatableRun: (play?: { elapsedTimeSecs?: number; puzzleKey?: string }, config?: AugmentationConfig) => void
+
+  /**
+   * Ask the host for another puzzle from the game's pool, for a repeatable game whose puzzles come from
+   * the host (the first arrives with `gameReady()`). Leave `buckets` out to draw from the whole pool, and
+   * set it only when the game wants a particular kind of puzzle, such as difficulties chosen by the player:
+   * the draw is uniform across whichever buckets it covers. `exclude` is the game's own recent keys, newest
+   * last, which the host avoids while it can. Rejects when the game has no pool, a bucket does not exist,
+   * or the host does not answer in time. A game that sends READY again is handed the last puzzle drawn, so
+   * one that draws ahead should keep the puzzle in play in its storage rather than rely on the boot's.
+   */
+  requestPuzzle: (opts?: { buckets?: readonly string[]; exclude?: readonly string[] }) => Promise<SDKPoolPuzzle>
+
   /** The host-rendered on-screen keyboard, for games that take text or symbol input on touch devices. */
   keyboard: SDKKeyboard
 
@@ -198,6 +254,9 @@ export type SupportedOutgoingMessages = Pick<
   | "TIMER_TICK"
   | "TIMER_SYNC"
   | "UPLOAD_NEW_GAME_STATE"
+  | "UPDATE_GAME_USER_STATE"
+  | "COMPLETE_REPEATABLE_RUN"
+  | "REQUEST_PUZZLE"
   | "HIT_CHECKPOINT"
   | "KEYBOARD_UPDATE_CONFIG"
   | "INITIALIZE_SETTINGS"
@@ -216,6 +275,7 @@ export type SupportedIncomingMessages = Pick<
   | "KEYBOARD_KEY_PRESS"
   | "KEYBOARD_CURSOR_CHANGE"
   | "KEYBOARD_CURSOR_END"
+  | "PUZZLE_DATA"
 >
 
 type MessageHandler<T extends keyof SupportedIncomingMessages> = (data: SupportedIncomingMessages[T]) => void
@@ -408,6 +468,9 @@ const sdkRuntimeContract = "1.1"
 
 const hostAPI = createHostAPI()
 
+/** A puzzle request covers a round trip to the API and a blob read, so it gets longer than READY_DATA */
+const puzzleRequestTimeoutMs = 10_000
+
 /** Creates a Puzzmo SDK instance for communicating with the Puzzmo host */
 export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>(
   options: PuzzmoSDKOptions<Plugins> = {},
@@ -417,9 +480,13 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
 
   const getGameplay = () => readyData?.session?.gameplay
   const getGameplayID = () => getGameplay()?.id ?? null
-  const getPuzzleString = () => readyData?.session?.puzzle.puzzle ?? null
+  const getPuzzleString = () => readyData?.session?.puzzle.puzzle ?? readyData?.repeatablePuzzle?.puzzle ?? null
   const getBoardState = () => getGameplay()?.boardState ?? null
   const getTheme = () => readyData?.theme ?? null
+  // Mirrors what the host holds, so get() reflects the game's own writes within a session
+  let storedState: SDKStoredState | null = null
+  let lastRunEndedAtSecs = 0
+  let warnedStorageUnsaved = false
   const getCompleted = () => getGameplay()?.completed ?? false
 
   let warnedNoSession = false
@@ -515,6 +582,18 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   hostAPI.onMessage("KEYBOARD_KEY_PRESS", (data) => emit("keyboardKeyPress", data))
   hostAPI.onMessage("KEYBOARD_CURSOR_CHANGE", (data) => emit("keyboardCursorChange", data))
   hostAPI.onMessage("KEYBOARD_CURSOR_END", () => emit("keyboardCursorEnd"))
+
+  // Puzzle requests in flight, by nonce, each settled by its PUZZLE_DATA or a timeout
+  const puzzleRequests = new Map<string, { resolve: (puzzle: SDKPoolPuzzle) => void; reject: (error: Error) => void }>()
+  let puzzleRequestCount = 0
+
+  hostAPI.onMessage("PUZZLE_DATA", (data) => {
+    const request = puzzleRequests.get(data.nonce)
+    if (!request) return
+    puzzleRequests.delete(data.nonce)
+    if ("failed" in data) request.reject(new Error(data.error))
+    else request.resolve({ puzzleKey: data.puzzle.key, puzzleString: data.puzzle.puzzle })
+  })
 
   hostAPI.onMessage("RETRY_PUZZLE", () => {
     internalTimer._reset()
@@ -612,7 +691,9 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
 
       const inputString = getBoardState()
       const result: GameReadyResult = {
+        mode: readyData?.repeatable ? "repeatable" : "puzzle",
         puzzleString: getPuzzleString(),
+        puzzleKey: readyData?.repeatable ? (readyData.repeatablePuzzle?.key ?? null) : null,
         inputString,
         theme: getTheme(),
         completed: getCompleted(),
@@ -719,6 +800,61 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
       })
     },
 
+    completeRepeatableRun: (play?: { elapsedTimeSecs?: number; puzzleKey?: string }, config?: AugmentationConfig) => {
+      // The timer runs on across runs, so a run's default time is measured from where the last one ended
+      const timerSecs = internalTimer.timeWithoutPenaltySecs()
+      const sinceLastRun = timerSecs >= lastRunEndedAtSecs ? timerSecs - lastRunEndedAtSecs : timerSecs
+      lastRunEndedAtSecs = timerSecs
+      const elapsedTimeSecs = Math.round(play?.elapsedTimeSecs ?? sinceLastRun)
+      // The run's own time is the time deed; one the game passed would be a second, conflicting value
+      const gameDeeds = ((config?.deeds as Deed[] | undefined) ?? []).filter((deed) => deed.id !== "time")
+      const deedValues = [...gameDeeds, { id: "time", value: elapsedTimeSecs }]
+      const puzzleKey = play?.puzzleKey
+      hostAPI.sendMessage("COMPLETE_REPEATABLE_RUN", { input: { deedValues, elapsedTimeSecs, ...(puzzleKey ? { puzzleKey } : {}) } })
+      trackAnalyticsEvent("COMPLETE_REPEATABLE_RUN", { elapsedTimeSecs })
+    },
+
+    requestPuzzle: (opts?: { buckets?: readonly string[]; exclude?: readonly string[] }) =>
+      new Promise<SDKPoolPuzzle>((resolve, reject) => {
+        const nonce = `puzzle-${++puzzleRequestCount}`
+        const timer = setTimeout(() => {
+          if (!puzzleRequests.delete(nonce)) return
+          reject(new Error(`Timeout waiting for PUZZLE_DATA after ${puzzleRequestTimeoutMs}ms`))
+        }, puzzleRequestTimeoutMs)
+        const settle =
+          <T>(fn: (value: T) => void) =>
+          (value: T) => {
+            clearTimeout(timer)
+            fn(value)
+          }
+        puzzleRequests.set(nonce, { resolve: settle(resolve), reject: settle(reject) })
+        hostAPI.sendMessage("REQUEST_PUZZLE", {
+          nonce,
+          buckets: opts?.buckets ? [...opts.buckets] : undefined,
+          exclude: opts?.exclude ? [...opts.exclude] : undefined,
+        })
+      }),
+
+    storage: {
+      get: () => {
+        if (storedState) return storedState
+        const fromHost = readyData?.viewerStorage
+        return fromHost && fromHost.state != null ? { state: fromHost.state, stateVersion: fromHost.stateVersion } : null
+      },
+      set: (state: string, stateVersion = 1) => {
+        // The host's limits, checked here so a write it would refuse fails at the call instead of looking saved
+        const sizeBytes = new TextEncoder().encode(state).length
+        if (sizeBytes > storageMaxBytes) throw new Error(`[sdk.storage] State is ${sizeBytes} bytes, over the ${storageMaxBytes} byte cap`)
+        if (!Number.isInteger(stateVersion) || stateVersion < 1) throw new Error("[sdk.storage] stateVersion must be a positive integer")
+        if (readyData && !readyData.repeatable && !warnedStorageUnsaved) {
+          warnedStorageUnsaved = true
+          console.warn("[sdk.storage] Only repeat play saves storage for now; this write lasts until the page reloads")
+        }
+        storedState = { state, stateVersion }
+        hostAPI.sendMessage("UPDATE_GAME_USER_STATE", { state, stateVersion })
+      },
+    },
+
     settings: {
       initialize: (components: GameSettingsUIComponents[]) => {
         currentSettings = { ...settingsDefaultsFromComponents(components), ...currentSettings }
@@ -769,3 +905,6 @@ function settingsDefaultsFromComponents(components: GameSettingsUIComponents[]):
   }
   return defaults
 }
+
+/** The largest state `sdk.storage.set()` takes, matching the API's cap */
+const storageMaxBytes = 64 * 1024

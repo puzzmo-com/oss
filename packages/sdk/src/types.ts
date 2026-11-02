@@ -169,6 +169,12 @@ export type BootstrapGameData = {
   session?: BootstrapSession
   /** Server-computed per-player data for this game, also available via `getViewerMetadata()`. */
   viewerMetadata?: unknown
+  /** The game's own per-player state, as last written via `sdk.storage.set()`. Null until the game first writes. */
+  viewerStorage?: { state: string | null; stateVersion: number } | null
+  /** Set by a host booting the game for repeat play, which brings no session. */
+  repeatable?: boolean
+  /** For a repeatable game whose puzzles come from the host: the first one, drawn at boot. */
+  repeatablePuzzle?: { key: string; puzzle: string } | null
   /** Color scheme and design tokens the game should render with. */
   theme: Theme
   /** Structured context the host provides to the game. */
@@ -657,6 +663,39 @@ export type MessagesSentFromEmbed = {
   READY: { runtimeContract?: string }
   /** Signals that the game has finished loading and is ready to start. The host will respond with `START_GAME`. */
   READY_GAME_LOADED: { state: any; gameRuntimeContract: string; embedRuntimeContract: string }
+  /**
+   * A finished run of a repeatable game. Counters only: no points, streaks or boards, and nothing to
+   * identify the run, since the server never saw it start. Send once per run via `sdk.completeRepeatableRun()`.
+   */
+  COMPLETE_REPEATABLE_RUN: {
+    input: {
+      deedValues: Deed[]
+      elapsedTimeSecs: number
+      /** The pool puzzle the run was played on, for a game whose puzzles come from the host */
+      puzzleKey?: string
+    }
+  }
+
+  /**
+   * Ask the host for another puzzle from the game's pool, from `buckets` when given, else the whole pool.
+   * `exclude` is the game's own recent keys, newest last; the host answers with `PUZZLE_DATA` carrying the
+   * same nonce. Send via `sdk.requestPuzzle()`.
+   */
+  REQUEST_PUZZLE: {
+    nonce: string
+    buckets?: string[]
+    exclude?: string[]
+  }
+
+  /**
+   * Replace the game's own per-player state on the server: unlocks, meta progression, an in-flight
+   * repeatable run. Whole document, last write wins, 64 KB cap. The host throttles writes, so send it
+   * freely. Comes back as `viewerStorage` in READY_DATA.
+   */
+  UPDATE_GAME_USER_STATE: {
+    state: string
+    stateVersion: number
+  }
   /** Persist the current in-progress game state to the API. Call this after every meaningful player action. */
   UPLOAD_NEW_GAME_STATE: {
     id: string
@@ -743,6 +782,8 @@ export type MessagesSentFromEmbed = {
 
 /** Messages from the host to the SDK */
 export type MessagesReceived = {
+  /** The host's answer to `REQUEST_PUZZLE`: a puzzle from the game's pool, or why there isn't one. */
+  PUZZLE_DATA: { nonce: string; puzzle: { key: string; puzzle: string } } | { nonce: string; error: string; failed: true }
   /** The bootstrap payload containing puzzle data, theme, and existing gameplay state. Received in response to `READY`. */
   READY_DATA: BootstrapGameData
   /** Sent by REPLs and dev tooling to reset the game with a revised puzzle string without a full reload. */

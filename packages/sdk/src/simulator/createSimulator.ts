@@ -1,4 +1,4 @@
-import type { BootstrapGame, BootstrapGameData, MessagesReceived } from "../types"
+import type { BootstrapGame, BootstrapGameData, MessagesReceived, MessagesSentFromEmbed } from "../types"
 import type { SimulatorConfig, SimulatorContext, SimulatorState, SimulatorView, TabName, FixtureImports } from "./types"
 import { simulatorStyles } from "./styles"
 import { createInitialState, persistCollapsed, persistTab } from "./state"
@@ -333,6 +333,21 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     sendToGame(type, data, messageLogger)
   }
 
+  // Stands in for a pool: a bucket is a fixture category, and a key is fixtures/<category>/<name>
+  const drawFixturePuzzle = (request: MessagesSentFromEmbed["REQUEST_PUZZLE"]): MessagesReceived["PUZZLE_DATA"] => {
+    const categories = request.buckets?.length ? request.buckets : fixtureCategories
+    const missing = categories.find((category) => !fixtures?.get(category)?.size)
+    if (missing !== undefined || !categories.length)
+      return { nonce: request.nonce, error: `No fixtures in "${missing ?? ""}" to stand in for a pool`, failed: true }
+
+    const keys = categories.flatMap((category) => [...fixtures!.get(category)!.keys()].map((name) => `fixtures/${category}/${name}`))
+    const unplayed = keys.filter((key) => !request.exclude?.includes(key))
+    const from = unplayed.length ? unplayed : keys
+    const pick = from[Math.floor(Math.random() * from.length)]
+    const [, category, ...name] = pick.split("/")
+    return { nonce: request.nonce, puzzle: { key: pick, puzzle: fixtures!.get(category)!.get(name.join("/")) } }
+  }
+
   // Update badge count for a tab
   const updateBadge = (tabId: string, count: number | undefined) => {
     const badge = container.querySelector(`[data-badge="${tabId}"]`) as HTMLElement
@@ -482,6 +497,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
       },
       game: simulatorGame,
       session,
+      viewerStorage: state.userStorage,
       theme: state.selectedTheme,
       // Resolved in createInitialState: Host-tab override > config.hostContext > default app context.
       hostContext: state.hostContext,
@@ -581,6 +597,18 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
         updateThumbnail()
       }
       console.log("Simulator: Game state uploaded", data)
+    }
+
+    if (type === "COMPLETE_REPEATABLE_RUN") console.log("Simulator: Repeatable run completed", data)
+
+    if (type === "REQUEST_PUZZLE") {
+      wrappedSendToGame("PUZZLE_DATA", drawFixturePuzzle(data))
+      return
+    }
+
+    if (type === "UPDATE_GAME_USER_STATE" && typeof data?.state === "string") {
+      state.userStorage = { state: data.state, stateVersion: data.stateVersion ?? 1 }
+      console.log("Simulator: Game user storage updated", data)
     }
 
     if (type === "GAME_COMPLETED") {

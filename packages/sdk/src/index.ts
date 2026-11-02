@@ -5,6 +5,7 @@ export type {
   PuzzmoSDK,
   PuzzmoSDKOptions,
   GameReadyResult,
+  SDKPoolPuzzle,
   SDKEventMap,
   SDKEventType,
   SDKTimer,

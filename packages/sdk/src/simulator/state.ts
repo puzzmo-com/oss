@@ -173,6 +173,7 @@ export function createInitialState(config: SimulatorConfig, fixtureCategories: s
     puzzleData: puzzleOverride,
     originalPuzzle: puzzleOverride ?? "",
     currentInputStr: inputOverride ?? "",
+    userStorage: null,
     appliedPuzzleOverride: puzzleOverride,
     appliedInputOverride: inputOverride,
     completionData: null,
