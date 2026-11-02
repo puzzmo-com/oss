@@ -447,7 +447,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
   }
 
   // Create READY_DATA payload
-  const createReadyData = (puzzle: string): BootstrapGameData => {
+  const createReadyData = (puzzle: string | null): BootstrapGameData => {
     const gameplay = {
       additionalTimeAddedSecs: 0,
       boardState: state.currentInputStr,
@@ -461,7 +461,10 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
       slug: "simulator-game",
       viewerOwnsPuzzle: true,
     }
-    const simulatorPuzzle = { id: "simulator-puzzle", name: "Proto Jig Puzzle", puzzle, mostRecentDaily: null }
+    const session =
+      puzzle === null
+        ? undefined
+        : { gameplay, puzzle: { id: "simulator-puzzle", name: "Proto Jig Puzzle", puzzle, mostRecentDaily: null } }
     return {
       userState: {
         // Keyed by game slug, matching the shape real hosts send
@@ -478,7 +481,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
         roles: "",
       },
       game: simulatorGame,
-      session: { gameplay, puzzle: simulatorPuzzle },
+      session,
       theme: state.selectedTheme,
       // Resolved in createInitialState: Host-tab override > config.hostContext > default app context.
       hostContext: state.hostContext,
@@ -486,12 +489,21 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     }
   }
 
+  // Contracts this simulator can host; mirrors negotiateRuntimeContract in @puzzmo-com/shared,
+  // which the SDK package can't depend on. Games declaring an unknown contract get "1.0".
+  const simulatorRuntimeContracts = ["1.0", "1.1"]
+
   // Handle READY message from game - send READY_DATA with puzzle
   const handleReady = async (appRuntimeContract: string) => {
-    updateStatus("Loading puzzle...", "waiting")
+    // A game built on an SDK from before "1.1" can't run without a session
+    const sendSession = config.session !== false || appRuntimeContract === "1.0"
+    if (!sendSession) console.log("Simulator: Sending READY_DATA without a session")
+    else if (config.session === false)
+      console.warn("Simulator: `session: false` needs a game built on an SDK speaking runtime contract 1.1 or later")
+    updateStatus(sendSession ? "Loading puzzle..." : "Sending READY_DATA...", "waiting")
 
     try {
-      const puzzle = await loadPuzzle()
+      const puzzle = sendSession ? await loadPuzzle() : null
       const readyData = { ...createReadyData(puzzle), appRuntimeContract }
 
       updateStatus("Sending READY_DATA...", "waiting")
@@ -531,7 +543,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     // Handle core messages
     if (type === "READY") {
       console.log("Simulator: Received READY from game")
-      handleReady(data?.runtimeContract === "1.1" ? "1.1" : "1.0")
+      handleReady(simulatorRuntimeContracts.includes(data?.runtimeContract) ? data.runtimeContract : "1.0")
       return
     }
 

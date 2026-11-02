@@ -29,8 +29,9 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
    // Wait for puzzle data from the host
    const { puzzleString, inputString, theme, completed } = await sdk.gameReady()
 
-   // Parse puzzle data and set up the game
-   const puzzle = JSON.parse(puzzleString)
+   // Parse puzzle data and set up the game. puzzleString is null when the host sends no puzzle
+   // (e.g. an endless mode): generate a board, or throw if the game can only play puzzles
+   const puzzle = puzzleString ? JSON.parse(puzzleString) : generatePuzzle()
    initializeGame(puzzle)
 
    // If there's saved state, restore it
@@ -114,7 +115,7 @@ Add the `@puzzmo/sdk` package and wire up the game lifecycle.
 
 ## Key SDK APIs
 
-- `sdk.gameReady()` - Async. Sends READY, waits for puzzle data. Returns `{ puzzleString, inputString, theme, completed }`.
+- `sdk.gameReady()` - Async. Sends READY, waits for puzzle data. Returns `{ puzzleString, inputString, theme, completed }`. `puzzleString` and `inputString` are null when the host sends no play session; every game must handle that, even if only by throwing.
 - `sdk.gameLoaded()` - Signals game is ready. Host will send START_GAME.
 - `sdk.on(event, handler)` - Listen for lifecycle events: `start`, `pause`, `resume`, `retry`, `settingsUpdate`.
 - `sdk.updateGameState(stateString)` - Save current game state.

@@ -20,8 +20,8 @@ export type Pico8BridgeOptions = {
   sdk: Pico8BridgeSDK
   /** `completed` from `gameReady()`. A finished play opens with `pz.completed` set, and won't ask for the completion screen again. */
   completed?: boolean
-  /** `puzzleString` from `gameReady()`, which the cart gets as `pz.puzzle`. Keep puzzles to plain ASCII. */
-  puzzleString?: string
+  /** `puzzleString` from `gameReady()`, which the cart gets as `pz.puzzle`, null when there is no puzzle. Keep puzzles to plain ASCII. */
+  puzzleString?: string | null
   /** `inputString` from `gameReady()`: the progress the cart last saved with `pz_save()`, which it gets as `pz.progress`. */
   inputString?: string | null
   /**

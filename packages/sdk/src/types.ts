@@ -673,8 +673,8 @@ export type MessagesSentFromEmbed = {
   }
   /** Upload the final completed game state. Triggers scoring, deeds, and augmentations on the host. */
   GAME_COMPLETED: {
-    /** The gameplay ID returned from `READY_DATA`. */
-    id: string
+    /** The gameplay ID returned from `READY_DATA`. Absent when the host sent no play session. */
+    id?: string
     /** See CompleteGamePlayedInput — elapsed time, board state, score, etc. */
     input: any
     config?: {

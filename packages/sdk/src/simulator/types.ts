@@ -13,6 +13,11 @@ export interface SimulatorConfig {
   /** Game slug for API features (e.g. "crossword", "ribbit") */
   slug?: string
   /**
+   * Whether READY_DATA carries a play session (default: true). Set to false to run the game the way
+   * a host will for a mode with no puzzle. Ignored for games built on an SDK from before runtime contract "1.1".
+   */
+  session?: boolean
+  /**
    * The `hostContext` array sent in READY_DATA, so host-context-dependent features (embed
    * settings, sandbox mode, mobile layout, …) can be exercised locally. Defaults to a single
    * desktop "app" context. The Host tab can override this at runtime (persisted per-browser,

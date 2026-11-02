@@ -27,13 +27,16 @@ export interface PuzzmoSDKOptions<Plugins extends readonly SDKPlugin[] = []> {
 
 /** The bootstrap info a game needs to set up its board, returned by `sdk.gameReady()`. */
 export type GameReadyResult = {
-  /** The serialized puzzle for this gameplay, in the game's own format. */
-  puzzleString: string
+  /**
+   * The serialized puzzle for this gameplay, in the game's own format. Null when the host sent no
+   * play session, e.g. for a mode with no puzzle.
+   */
+  puzzleString: string | null
   /** The player's saved in-progress board state from a previous session, or null when starting fresh. */
   inputString: string | null
   /** The host's current display theme, so the game can match the surrounding page. */
   theme: Theme | null
-  /** True when the player has already finished this puzzle (e.g. re-opening a completed daily). */
+  /** True when the player has already finished this puzzle (e.g. re-opening a completed daily). False without a session. */
   completed: boolean
   /** The raw bootstrap payload from the host: user state, the gameplay record, host context, etc. */
   readyData: MessagesReceived["READY_DATA"] | null
@@ -134,7 +137,8 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
    * Save the player's in-progress state to the server so play can resume later, on any
    * device. `inputString` is the game's own serialized format — it comes back as `inputString`
    * from `gameReady()`. Call whenever the player makes a meaningful move; elapsed time is filled
-   * in from the SDK timer unless provided in `play`.
+   * in from the SDK timer unless provided in `play`. Ignored, with a console warning, when there is
+   * no gameplay to save to: the host sent no play session, or `gameReady()` hasn't resolved yet.
    */
   updateGameState: (inputString: string, play?: Partial<GamePlay>) => void
 
@@ -142,7 +146,9 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
    * Report the game as finished. Concludes the timer, fills in elapsed/penalty time when not
    * provided, and uploads the final play plus its deeds — the host uses these for scoring,
    * leaderboards, stats, and other augmentations. Pass progress as `inputString` (the same
-   * string `updateGameState()` takes). Follow with `showCompletionScreen()`.
+   * string `updateGameState()` takes). Follow with `showCompletionScreen()`. Without a play session
+   * the result is still reported, with no gameplay ID, when the host negotiated contract "1.1" —
+   * older hosts can't record one, so the message is dropped with a console warning.
    */
   gameCompleted: (play: GameCompletedPlay, config?: AugmentationConfig) => void
 
@@ -157,7 +163,8 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
    * Record a named mid-game checkpoint. Uploads the current board state and play time, and can
    * run parts of the completion pipeline early (e.g. posting to leaderboards) via
    * `checkpointConfig.process`. A checkpoint is also the host's opportunity to show an ad when
-   * `checkpointConfig.interruptible` is true.
+   * `checkpointConfig.interruptible` is true. Ignored, with a console warning, when there is no
+   * gameplay to save to: the host sent no play session, or `gameReady()` hasn't resolved yet.
    */
   hitCheckpoint: (checkpointName: string, checkpointConfig: CheckpointConfig, config?: AugmentationConfig) => void
 
@@ -394,11 +401,10 @@ function createHostAPI() {
 }
 
 /**
- * The host<->game contract this SDK is built against, declared in READY and READY_GAME_LOADED.
- * Stays "1.0" until every host supporting "1.1" is deployed: an older puzzmo.com reloads when it
- * sees a contract it doesn't know.
+ * The host<->game contract this SDK speaks, declared in READY and READY_GAME_LOADED: games read
+ * `game` and `session`, and handle `session` being absent. Hosts on "1.0" always send a session.
  */
-const sdkRuntimeContract = "1.0"
+const sdkRuntimeContract = "1.1"
 
 const hostAPI = createHostAPI()
 
@@ -415,6 +421,17 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   const getBoardState = () => getGameplay()?.boardState ?? null
   const getTheme = () => readyData?.theme ?? null
   const getCompleted = () => getGameplay()?.completed ?? false
+
+  let warnedNoSession = false
+  /** Warns once that a call was dropped: before READY_DATA arrived, or the host sent no play session */
+  const warnNoSession = (method: string) => {
+    if (warnedNoSession) return
+    warnedNoSession = true
+    const reason = readyData
+      ? "the host sent no play session, so there is no gameplay to save to"
+      : "it was called before gameReady() resolved"
+    console.warn(`[Puzzmo SDK] ${method}() was ignored: ${reason}`)
+  }
 
   const eventListeners = new Map<SDKEventType, Set<(data?: any) => void>>()
 
@@ -576,48 +593,33 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
 
     plugins: pluginAPIs as PluginAPIs<Plugins>,
 
-    gameReady: async (): Promise<GameReadyResult> => {
+    gameReady: async () => {
       hostAPI.sendMessage("READY", { runtimeContract: sdkRuntimeContract })
 
-      if (getPuzzleString()) {
-        const inputString = getBoardState()
-        return {
-          puzzleString: getPuzzleString()!,
-          inputString,
-          // @ts-expect-error - this is backwards compat
-          boardState: inputString,
-          theme: getTheme(),
-          completed: getCompleted(),
-          readyData,
-        }
+      // READY_DATA may already be here, answering an earlier READY
+      if (!readyData) {
+        const timeout = options.timeout ?? 5000
+        await new Promise<MessagesReceived["READY_DATA"]>((resolve, reject) => {
+          readyDataResolve = resolve
+          setTimeout(() => {
+            if (readyDataResolve) {
+              readyDataResolve = null
+              reject(new Error(`Timeout waiting for READY_DATA after ${timeout}ms`))
+            }
+          }, timeout)
+        })
       }
 
-      const timeout = options.timeout ?? 5000
-      const readyDataPromise = new Promise<MessagesReceived["READY_DATA"]>((resolve, reject) => {
-        readyDataResolve = resolve
-        setTimeout(() => {
-          if (readyDataResolve) {
-            readyDataResolve = null
-            reject(new Error(`Timeout waiting for READY_DATA after ${timeout}ms`))
-          }
-        }, timeout)
-      })
-
-      await readyDataPromise
-
-      const puzzleString = getPuzzleString()
-      if (!puzzleString) throw new Error("READY_DATA received but no puzzle data found")
-
       const inputString = getBoardState()
-      return {
-        puzzleString,
+      const result: GameReadyResult = {
+        puzzleString: getPuzzleString(),
         inputString,
-        // @ts-expect-error - this is backwards compat
-        boardState: inputString,
         theme: getTheme(),
         completed: getCompleted(),
         readyData,
       }
+      // boardState is the pre-rename spelling of inputString, kept for untyped callers
+      return { ...result, boardState: inputString } as GameReadyResult
     },
 
     gameLoaded: (state: any = {}) => {
@@ -643,7 +645,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
 
     updateGameState: (inputString: string, play?: Partial<GamePlay>) => {
       const gameplayID = getGameplayID()
-      if (!gameplayID) return
+      if (!gameplayID) return warnNoSession("updateGameState")
 
       hostAPI.sendMessage("UPLOAD_NEW_GAME_STATE", {
         id: gameplayID,
@@ -679,13 +681,18 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
       })
 
       const gameplayID = getGameplayID()
-      if (gameplayID) {
+      // Without a session there's no gameplay ID; only hosts which negotiated "1.1" know to record
+      // an id-less completion. A pre-1.1 host sending no gameplay is a host bug, not sessionless play.
+      const sessionlessHost = readyData && !readyData.session && readyData.appRuntimeContract === "1.1"
+      if (gameplayID || sessionlessHost) {
         hostAPI.sendMessage("GAME_COMPLETED", {
-          id: gameplayID,
+          id: gameplayID ?? undefined,
           input: finalPlay,
           config,
         })
         trackAnalyticsEvent("GAME_COMPLETED", { input: finalPlay })
+      } else {
+        warnNoSession("gameCompleted")
       }
     },
 
@@ -696,7 +703,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
 
     hitCheckpoint: (checkpointName: string, checkpointConfig: CheckpointConfig, config?: AugmentationConfig) => {
       const gameplayID = getGameplayID()
-      if (!gameplayID) return
+      if (!gameplayID) return warnNoSession("hitCheckpoint")
 
       const inputStr = getBoardState() ?? ""
       const play: Partial<GamePlay> = {
