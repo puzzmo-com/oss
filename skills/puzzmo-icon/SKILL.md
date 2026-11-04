@@ -97,9 +97,9 @@ The substitution is a literal string replace: every `#000000` becomes the fg, ev
 Fetch any of these to compare against. The endpoint returns the raw SVG; pass `size`, `fg`, `bg` to render at a specific surface.
 
 ```
-https://api.puzzmo.com/gameIcon?slug={slug}&size=128
-https://api.puzzmo.com/gameIcon?slug={slug}&size=128&fg=1B1B28&bg=FFFFFF
-https://api.puzzmo.com/gameIcon?slug={slug}&size=128&fg=E2E8F0&bg=1E293B
+https://api.puzzmo.com/gameIcon.svg?slug={slug}&size=128
+https://api.puzzmo.com/gameIcon.svg?slug={slug}&size=128&fg=1B1B28&bg=FFFFFF
+https://api.puzzmo.com/gameIcon.svg?slug={slug}&size=128&fg=E2E8F0&bg=1E293B
 ```
 
 Public game slugs:
