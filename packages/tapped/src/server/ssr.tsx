@@ -150,8 +150,7 @@ export const createWouterSSRContext = async <TAppConfig = Record<string, unknown
       console.warn(`SSR: ${error.operationName} timed out after ${error.timeoutMs}ms, serving client shell (CSR) for ${pathname}`)
       csrFallback = "timeout"
     } else {
-      console.error("SSR: Failed to load data", error)
-      // The context this would have become never gets returned, so the route rides on the error
+      // Logged by the SSR handler. The context this would have become never gets returned, so the route rides on the error
       throw attachHeadHTML(attachRoutePath(error, routeMatch?.route.path), renderHeadTags(await headTags))
     }
   } finally {

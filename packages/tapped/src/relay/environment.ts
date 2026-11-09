@@ -45,7 +45,7 @@ const createFetchFunction =
       }),
     })
 
-    return Observable.from(response.then((data) => data.json()))
+    return Observable.from(response.then((res) => parseGraphQLResponse(res, params.name)))
   }
 
 /** Creates a Relay environment with network layer and store for GraphQL queries */
@@ -53,4 +53,17 @@ export const createEnvironment = (url: string, records: RecordSource, requestHea
   const network = Network.create(createFetchFunction(url, requestHeaders))
   const store = new Store(records)
   return new Environment({ store, network })
+}
+
+/** Parses a GraphQL response, throwing with the status and body when there is nothing Relay could report on. */
+const parseGraphQLResponse = async (response: Response, operationName: string) => {
+  const body = await response.text()
+  let json: any
+  try {
+    json = JSON.parse(body)
+  } catch {}
+
+  // Relay reports a payload with neither as "No data returned ... (No errors)", hiding what the upstream sent
+  if (json?.data || json?.errors) return json
+  throw new Error(`GraphQL ${operationName} got a ${response.status} with no data or errors: ${body.slice(0, 200)}`)
 }

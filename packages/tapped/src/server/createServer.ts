@@ -207,10 +207,9 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
     // Held outside the try so the failure paths can still label themselves with the matched route
     let context: any
 
-    // SSR is an enhancement layer: when rendering or data loading fails, serve the template
-    // as a plain SPA shell (no SSR markup, no record source) so the client renders from scratch
+    // SSR is an enhancement layer: when rendering or data loading fails, serve the template as a plain
+    // SPA shell (no SSR markup, no record source) so the client renders from scratch. Callers log the failure
     const sendSPAFallback = (error: any, tpl: string | undefined) => {
-      console.error("SSR failed, serving SPA shell fallback:", error)
       if (reply.sent || !tpl) return false
       // A render error has a context; a loader error carries the head tags itself
       const headHTML = context?.headHTML || headHTMLOf(error)
@@ -420,6 +419,8 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
         progressiveChunkSize: Number.MAX_SAFE_INTEGER,
         onShellError(error: any) {
           debugLog("onShellError called")
+          // onError has already logged the error itself
+          console.error(`SSR shell failed for ${requestLabel(request.url, context?.routeMatch?.route?.path)}, serving SPA shell fallback`)
           if (!sendSPAFallback(error, loadedTemplate) && !reply.sent) {
             reply.code(500)
             reply.header("Content-Type", "text/html")
@@ -462,9 +463,11 @@ export const registerSSRHandler = (options: RegisterSSRHandlerOptions) => {
       // makes Fastify send an empty 200 right away, and the SPA fallback then has nothing to write to.
       return reply
     } catch (e: any) {
-      console.error("Route handler error:", e)
       vite?.ssrFixStacktrace(e)
-      console.error(e.stack)
+      // The one log for a failed request: loaders rethrow without logging, and the error's dump carries its stack
+      const where = requestLabel(request.url, context?.routeMatch?.route?.path ?? routePathOf(e))
+      if (isTappedHttpError(e) && e.status < 500) console.warn(`SSR ${e.status} for ${where}: ${e.message}`)
+      else console.error(`SSR failed for ${where}:`, e)
       if (reply.sent) return
 
       // Structured errors from loaders/middleware: honor the status, keep 4xx messages, sanitize 5xx in production.
@@ -525,6 +528,12 @@ const applyTimingAndRouteHeaders = (reply: any, context: { timings?: SSRTimings;
   if (context.responseHeaders) {
     for (const [key, value] of Object.entries(context.responseHeaders)) reply.header(key, value)
   }
+}
+
+/** Names a request in a log line by path and matched route; the query string is dropped as it can carry tokens. */
+const requestLabel = (url: string, routePath: string | null | undefined) => {
+  const pathname = url.split("?")[0]
+  return routePath ? `${pathname} (${routePath})` : pathname
 }
 
 export interface StartServerOptions {

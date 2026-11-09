@@ -32,7 +32,7 @@ export const isTappedHttpError = (error: unknown): error is TappedHttpError =>
  * crossing the vite-ssrLoadModule/node module boundary.
  */
 export const attachRoutePath = <E>(error: E, routePath: string | undefined | null): E => {
-  if (routePath && typeof error === "object" && error !== null) (error as { tappedRoutePath?: string }).tappedRoutePath = routePath
+  if (routePath) attachHidden(error, "tappedRoutePath", routePath)
   return error
 }
 
@@ -45,10 +45,16 @@ export const routePathOf = (error: unknown): string | null =>
  * their own lookup, so a broken loader should not also cost the shell its crawler metadata.
  */
 export const attachHeadHTML = <E>(error: E, headHTML: string): E => {
-  if (headHTML && typeof error === "object" && error !== null) (error as { tappedHeadHTML?: string }).tappedHeadHTML = headHTML
+  if (headHTML) attachHidden(error, "tappedHeadHTML", headHTML)
   return error
 }
 
 /** The head HTML attached by attachHeadHTML, if the error carries any. */
 export const headHTMLOf = (error: unknown): string =>
   (typeof error === "object" && error !== null && (error as { tappedHeadHTML?: string }).tappedHeadHTML) || ""
+
+/** Sets a non-enumerable property, so logging the error does not dump tapped's bookkeeping with it. */
+const attachHidden = (error: unknown, key: string, value: string) => {
+  if (typeof error === "object" && error !== null)
+    Object.defineProperty(error, key, { value, writable: true, configurable: true, enumerable: false })
+}
