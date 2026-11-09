@@ -169,6 +169,10 @@ Separately from explicit `"spa"` routes, when a route's `preload` blows its time
 same client-shell response instead of 500ing. The response carries `x-ssr-fallback: spa` or `x-ssr-fallback: timeout`
 so you can tell which happened from the Network panel.
 
+Tapped never sets the third value, `"backoff"`, itself. An app sets `context.csrFallback = "backoff"` in
+`createTappedContext` when it decided not to render, for example while its upstream is overloaded, so the
+shell it serves is reported as its own outcome rather than as a `spa` route.
+
 ### Prefixed URLs
 
 An app whose client router strips a URL prefix before matching (a locale, a tenant) can give

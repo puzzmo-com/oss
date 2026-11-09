@@ -18,10 +18,10 @@ export interface SSRTimings {
 }
 
 /**
- * How a request's document was produced. The failure modes matter most: `timeout` and `error` both
- * answer 200 with a client shell, so without this they are indistinguishable from a healthy SPA route.
+ * How a request's document was produced. The failure modes matter most: `timeout`, `backoff` and `error`
+ * all answer 200 with a client shell, so without this they are indistinguishable from a healthy SPA route.
  */
-export type SSROutcome = "ssr" | "spa" | "timeout" | "error" | "short-circuit" | "cache-hit" | "aborted"
+export type SSROutcome = "ssr" | "spa" | "timeout" | "backoff" | "error" | "short-circuit" | "cache-hit" | "aborted"
 
 /** What a finished request reports to `onRequestComplete`. */
 export interface SSRRequestEvent {
@@ -43,8 +43,12 @@ export interface WouterContext<TAppConfig = Record<string, unknown>> {
   pathname: string
   styleXSheet: typeof styleSheet
   appConfig?: TAppConfig
-  /** Set when the server should skip SSR and serve the client shell: an explicit `render: "spa"` route, or a preload timeout. */
-  csrFallback?: "spa" | "timeout"
+  /**
+   * Set when the server should skip SSR and serve the client shell: an explicit `render: "spa"` route, a
+   * preload timeout, or `backoff`, which tapped never sets itself: a consumer sets it when it chose not to
+   * render, e.g. while its upstream is overloaded.
+   */
+  csrFallback?: "spa" | "timeout" | "backoff"
   /** A middleware short-circuit (e.g. a redirect); the server translates it to the HTTP reply verbatim. */
   shortCircuitResponse?: Response
   /** Extra response headers from the matched route's `headers()`. */
