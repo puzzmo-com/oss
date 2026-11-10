@@ -460,10 +460,17 @@ describe("CSS easing and string mixing", () => {
   it("mixes every number in same-shaped strings and refuses different shapes", () => {
     expect(mixStrings("rotate(0 35 35)", "rotate(90 35 35)")!(0.5)).toBe("rotate(45 35 35)")
     expect(mixStrings("0 0 100 100", "0 0 100 200")!(0.25)).toBe("0 0 100 125")
-    expect(mixStrings("#ff0000", "#00ff00")).toBeUndefined()
-    // Same digit-run shape, which would otherwise mix into colours that do not parse
-    expect(mixStrings("#112233", "#445566")).toBeUndefined()
+    // Same digit-run shape, which would otherwise mix into ids that do not exist
+    expect(mixStrings("url(#a11)", "url(#b22)")).toBeUndefined()
     expect(mixStrings("translate(1 2)", "rotate(1 2)")).toBeUndefined()
+  })
+
+  it("mixes whole colours by channel, whether hex or rgb", () => {
+    expect(mixStrings("#ff0000", "#00ff00")!(0.5)).toBe("rgba(128, 128, 0, 1)")
+    expect(mixStrings("#000", "#ffffff80")!(0.5)).toBe("rgba(128, 128, 128, 0.751)")
+    expect(mixStrings("rgb(0, 0, 0)", "#204060")!(0.5)).toBe("rgba(16, 32, 48, 1)")
+    expect(mixStrings("rgba(0 0 0 / 50%)", "#000")!(0.5)).toBe("rgba(0, 0, 0, 0.75)")
+    expect(mixStrings("#ff0000", "white")).toBeUndefined()
   })
 })
 

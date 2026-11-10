@@ -223,11 +223,11 @@ export function thumbnailMotionRuntime() {
       springLinearEasing({ stiffness: 320, damping: 26, mass: 1 }) +
       "; --puzzmo-ease-settle: " +
       springLinearEasing({ stiffness: 500, damping: 34, mass: 1 }) +
-      "; --puzzmo-duration-fast: 0.18s; --puzzmo-duration-base: 0.35s; --puzzmo-duration-slow: 0.5s; }",
+      "; --puzzmo-duration-fast: 0.18s; --puzzmo-duration-base: 0.2s; --puzzmo-duration-slow: 0.5s; }",
     // :where() keeps this at zero specificity, so any selector in the thumbnail's own style wins
     ":where(." +
       lifecycle.container +
-      " [data-key]) { transition: transform var(--puzzmo-duration-base) ease-in-out, fill var(--puzzmo-duration-base) ease-in-out, opacity var(--puzzmo-duration-base) ease-in-out; }",
+      " [data-key]) { transition: transform var(--puzzmo-duration-base) ease-out, fill var(--puzzmo-duration-base) ease-out, opacity var(--puzzmo-duration-base) ease-out; }",
     "@media (prefers-reduced-motion: reduce) { :where(." + lifecycle.container + " [data-key]) { transition-duration: 0s; } }",
   ].join("\n")
 
@@ -246,10 +246,17 @@ export function thumbnailMotionRuntime() {
 
   /**
    * Interpolates every number in two same-shaped strings, e.g. "rotate(0 35 35)" to "rotate(90 35 35)";
-   * undefined if the shapes differ. Hex colours are refused: their digit runs are not numbers, so
-   * mixing "#112233" toward "#445566" would pass through colours that do not parse.
+   * undefined if the shapes differ. Two whole colours (hex or rgb/rgba, as themes hand out hex) mix by
+   * channel instead; any other "#" (a url(#id)) is refused, since its digit runs are not numbers.
    */
   const mixStrings = (from: string, to: string): ((p: number) => string) | undefined => {
+    const fromColour = parseColour(from)
+    const toColour = parseColour(to)
+    if (fromColour && toColour)
+      return (p) => {
+        const c = fromColour.map((v, i) => v + (toColour[i] - v) * p)
+        return "rgba(" + Math.round(c[0]) + ", " + Math.round(c[1]) + ", " + Math.round(c[2]) + ", " + round(c[3]) + ")"
+      }
     if (from.indexOf("#") !== -1 || to.indexOf("#") !== -1) return undefined
     const a = (from.match(numberPattern) || []).map(Number)
     const b = (to.match(numberPattern) || []).map(Number)
@@ -260,6 +267,22 @@ export function thumbnailMotionRuntime() {
       for (let i = 0; i < a.length; i++) out += round(a[i] + (b[i] - a[i]) * p) + template[i + 1]
       return out
     }
+  }
+
+  /** A whole-value hex or rgb()/rgba() colour as [r, g, b, alpha], or undefined for anything else */
+  const parseColour = (value: string): number[] | undefined => {
+    const v = value.trim()
+    const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(v)
+    if (hex) {
+      let h = hex[1]
+      if (h.length <= 4) h = h.replace(/./g, (d) => d + d)
+      const channels = h.match(/../g)!.map((pair) => parseInt(pair, 16))
+      return [channels[0], channels[1], channels[2], channels.length === 4 ? channels[3] / 255 : 1]
+    }
+    const fn = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/i.exec(v)
+    if (!fn) return undefined
+    const alpha = fn[4] === undefined ? 1 : fn[4].endsWith("%") ? parseFloat(fn[4]) / 100 : Number(fn[4])
+    return [Number(fn[1]), Number(fn[2]), Number(fn[3]), alpha]
   }
 
   /**
