@@ -1,5 +1,6 @@
 import type { AppBundle, ThumbnailConfig } from "../../types"
 import { normalizeThumbnailResult } from "../normalizeThumbnail"
+import { type ThumbnailMorpher, createThumbnailMorpher } from "../../thumbnailMotion"
 import type { PreviewKind, SimulatorContext, SimulatorView } from "../types"
 import { persistPreviewKind, persistRenderContext, persistRenderHost } from "../state"
 
@@ -49,6 +50,16 @@ export interface ThumbViewExtended extends SimulatorView {
 }
 
 export function createThumbView(): ThumbViewExtended {
+  // The image preview keeps its SVG in the DOM and morphs it between input strings, so a thumbnail
+  // that keys its parts animates here the way it does on Puzzmo. See the SDK's thumbnailMotion.
+  let morpher: ThumbnailMorpher | undefined
+  let morphTarget: HTMLElement | undefined
+  const dropMorpher = () => {
+    morpher?.dispose()
+    morpher = undefined
+    morphTarget = undefined
+  }
+
   const updatePreview = (ctx: SimulatorContext) => {
     const previewEl = ctx.getElement<HTMLElement>("#simulator-thumb-preview")
     const fnEl = ctx.getElement<HTMLElement>("#simulator-thumb-fn")
@@ -57,6 +68,7 @@ export function createThumbView(): ThumbViewExtended {
     previewEl?.style.setProperty("--sim-thumb-bg", ctx.state.selectedTheme.g_bg)
 
     if (ctx.state.previewKind === "text") {
+      dropMorpher()
       const shareFn = findShareStringFn()
       if (!shareFn) {
         if (previewEl) previewEl.innerHTML = missingShareStringHtml
@@ -85,6 +97,7 @@ export function createThumbView(): ThumbViewExtended {
 
     const thumbFn = findThumbnailFn()
     if (!thumbFn) {
+      dropMorpher()
       if (previewEl) previewEl.innerHTML = '<span class="simulator-empty">No thumbnail function found</span>'
       if (fnEl) fnEl.textContent = ""
       return
@@ -104,9 +117,19 @@ export function createThumbView(): ThumbViewExtended {
       }
 
       const { svg } = normalizeThumbnailResult(thumbFn.fn(puzzleStr, ctx.state.currentInputStr, thumbnailConfig))
-      if (previewEl) previewEl.innerHTML = svg
+      if (previewEl) {
+        // A fresh element (the tab re-rendered) gets a fresh morpher; otherwise morph in place
+        if (!morpher || morphTarget !== previewEl) {
+          dropMorpher()
+          previewEl.innerHTML = ""
+          morpher = createThumbnailMorpher(previewEl)
+          morphTarget = previewEl
+        }
+        morpher.show(svg)
+      }
     } catch (e) {
       console.error("Simulator: Thumbnail error", e)
+      dropMorpher()
       if (previewEl) previewEl.innerHTML = `<span class="simulator-empty">Error: ${e}</span>`
     }
   }

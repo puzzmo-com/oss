@@ -14,6 +14,7 @@ export default defineConfig({
         svgJSX: resolve(__dirname, "src/svgJSX.ts"),
         "pico8/index": resolve(__dirname, "src/pico8/index.ts"),
         vite: resolve(__dirname, "src/vite.ts"),
+        thumbnailMotion: resolve(__dirname, "src/thumbnailMotion.ts"),
       },
       formats: ["es", "cjs"],
       fileName: (format, entryName) => {
