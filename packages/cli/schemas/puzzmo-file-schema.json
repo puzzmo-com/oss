@@ -43,7 +43,7 @@
         },
         "stableID": {
           "type": ["string", "null"],
-          "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard\n(value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+          "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n\n- A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your\ndeedID). The formatting will get validated on puzzle creation, and in TypeScript."
         },
         "scoreTechnique": {
           "type": ["string", "null"],
@@ -102,7 +102,7 @@
         },
         "stableID": {
           "type": ["string", "null"],
-          "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard\n(value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+          "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n\n- A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your\ndeedID). The formatting will get validated on puzzle creation, and in TypeScript."
         },
         "order": {
           "type": "string",
@@ -225,7 +225,7 @@
             "properties": {
               "stableID": {
                 "type": ["string", "null"],
-                "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard\n(value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+                "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n\n- A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your\ndeedID). The formatting will get validated on puzzle creation, and in TypeScript."
               },
               "deedID": {
                 "$ref": "#/definitions/DeedKeys",
@@ -251,7 +251,7 @@
             "properties": {
               "stableID": {
                 "type": ["string", "null"],
-                "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n-  A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard\n(value here likely can be your deedID). The formatting will get validated on puzzle creation, and in TypeScript."
+                "description": "For a lot of augmentations, this acts as an \"id\" and should be unique and treated as a lower, kebab-case string.\n\nFor a leaderboard:\n\n- A stable ID has to be in the format of `game-[gameslug]:[your value name]` for a game-based leaderboard (value here likely can be your\ndeedID). The formatting will get validated on puzzle creation, and in TypeScript."
               },
               "deedID": {
                 "$ref": "#/definitions/DeedKeys",
@@ -339,7 +339,7 @@
           "items": {
             "$ref": "#/definitions/ExpressionSetup"
           },
-          "description": "Additional stats to display in the game completion sidebar/popover on the Today page. Use this to show deed values that don't have an associated leaderboard.\n\nThese items are merged with leaderboard entries, sorted by `sortValue`, and displayed as a list of stats after game completion. Each entry looks up a deed by `deedID` and formats its value using `formatString`.\n\nItems can include:\n\n- `display` or `secondaryName`: Label shown for the stat\n- `deedID`: Which deed to look up for the value\n- `formatString`: How to format the value (e.g. \"%@ pts\")\n- `sortValue`: Order relative to other sidebar items (lower = earlier)\n- `order`: \"Lower=better\" or default (higher=better) for directional indicators\n\nExample: Show a custom \"Combos\" stat\n\n```json\n{ \"completionSidebar\": [ { \"deedID\": \"combo-count\", \"displayName\": \"Combos\", \"formatString\": \"%@\", \"sortValue\": 10 } ] }\n```"
+          "description": "Additional stats to display in the game completion sidebar/popover on the Today page. Use this to show deed values that don't have an associated leaderboard.\n\nThese items are merged with leaderboard entries, sorted by `sortValue`, and displayed as a list of stats after game completion. Each entry looks up a deed by `deedID` and formats its value using `formatString`.\n\nItems can include:\n\n- `display` or `secondaryName`: Label shown for the stat\n- `deedID`: Which deed to look up for the value\n- `formatString`: How to format the value (e.g. \"%@ pts\")\n- `sortValue`: Order relative to other sidebar items (lower = earlier)\n- `order`: \"Lower=better\" or default (higher=better) for directional indicators\n\nExample: Show a custom \"Combos\" stat\n\n```json\n{ \"completionSidebar\": [{ \"deedID\": \"combo-count\", \"displayName\": \"Combos\", \"formatString\": \"%@\", \"sortValue\": 10 }] }\n```"
         },
         "completionNotables": {
           "type": "array",

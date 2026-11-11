@@ -138,6 +138,7 @@ const render = () => {
 
 /**
  * Called once on win. Reports gameplay metrics back to the host via:
+ *
  * - `sdk.gameCompleted(gameplay, augmentations)` — durable record + deeds
  * - `sdk.showCompletionScreen(content)` — the host's win UI
  */
@@ -199,10 +200,10 @@ const setupBoard = (data: Puzzle, savedState?: State) => {
 
 /**
  * Lifecycle entrypoint:
- * - `sdk.gameReady()` blocks until the host sends puzzle/state/theme. `puzzleString` is null when
- * the host sends no puzzle (e.g. an endless mode), so we fall back to the built-in board.
- * - `sdk.gameLoaded()` tells the host we're done bootstrapping; the host will
- * then dispatch `start` (or restore a paused session).
+ *
+ * - `sdk.gameReady()` blocks until the host sends puzzle/state/theme. `puzzleString` is null when the host sends no puzzle (e.g. an endless
+ *   mode), so we fall back to the built-in board.
+ * - `sdk.gameLoaded()` tells the host we're done bootstrapping; the host will then dispatch `start` (or restore a paused session).
  */
 const init = async () => {
   const { puzzleString, inputString, theme } = await sdk.gameReady()

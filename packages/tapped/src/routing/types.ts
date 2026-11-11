@@ -6,9 +6,10 @@ export type { Params, LoaderArgs, PreloadedData, LoaderFn } from "../relay/types
 
 /**
  * How a route's initial document is produced:
+ *
  * - `"ssr"` (default) — loaders run on the server, the page streams as fully-rendered HTML with a seeded Relay store.
- * - `"spa"` — the server skips loaders and serves the client shell; the browser fetches data itself. Middleware still runs,
- * so auth gating holds. Use for pages that are personal/uncacheable or too heavy to be worth server rendering.
+ * - `"spa"` — the server skips loaders and serves the client shell; the browser fetches data itself. Middleware still runs, so auth gating
+ *   holds. Use for pages that are personal/uncacheable or too heavy to be worth server rendering.
  */
 export type RenderMode = "ssr" | "spa"
 
