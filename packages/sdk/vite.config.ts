@@ -7,6 +7,7 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, "src/index.ts"),
         contracts: resolve(__dirname, "src/contracts.ts"),
+        bundles: resolve(__dirname, "src/bundles.ts"),
         "inputs/index": resolve(__dirname, "src/inputs/index.ts"),
         "simulator/index": resolve(__dirname, "src/simulator/index.ts"),
         "simulator/standalone": resolve(__dirname, "src/simulator/standalone.ts"),

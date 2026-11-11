@@ -380,6 +380,95 @@ export type AppBundle = {
   }
 }
 
+/**
+ * Server-only code Puzzmo runs for a game, built by `serverBundlePlugin` and never served to players.
+ * The app bundle's private twin: each member is a capability, Puzzmo calls the ones it knows, and a
+ * missing one is a feature the game doesn't offer. Write it with `createServerBundle`.
+ *
+ * Every call runs in a sandbox with no network or filesystem, within 2 seconds and 128 MB. `Date`
+ * reads a fixed time and `Math.random` is seeded, so a call made again later answers the same.
+ * Whatever the bundle writes with `console.log` is kept with the call for the game's team to read
+ * in Workshop, and is never shown to players.
+ */
+export type ServerBundle = {
+  /** Achievements in repeat play: measures each round the game logs, for Puzzmo's achievement rules to read */
+  achievements?: AchievementsServerCapability
+}
+
+/** Passed last to every server bundle method, as `ThumbnailConfig` is to `renderThumbnail` */
+export type ServerCallConfig = {
+  /** The uploaded build this bundle came with */
+  buildID: string
+  /** Why Puzzmo is calling: a player's round closing, someone debugging in Workshop, or the checks an upload runs */
+  purpose: "live" | "debug" | "check"
+}
+
+/**
+ * Achievements in repeat play. The game logs each round with `sdk.rounds`; when the round closes,
+ * Puzzmo replays the log here to measure it, and its achievement rules read those measurements.
+ */
+export type AchievementsServerCapability = {
+  /** What `replayRound` reports and what Puzzmo should total from it. Called when a build is uploaded. */
+  describe(config: ServerCallConfig): AchievementsDescription
+  /** Replays one round's log to measure it. It must give the same answer every time for the same round. */
+  replayRound(round: RoundReplayInput, config: ServerCallConfig): RoundReplayResult
+}
+
+export type AchievementsDescription = {
+  /** The version of this contract the bundle implements */
+  contract: 1
+  /** Every fact `replayRound` can report, by name. Rules read them as `round.<name>`. */
+  facts: Record<string, AchievementFactDescription>
+  /** Totals Puzzmo keeps across rounds, by name. Rules read them as `game.player.lifetime.<name>` and so on. */
+  counters?: Record<string, AchievementCounterDescription>
+}
+
+export type AchievementFactDescription = {
+  type: "number" | "boolean" | "string"
+  /** One line for the game's team, shown beside the fact in Workshop */
+  about: string
+}
+
+/** A total Puzzmo keeps from one fact, round after round. The game measures; Puzzmo counts. */
+export type AchievementCounterDescription = {
+  /** The fact each round feeds in */
+  from: string
+  /**
+   * How a round's value joins the total: `sum` adds, `max` and `min` keep the extreme, `latest` and `first`
+   * keep one value, `streak` counts rounds in a row where the fact was true, and `distinct` counts different values
+   */
+  op: "sum" | "max" | "min" | "latest" | "first" | "streak" | "distinct"
+  /** Which totals to keep: across all time, for Puzzmo's day (as the daily), and for each puzzle. Defaults to `["lifetime"]`. */
+  windows?: ("lifetime" | "today" | "puzzle")[]
+  /**
+   * Also keep the total across everyone who plays the game, read as `game.everyone.*`. Defaults to false. Not for a
+   * `distinct` counter: an upload with one is refused, since everyone's totals are numbers rather than sets.
+   */
+  everyone?: boolean
+  /** Only count rounds where this boolean fact is true */
+  when?: string
+  about?: string
+}
+
+export type RoundReplayInput = {
+  /** The puzzle the round was played on, as the game's pool holds it; null for a game that makes its own puzzles */
+  puzzle: string | null
+  /** Everything the game passed to `sdk.rounds.log` during the round, in order */
+  log: unknown[][]
+  /**
+   * How the round ended. An abandoned round is one the player walked away from, or replaced with another. When it's
+   * `completed` but the log doesn't reach a finished puzzle, answer `{ valid: false }`: a page reload loses the rest of
+   * a round's log, and Puzzmo closes that round as completed when the resumed win arrives, so it counts nothing
+   * rather than counting a loss.
+   */
+  outcome: "completed" | "failed" | "abandoned"
+  /** How many times the player restarted this puzzle before this attempt */
+  resets: number
+}
+
+/** A round's measurements, or why its log can't be trusted. An invalid round earns nothing. */
+export type RoundReplayResult = { valid: true; facts: Record<string, number | boolean | string> } | { valid: false; reason: string }
+
 /** Configuration passed to thumbnail renderers */
 export type ThumbnailConfig = {
   theme: Theme
@@ -677,6 +766,26 @@ export type MessagesSentFromEmbed = {
   }
 
   /**
+   * A repeat-play round begins: a fresh deal, or the same deal again from the top. The host opens the round on
+   * the server, which closes any round still open as abandoned. Send via `sdk.rounds.start()`.
+   */
+  START_REPEATABLE_ROUND: {
+    reason: "new" | "reset"
+    /** The pool key of the deal, for a game whose puzzles come from the host */
+    puzzleKey?: string
+  }
+
+  /**
+   * Events for the round in progress's log, starting at index `from`, which the host batches up to the
+   * server. Each is `[msSinceRoundStart, ...up to 7 numbers, booleans, nulls or strings of 64 characters]`;
+   * the host drops any other. Send via `sdk.rounds.log()`.
+   */
+  APPEND_REPEATABLE_ROUND_LOG: {
+    from: number
+    events: (readonly [number, ...(number | boolean | string | null)[]])[]
+  }
+
+  /**
    * Ask the host for another puzzle from the game's pool, from `buckets` when given, else the whole pool.
    * `exclude` is the game's own recent keys, newest last; the host answers with `PUZZLE_DATA` carrying the
    * same nonce. Send via `sdk.requestPuzzle()`.
@@ -784,6 +893,17 @@ export type MessagesSentFromEmbed = {
 export type MessagesReceived = {
   /** The host's answer to `REQUEST_PUZZLE`: a puzzle from the game's pool, or why there isn't one. */
   PUZZLE_DATA: { nonce: string; puzzle: { key: string; puzzle: string } } | { nonce: string; error: string; failed: true }
+  /** Achievements the round the game just finished unlocked, in the shape `sdk.on("achievementsUnlocked")` hands over */
+  ACHIEVEMENTS_UNLOCKED: {
+    achievements: {
+      stableID: string
+      name: string
+      description: string
+      icon: string
+      tier: "Basic" | "Fancy" | "Rare" | "Mythic"
+      isSiteAchievement: boolean
+    }[]
+  }
   /** The bootstrap payload containing puzzle data, theme, and existing gameplay state. Received in response to `READY`. */
   READY_DATA: BootstrapGameData
   /** Sent by REPLs and dev tooling to reset the game with a revised puzzle string without a full reload. */

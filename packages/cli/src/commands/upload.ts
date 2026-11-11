@@ -17,7 +17,7 @@ import {
   type TokenEntry,
 } from "../util/config.js"
 import { createUserGame } from "../util/createGame.js"
-import { discoverGames, type DiscoveredGame } from "../util/discoverGames.js"
+import { discoverGames, findSharedServerBundles, type DiscoveredGame } from "../util/discoverGames.js"
 import { lintDist } from "../util/lintDist.js"
 import { lintPuzzmoFile } from "../util/lintPuzzmoFile.js"
 import { mascotSmall, pickMascot } from "../util/mascot.js"
@@ -91,6 +91,18 @@ export const upload = async (dir: string, options: UploadOptions = {}) => {
     }
   }
 
+  // Sending one file as several games' bundles would run one game's server code for the others, so nothing goes up.
+  const sharedBundles = findSharedServerBundles(games)
+  if (sharedBundles.length) {
+    console.error(`\nRefusing to upload: more than one game would send the same server bundle.`)
+    // The shared paths are real paths, so the root has to be too for the relative path to read well
+    const realRoot = fs.realpathSync(rootDir)
+    for (const shared of sharedBundles)
+      console.error(`  - ${path.relative(realRoot, shared.serverBundlePath)} would be sent for ${shared.slugs.join(", ")}`)
+    console.error(`Set "output.serverBundle" in each of these games' puzzmo.json to the bundle built for that game.`)
+    process.exit(1)
+  }
+
   const sha = getGitSHA(rootDir) || hashGames(games)
   const description = getGitMessage(rootDir)
   const repoURL = getGitRepoURL(rootDir)
@@ -161,7 +173,7 @@ type UploadOneOptions = {
 /** Uploads a single discovered game; throws on failure */
 const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Promise<GameSuccess> => {
   const { credential, apiURL, sha, description, repoURL, verbose } = opts
-  const { puzzmoFile, distDir, iconPath, helpPath } = game
+  const { puzzmoFile, distDir, iconPath, helpPath, serverBundlePath } = game
   const gameSlug = puzzmoFile.game.slug
 
   const files = collectFiles(distDir)
@@ -182,6 +194,12 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   warnAboutAbsoluteScriptURLs(distDir)
   for (const warning of lintPuzzmoFile(puzzmoFile)) console.log(yellow(`  Warning: ${warning}`))
 
+  const serverBundle = serverBundlePath ? fs.readFileSync(serverBundlePath, "utf-8") : null
+  if (serverBundlePath && serverBundle)
+    console.log(
+      `  Server bundle: ${formatBytes(serverBundle.length)} from ${path.relative(game.puzzmoJsonDir, serverBundlePath)}, uploaded privately`,
+    )
+
   const result = await uploadFiles(
     apiURL,
     credential.token,
@@ -199,9 +217,13 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
       repoURL,
       iconSVG: iconPath ? fs.readFileSync(iconPath, "utf-8") : null,
       helpMD: helpPath ? fs.readFileSync(helpPath, "utf-8") : null,
+      serverBundle,
     },
   )
 
+  if (result.serverBundle)
+    for (const [capability, summary] of Object.entries(result.serverBundle))
+      console.log(`  Server bundle offers ${capability}: ${summary}.`)
   if (result.iconChanged && iconPath) console.log(`  Icon updated from ${path.relative(game.puzzmoJsonDir, iconPath)}.`)
   if (result.helpChanged && helpPath) console.log(`  In-game help updated from ${path.relative(game.puzzmoJsonDir, helpPath)}, live now.`)
 

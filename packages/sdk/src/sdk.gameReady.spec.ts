@@ -120,6 +120,32 @@ describe("a repeatable game with a puzzle pool", () => {
     expect(lastSent("COMPLETE_REPEATABLE_RUN").input).not.toHaveProperty("puzzleKey")
   })
 
+  it("logs a round's events with where each batch starts, counting afresh from each start", () => {
+    const sdk = createPuzzmoSDK()
+    sdk.rounds.start({ reason: "new", puzzleKey: "v2/3/18" })
+    expect(lastSent("START_REPEATABLE_ROUND")).toEqual({ reason: "new", puzzleKey: "v2/3/18" })
+
+    sdk.rounds.log([0, "d"], [120, "m", 3, 4])
+    sdk.rounds.log([300, "u"])
+    expect(lastSent("APPEND_REPEATABLE_ROUND_LOG")).toEqual({ from: 2, events: [[300, "u"]] })
+
+    sdk.rounds.start({ reason: "reset" })
+    expect(lastSent("START_REPEATABLE_ROUND")).toEqual({ reason: "reset" })
+    sdk.rounds.log([10, "d"])
+    expect(lastSent("APPEND_REPEATABLE_ROUND_LOG")).toEqual({ from: 0, events: [[10, "d"]] })
+  })
+
+  it("hands the game the achievements a round unlocked", () => {
+    const sdk = createPuzzmoSDK()
+    const heard: unknown[] = []
+    sdk.on("achievementsUnlocked", (data) => heard.push(data))
+    const achievements = [
+      { stableID: "no-regrets", name: "No Regrets", description: "", icon: "", tier: "Fancy", isSiteAchievement: false },
+    ]
+    sendFromHost("ACHIEVEMENTS_UNLOCKED", { achievements })
+    expect(heard).toEqual([{ achievements }])
+  })
+
   it("refuses state the host would refuse, without keeping it", () => {
     const sdk = createPuzzmoSDK()
     expect(() => sdk.storage.set("x".repeat(64 * 1024 + 1))).toThrow(/byte cap/)

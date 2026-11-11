@@ -19,6 +19,11 @@
       "import": "./dist/contracts.js",
       "require": "./dist/contracts.cjs"
     },
+    "./bundles": {
+      "types": "./dist/bundles.d.ts",
+      "import": "./dist/bundles.js",
+      "require": "./dist/bundles.cjs"
+    },
     "./inputs": {
       "types": "./dist/inputs/index.d.ts",
       "import": "./dist/inputs/index.js",

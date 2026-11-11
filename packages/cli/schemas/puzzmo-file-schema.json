@@ -437,6 +437,10 @@
             "dir": {
               "type": "string",
               "description": "Path to the built artifacts. Resolved relative to the puzzmo.json's directory. Can be shared across games (e.g. `../../dist/<slug>`) or per-game (e.g. `./build`)."
+            },
+            "serverBundle": {
+              "type": "string",
+              "description": "Path to the built server bundle file. Resolved relative to the puzzmo.json's directory, like `dir`. Set it per game when one repo builds several games; otherwise `puzzmo games upload` looks for `dist-server/server-bundle.js` beside the output folder."
             }
           },
           "required": ["dir"],

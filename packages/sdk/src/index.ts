@@ -12,6 +12,10 @@ export type {
   SDKSettings,
   SDKKeyboard,
   SDKHaptics,
+  SDKRounds,
+  SDKRoundEvent,
+  SDKRoundEventValue,
+  SDKUnlockedAchievement,
 } from "./sdk"
 
 export type { SDKPlugin, SDKPluginContext, PluginAPIs, SDKPluginBootstrap } from "./plugins"
@@ -33,6 +37,14 @@ export type {
   MessagesReceived,
   MessagesSentFromEmbed,
   AppBundle,
+  ServerBundle,
+  ServerCallConfig,
+  AchievementsServerCapability,
+  AchievementsDescription,
+  AchievementFactDescription,
+  AchievementCounterDescription,
+  RoundReplayInput,
+  RoundReplayResult,
   ThumbnailResult,
   ThumbnailConfig,
   KeyboardConfig,

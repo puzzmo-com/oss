@@ -19,6 +19,8 @@ export type PuzzmoFile = {
   integrations?: Record<string, unknown>
   output?: {
     dir: string
+    /** The built server bundle, relative to puzzmo.json. Defaults to dist-server/server-bundle.js beside the dist folder */
+    serverBundle?: string
   }
 }
 
@@ -54,6 +56,8 @@ type CompleteResponse = {
   helpChanged: boolean
   gameURL: string | null
   versionsURL: string | null
+  /** What each capability of the build's server bundle offers, by name, when one was uploaded */
+  serverBundle: Record<string, string> | null
   error?: string
 }
 
@@ -71,6 +75,8 @@ export type UploadFilesOptions = {
   iconSVG?: string | null
   /** Contents of the Markdown named by `game.helpPath`, synced onto the game's in-game help */
   helpMD?: string | null
+  /** The build's private server bundle (`output.serverBundle`, or dist-server/server-bundle.js), checked by Puzzmo then kept apart */
+  serverBundle?: string | null
 }
 
 /** Wraps fetch to surface the underlying network cause (DNS, ECONNREFUSED, TLS, etc.) */
@@ -102,11 +108,13 @@ const readResponse = async (res: Response, url: string, step: string, verbose: b
     throw new Error(`Invalid JSON response during ${step} (${url}): ${verbose ? text : text.slice(0, 200)}`)
   }
   if (!res.ok) {
-    const body = json as { error?: string; validationErrors?: string[] }
+    const body = json as { error?: string; validationErrors?: string[]; logs?: string[] }
     const serverMsg = body.error || res.statusText || "Unknown error"
     const validation = body.validationErrors?.length ? `\n  - ${body.validationErrors.join("\n  - ")}` : ""
+    // A server bundle that fails its checks sends back what it logged, which is usually the clue
+    const logs = body.logs?.length ? `\n  It logged:\n    ${body.logs.join("\n    ")}` : ""
     const detail = verbose ? `\n${JSON.stringify(json, null, 2)}` : ""
-    throw new Error(`Server error during ${step} (${res.status} from ${url}): ${serverMsg}${validation}${detail}`)
+    throw new Error(`Server error during ${step} (${res.status} from ${url}): ${serverMsg}${validation}${logs}${detail}`)
   }
   return json
 }
@@ -175,7 +183,7 @@ export const uploadFiles = async (
   onProgress?: UploadProgress,
   options: UploadFilesOptions = {},
 ): Promise<CompleteResponse> => {
-  const { verbose = false, description, repoURL, iconSVG, helpMD } = options
+  const { verbose = false, description, repoURL, iconSVG, helpMD, serverBundle } = options
   if (verbose) console.log(`  API URL: ${apiURL}`)
 
   // Step 1: Init session (includes puzzmo.json metadata)
@@ -206,10 +214,28 @@ export const uploadFiles = async (
     onProgress?.(batchNum, totalBatches, totalUploaded)
   }
 
-  // Step 3: Complete
+  // Step 3: The server bundle, before completing, so a bundle Puzzmo refuses fails the upload rather than live play
+  let serverBundleResult: Record<string, string> | null = null
+  if (serverBundle) {
+    const step = "server bundle upload"
+    const bundleURL = `${apiURL}/cliUpload/${init.sessionID}/serverBundle?encoding=base64`
+    const res = await fetchWithContext(
+      bundleURL,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/octet-stream" },
+        body: Buffer.from(serverBundle).toString("base64"),
+      },
+      step,
+      verbose,
+    )
+    serverBundleResult = ((await readResponse(res, bundleURL, step, verbose)) as { capabilities: Record<string, string> }).capabilities
+  }
+
+  // Step 4: Complete
   const complete = (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {}, "upload complete", verbose)) as Omit<
     CompleteResponse,
-    "integrationsChanged" | "iconChanged" | "helpChanged" | "gameURL" | "versionsURL"
+    "integrationsChanged" | "iconChanged" | "helpChanged" | "gameURL" | "versionsURL" | "serverBundle"
   >
   if (verbose) console.log(`  Assets base: ${complete.assetsBase}`)
   return {
@@ -219,5 +245,6 @@ export const uploadFiles = async (
     helpChanged: !!init.helpChanged,
     gameURL: init.gameURL ?? null,
     versionsURL: init.versionsURL ?? null,
+    serverBundle: serverBundleResult,
   }
 }

@@ -76,6 +76,43 @@ export interface SDKStorage {
   set: (state: string, stateVersion?: number) => void
 }
 
+/** A value a round event carries after its time */
+export type SDKRoundEventValue = number | boolean | string | null
+
+/**
+ * One entry in a round's log: its time in ms since the round started, then up to 7 values for the server bundle's
+ * replay to read. Strings hold at most 64 characters: a pile name or an op, not a payload. The host drops an event
+ * that breaks these rules, which leaves the round's log short of what happened, so its replay won't verify.
+ */
+export type SDKRoundEvent = readonly [number, ...SDKRoundEventValue[]]
+
+/**
+ * Repeat-play rounds, which the server replays through the game's achievements parser to decide what the
+ * player unlocked. A round runs from `start()` to `completeRepeatableRun()`; one the player walks away
+ * from closes as abandoned when the next starts, or after two quiet hours.
+ */
+export interface SDKRounds {
+  /**
+   * A round begins: a fresh deal (`new`) or the same deal again from the top (`reset`). A pool game passes
+   * the key of the puzzle the host drew for it; the server only verifies a round on a key it handed out.
+   */
+  start: (opts: { reason: "new" | "reset"; puzzleKey?: string }) => void
+  /** Adds events to the round's log, in the order they happened. The host sends them on in batches. */
+  log: (...events: SDKRoundEvent[]) => void
+}
+
+/** An achievement the server decided a round unlocked, as the `achievementsUnlocked` event hands it over */
+export type SDKUnlockedAchievement = {
+  stableID: string
+  name: string
+  description: string
+  icon: string
+  /** How hard it is to earn */
+  tier: "Basic" | "Fancy" | "Rare" | "Mythic"
+  /** A Puzzmo achievement any game can offer, rather than one of this game's own */
+  isSiteAchievement: boolean
+}
+
 /** Player-facing game settings, rendered by the host's settings panel and persisted per-user, per-game. */
 export interface SDKSettings {
   /**
@@ -216,6 +253,9 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
    */
   completeRepeatableRun: (play?: { elapsedTimeSecs?: number; puzzleKey?: string }, config?: AugmentationConfig) => void
 
+  /** The rounds of repeat play, logged for the server to replay. See `SDKRounds`. */
+  rounds: SDKRounds
+
   /**
    * Ask the host for another puzzle from the game's pool, for a repeatable game whose puzzles come from
    * the host (the first arrives with `gameReady()`). Leave `buckets` out to draw from the whole pool, and
@@ -256,6 +296,8 @@ export type SupportedOutgoingMessages = Pick<
   | "UPLOAD_NEW_GAME_STATE"
   | "UPDATE_GAME_USER_STATE"
   | "COMPLETE_REPEATABLE_RUN"
+  | "START_REPEATABLE_ROUND"
+  | "APPEND_REPEATABLE_ROUND_LOG"
   | "REQUEST_PUZZLE"
   | "HIT_CHECKPOINT"
   | "KEYBOARD_UPDATE_CONFIG"
@@ -276,6 +318,7 @@ export type SupportedIncomingMessages = Pick<
   | "KEYBOARD_CURSOR_CHANGE"
   | "KEYBOARD_CURSOR_END"
   | "PUZZLE_DATA"
+  | "ACHIEVEMENTS_UNLOCKED"
 >
 
 type MessageHandler<T extends keyof SupportedIncomingMessages> = (data: SupportedIncomingMessages[T]) => void
@@ -293,6 +336,8 @@ export type SDKEventMap = {
   keyboardCursorChange: { position: [number, number] }
   /** The drag cursor was released. Only fires when `supportsDragCursor` is true. */
   keyboardCursorEnd: void
+  /** A repeat-play round the game just finished unlocked these. The host shows them over the game; a game need not. */
+  achievementsUnlocked: { achievements: SDKUnlockedAchievement[] }
 }
 
 export type SDKEventType = keyof SDKEventMap
@@ -486,6 +531,8 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   // Mirrors what the host holds, so get() reflects the game's own writes within a session
   let storedState: SDKStoredState | null = null
   let lastRunEndedAtSecs = 0
+  // Events logged in the round in progress, so each batch says where it starts and a resend is harmless
+  let roundLogLength = 0
   let warnedStorageUnsaved = false
   const getCompleted = () => getGameplay()?.completed ?? false
 
@@ -582,6 +629,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   hostAPI.onMessage("KEYBOARD_KEY_PRESS", (data) => emit("keyboardKeyPress", data))
   hostAPI.onMessage("KEYBOARD_CURSOR_CHANGE", (data) => emit("keyboardCursorChange", data))
   hostAPI.onMessage("KEYBOARD_CURSOR_END", () => emit("keyboardCursorEnd"))
+  hostAPI.onMessage("ACHIEVEMENTS_UNLOCKED", (data) => emit("achievementsUnlocked", data))
 
   // Puzzle requests in flight, by nonce, each settled by its PUZZLE_DATA or a timeout
   const puzzleRequests = new Map<string, { resolve: (puzzle: SDKPoolPuzzle) => void; reject: (error: Error) => void }>()
@@ -812,6 +860,18 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
       const puzzleKey = play?.puzzleKey
       hostAPI.sendMessage("COMPLETE_REPEATABLE_RUN", { input: { deedValues, elapsedTimeSecs, ...(puzzleKey ? { puzzleKey } : {}) } })
       trackAnalyticsEvent("COMPLETE_REPEATABLE_RUN", { elapsedTimeSecs })
+    },
+
+    rounds: {
+      start: (opts) => {
+        roundLogLength = 0
+        hostAPI.sendMessage("START_REPEATABLE_ROUND", { reason: opts.reason, ...(opts.puzzleKey ? { puzzleKey: opts.puzzleKey } : {}) })
+      },
+      log: (...events) => {
+        if (!events.length) return
+        hostAPI.sendMessage("APPEND_REPEATABLE_ROUND_LOG", { from: roundLogLength, events: events.map((ev) => [...ev]) })
+        roundLogLength += events.length
+      },
     },
 
     requestPuzzle: (opts?: { buckets?: readonly string[]; exclude?: readonly string[] }) =>

@@ -245,11 +245,13 @@ type BundlePluginOptions = {
   entry: string
   /** Output file name */
   outputFile: string
+  /** Folder the bundle is written to */
+  outDir: string
 }
 
 function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
   return (options: Partial<BundlePluginOptions> = {}): Plugin => {
-    const { entry, outputFile } = { ...defaults, ...options }
+    const { entry, outputFile, outDir } = { ...defaults, ...options }
     return {
       name: pluginName,
       apply: "build",
@@ -270,7 +272,7 @@ function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
                 formats: ["es"],
                 fileName: () => outputFile,
               },
-              outDir: "dist",
+              outDir,
               emptyOutDir: false,
             },
           })
@@ -310,7 +312,27 @@ export type AppBundlePluginOptions = {
  * returning the SVG and its dimensions (`{ svg, width, height }`), used by the Puzzmo
  * platform for puzzle previews.
  */
-export const appBundlePlugin = createBundlePlugin("app-bundle", { entry: "src/appBundle.js", outputFile: "app-bundle.js" })
+export const appBundlePlugin = createBundlePlugin("app-bundle", { entry: "src/appBundle.js", outputFile: "app-bundle.js", outDir: "dist" })
+
+export type ServerBundlePluginOptions = {
+  /** Entry file for the server bundle (default: `src/serverBundle.js`, or `.ts`) */
+  entry?: string
+  /** Output file name (default: `server-bundle.js`) */
+  outputFile?: string
+}
+
+/**
+ * Vite plugin that produces dist-server/server-bundle.js after the main build: the game's private
+ * server bundle (see `ServerBundle`). It goes in its own folder, never `dist`, so it can't be served to
+ * players by mistake; `puzzmo games upload` finds it there and sends it to Puzzmo privately. A repo that
+ * builds several games gives each its own `outputFile` and names it in that game's puzzmo.json as
+ * `output.serverBundle`, since uploads refuse to send one file for more than one game.
+ */
+export const serverBundlePlugin = createBundlePlugin("server-bundle", {
+  entry: "src/serverBundle.js",
+  outputFile: "server-bundle.js",
+  outDir: "dist-server",
+})
 
 export type EditorBundlePluginOptions = {
   /** Entry file for the editor bundle (default: `src/editorBundle.js`) */
@@ -320,7 +342,11 @@ export type EditorBundlePluginOptions = {
 }
 
 /** Vite plugin that produces dist/editor-bundle.js after the main build for editor-level integrations. */
-export const editorBundlePlugin = createBundlePlugin("editor-bundle", { entry: "src/editorBundle.js", outputFile: "editor-bundle.js" })
+export const editorBundlePlugin = createBundlePlugin("editor-bundle", {
+  entry: "src/editorBundle.js",
+  outputFile: "editor-bundle.js",
+  outDir: "dist",
+})
 
 /**
  * Recursively find directories containing puzzmo.json, up to `maxDepth` levels deep.

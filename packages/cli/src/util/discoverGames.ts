@@ -29,6 +29,18 @@ export type DiscoveredGame = {
   iconPath: string | null
   /** Absolute path to the help Markdown named by `game.helpPath`, or null when the file sets no help */
   helpPath: string | null
+  /**
+   * Absolute path to the private server bundle to upload: `output.serverBundle` when set, otherwise dist-server/server-bundle.js beside
+   * the dist folder if that exists, otherwise null
+   */
+  serverBundlePath: string | null
+}
+
+/** Games which would all upload the same server bundle file */
+export type SharedServerBundle = {
+  /** Absolute (real) path of the file they share */
+  serverBundlePath: string
+  slugs: string[]
 }
 
 /** A puzzmo.json that was found but could not be used (invalid JSON, schema errors, missing dist) */
@@ -108,15 +120,34 @@ export const discoverGames = async (rootDir: string, options: DiscoverOptions = 
       }
     }
 
+    // Only an explicit path can be missing: the default is optional, as most games have no server bundle.
+    const serverBundlePath = resolveServerBundlePath(puzzmoFile, puzzmoJsonDir, distDir)
+    const configuredServerBundle = puzzmoFile.output?.serverBundle
+    if (requireDist && configuredServerBundle && serverBundlePath && !isFile(serverBundlePath))
+      fileErrors.push(
+        `Server bundle not found for ${puzzmoFile.game.slug}: "${configuredServerBundle}" (${serverBundlePath}) does not exist. Build the game first, or fix "output.serverBundle" in puzzmo.json.`,
+      )
+
     if (fileErrors.length) {
       errors.push({ puzzmoJsonPath, slug: puzzmoFile.game.slug, errors: fileErrors })
       continue
     }
 
-    games.push({ puzzmoJsonPath, puzzmoJsonDir, puzzmoFile, distDir: distDir ?? "", iconPath, helpPath })
+    games.push({ puzzmoJsonPath, puzzmoJsonDir, puzzmoFile, distDir: distDir ?? "", iconPath, helpPath, serverBundlePath })
   }
 
   return { games, errors }
+}
+
+/** Groups the games whose uploads would send the same server bundle file, so one game's bundle can't go up as another's */
+export const findSharedServerBundles = (games: DiscoveredGame[]): SharedServerBundle[] => {
+  const slugsByPath = new Map<string, string[]>()
+  for (const game of games) {
+    if (!game.serverBundlePath) continue
+    const realPath = safeRealpath(game.serverBundlePath) ?? game.serverBundlePath
+    slugsByPath.set(realPath, [...(slugsByPath.get(realPath) ?? []), game.puzzmoFile.game.slug])
+  }
+  return [...slugsByPath].filter(([, slugs]) => slugs.length > 1).map(([serverBundlePath, slugs]) => ({ serverBundlePath, slugs }))
 }
 
 /** Recursively finds puzzmo.json files under `dir`, skipping output / vendored folders. Tracks realpaths to avoid symlink cycles. */
@@ -169,6 +200,15 @@ const resolveDistDir = (puzzmoFile: PuzzmoFile, puzzmoJsonDir: string, repoRoot:
     }
   }
   return null
+}
+
+/** Resolves `output.serverBundle` when set, otherwise the dist-server/server-bundle.js beside dist if one was built */
+const resolveServerBundlePath = (puzzmoFile: PuzzmoFile, puzzmoJsonDir: string, distDir: string | null): string | null => {
+  if (puzzmoFile.output?.serverBundle) return path.resolve(puzzmoJsonDir, puzzmoFile.output.serverBundle)
+  if (!distDir) return null
+  // serverBundlePlugin writes it beside dist, never in it, so it can't be served to players
+  const sibling = path.join(path.dirname(distDir), "dist-server", "server-bundle.js")
+  return isFile(sibling) ? sibling : null
 }
 
 /** Returns the directories from `start` walking up to (and including) `stop` */
