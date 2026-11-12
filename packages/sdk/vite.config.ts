@@ -5,17 +5,17 @@ export default defineConfig({
   build: {
     lib: {
       entry: {
-        index: resolve(__dirname, "src/index.ts"),
-        contracts: resolve(__dirname, "src/contracts.ts"),
-        bundles: resolve(__dirname, "src/bundles.ts"),
-        "inputs/index": resolve(__dirname, "src/inputs/index.ts"),
-        "simulator/index": resolve(__dirname, "src/simulator/index.ts"),
-        "simulator/standalone": resolve(__dirname, "src/simulator/standalone.ts"),
-        fonts: resolve(__dirname, "src/fonts.ts"),
-        svgJSX: resolve(__dirname, "src/svgJSX.ts"),
-        "pico8/index": resolve(__dirname, "src/pico8/index.ts"),
-        vite: resolve(__dirname, "src/vite.ts"),
-        thumbnailMotion: resolve(__dirname, "src/thumbnailMotion.ts"),
+        index: resolve(import.meta.dirname, "src/index.ts"),
+        contracts: resolve(import.meta.dirname, "src/contracts.ts"),
+        bundles: resolve(import.meta.dirname, "src/bundles.ts"),
+        "inputs/index": resolve(import.meta.dirname, "src/inputs/index.ts"),
+        "simulator/index": resolve(import.meta.dirname, "src/simulator/index.ts"),
+        "simulator/standalone": resolve(import.meta.dirname, "src/simulator/standalone.ts"),
+        fonts: resolve(import.meta.dirname, "src/fonts.ts"),
+        svgJSX: resolve(import.meta.dirname, "src/svgJSX.ts"),
+        "pico8/index": resolve(import.meta.dirname, "src/pico8/index.ts"),
+        vite: resolve(import.meta.dirname, "src/vite.ts"),
+        thumbnailMotion: resolve(import.meta.dirname, "src/thumbnailMotion.ts"),
       },
       formats: ["es", "cjs"],
       fileName: (format, entryName) => {
