@@ -43,6 +43,7 @@ export type {
   AchievementsDescription,
   AchievementFactDescription,
   AchievementCounterDescription,
+  AchievementEventDescription,
   RoundReplayInput,
   RoundReplayResult,
   ThumbnailResult,

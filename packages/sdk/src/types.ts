@@ -421,12 +421,38 @@ export type AchievementsDescription = {
   facts: Record<string, AchievementFactDescription>
   /** Totals Puzzmo keeps across rounds, by name. Rules read them as `game.player.lifetime.<name>` and so on. */
   counters?: Record<string, AchievementCounterDescription>
+  /**
+   * The events that can move a `duringRound` fact, matched against each event's first value after its time (the
+   * `"move"` in `[1200, "move", 3, 7]`). When a batch of the log holds one, Puzzmo replays the round so far and
+   * checks the achievements that unlock during a round. List the rare ones that matter rather than every move: each
+   * listed event costs a replay. Required when a fact is `duringRound`.
+   */
+  duringRoundEvents?: string[]
+  /**
+   * What each kind of event in the log means, by its kind (the `"move"` in `[1200, "move", 3, 7]`), so Workshop can
+   * show a round's log in words. Optional, and only shown to the game's team.
+   */
+  events?: Record<string, AchievementEventDescription>
+}
+
+/** One kind of event the game logs with `sdk.rounds.log`, as Workshop names it */
+export type AchievementEventDescription = {
+  /** One line for the game's team, shown beside each event of this kind in Workshop, e.g. "Moved cards" */
+  about: string
+  /** A name for each value after the kind, in order, e.g. `["from", "to", "count"]`. At most six. */
+  values?: string[]
 }
 
 export type AchievementFactDescription = {
   type: "number" | "boolean" | "string"
   /** One line for the game's team, shown beside the fact in Workshop */
   about: string
+  /**
+   * Measured partway through a round too, so an achievement can unlock while the player is still playing. Only for a
+   * fact that never takes back what it said as the round goes on: a boolean that stays true once true, a number that
+   * only grows, a string that never changes once set. "Witnessed a misclick" qualifies; "hasn't used undo" doesn't.
+   */
+  duringRound?: boolean
 }
 
 /** A total Puzzmo keeps from one fact, round after round. The game measures; Puzzmo counts. */
@@ -460,8 +486,11 @@ export type RoundReplayInput = {
    * `completed` but the log doesn't reach a finished puzzle, answer `{ valid: false }`: a page reload loses the rest of
    * a round's log, and Puzzmo closes that round as completed when the resumed win arrives, so it counts nothing
    * rather than counting a loss.
+   *
+   * `inProgress` is the round so far, still being played, for achievements that unlock during a round. Measure the log
+   * as it stands; only the facts `describe()` marks `duringRound` are read from it.
    */
-  outcome: "completed" | "failed" | "abandoned"
+  outcome: "completed" | "failed" | "abandoned" | "inProgress"
   /** How many times the player restarted this puzzle before this attempt */
   resets: number
 }
@@ -893,7 +922,7 @@ export type MessagesSentFromEmbed = {
 export type MessagesReceived = {
   /** The host's answer to `REQUEST_PUZZLE`: a puzzle from the game's pool, or why there isn't one. */
   PUZZLE_DATA: { nonce: string; puzzle: { key: string; puzzle: string } } | { nonce: string; error: string; failed: true }
-  /** Achievements the round the game just finished unlocked, in the shape `sdk.on("achievementsUnlocked")` hands over */
+  /** Achievements the round in progress or just finished unlocked, in the shape `sdk.on("achievementsUnlocked")` hands over */
   ACHIEVEMENTS_UNLOCKED: {
     achievements: {
       stableID: string

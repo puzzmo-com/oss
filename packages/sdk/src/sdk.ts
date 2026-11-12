@@ -336,7 +336,7 @@ export type SDKEventMap = {
   keyboardCursorChange: { position: [number, number] }
   /** The drag cursor was released. Only fires when `supportsDragCursor` is true. */
   keyboardCursorEnd: void
-  /** A repeat-play round the game just finished unlocked these. The host shows them over the game; a game need not. */
+  /** The repeat-play round in progress or just finished unlocked these. The host shows them over the game; a game need not. */
   achievementsUnlocked: { achievements: SDKUnlockedAchievement[] }
 }
 

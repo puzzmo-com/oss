@@ -20,6 +20,7 @@ export const createServerBundle = <T extends ServerBundle>(bundle: T): T => bund
 
 export type {
   AchievementCounterDescription,
+  AchievementEventDescription,
   AchievementFactDescription,
   AchievementsDescription,
   AchievementsServerCapability,
