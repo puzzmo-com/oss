@@ -26,6 +26,7 @@ vi.mock("../util/api.js", async (importOriginal) => ({
     gameURL: null,
     versionsURL: null,
     serverBundle: null,
+    serverBundleWarnings: [],
   })),
 }))
 

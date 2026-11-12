@@ -8,6 +8,7 @@ import { gameCreate } from "./commands/game/create.js"
 import { login } from "./commands/login.js"
 import { migrate } from "./commands/migrate.js"
 import { puzzlesUpload } from "./commands/puzzles.js"
+import { roundsPull } from "./commands/rounds.js"
 import { upload } from "./commands/upload.js"
 import { validate } from "./commands/validate.js"
 import { defaultSource } from "./util/config.js"
@@ -95,6 +96,21 @@ const puzzlesCommand = defineCommand({
   subCommands: { upload: puzzlesUploadCommand },
 })
 
+const roundsPullCommand = defineCommand({
+  meta: { name: "pull", description: "Write your team's traced rounds of a repeat-play game as replay fixtures" },
+  args: {
+    game: { type: "string", description: "The game slug to pull rounds for", required: true },
+    user: { type: "string", description: "Only this team member's rounds (their username)" },
+    out: { type: "string", description: "Folder to write the fixtures to", default: "fixtures/rounds" },
+  },
+  run: ({ args }) => roundsPull({ game: args.game, user: args.user, out: args.out }),
+})
+
+const roundsCommand = defineCommand({
+  meta: { name: "rounds", description: "Work with the rounds Puzzmo traced for your repeat-play games" },
+  subCommands: { pull: roundsPullCommand },
+})
+
 const migrateCommand = defineCommand({
   meta: { name: "migrate", description: "List and select migration skills from workshop.puzzmo.com" },
   run: () => migrate(),
@@ -162,6 +178,7 @@ const main = defineCommand({
     login: loginCommand,
     games: gamesCommand,
     puzzles: puzzlesCommand,
+    rounds: roundsCommand,
     migrate: migrateCommand,
     game: gameCommand,
     upload: uploadAlias,

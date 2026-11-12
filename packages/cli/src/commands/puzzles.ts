@@ -1,8 +1,9 @@
 import fs from "node:fs"
 import path from "node:path"
 
-import { addPuzzlesToPool, fetchGameSlugsForToken, type PuzzleFile, validatePoolPuzzles } from "../queries/puzzlePool.js"
-import { getTokens, isServerReachable, sortByServerPriority, sourceToURL, tokenHelp, type TokenEntry } from "../util/config.js"
+import { addPuzzlesToPool, type PuzzleFile, validatePoolPuzzles } from "../queries/puzzlePool.js"
+import { sourceToURL, tokenHelp } from "../util/config.js"
+import { findTokenForGame } from "../util/tokenForGame.js"
 
 type PuzzlesUploadOptions = {
   game: string
@@ -87,16 +88,6 @@ const readPuzzleFiles = (target: string): PuzzleFile[] => {
   return paths
     .sort((a, b) => path.basename(a).localeCompare(path.basename(b)))
     .map((p) => ({ filename: path.basename(p), content: fs.readFileSync(p, "utf-8") }))
-}
-
-/** Finds the first saved token, in server priority order, whose team owns the game */
-const findTokenForGame = async (gameSlug: string): Promise<TokenEntry | null> => {
-  for (const entry of sortByServerPriority(getTokens())) {
-    if (!(await isServerReachable(entry.source))) continue
-    const slugs = await fetchGameSlugsForToken(sourceToURL(entry.source), entry.token).catch(() => null)
-    if (slugs?.includes(gameSlug)) return entry
-  }
-  return null
 }
 
 /** Splits files into batches which stay under both the API's per-call count and its request size limit */

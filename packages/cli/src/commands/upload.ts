@@ -224,6 +224,7 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   if (result.serverBundle)
     for (const [capability, summary] of Object.entries(result.serverBundle))
       console.log(`  Server bundle offers ${capability}: ${summary}.`)
+  for (const warning of result.serverBundleWarnings) console.log(yellow(`  Warning: ${warning}`))
   if (result.iconChanged && iconPath) console.log(`  Icon updated from ${path.relative(game.puzzmoJsonDir, iconPath)}.`)
   if (result.helpChanged && helpPath) console.log(`  In-game help updated from ${path.relative(game.puzzmoJsonDir, helpPath)}, live now.`)
 
@@ -236,6 +237,8 @@ const uploadOneGame = async (game: DiscoveredGame, opts: UploadOneOptions): Prom
   } else {
     console.log(`  Uploaded.`)
   }
+  // Workshop and the MCP name a build by this, e.g. to check rules against it before it goes live
+  console.log(`  Build ID: ${result.versionID}`)
   return {
     ok: true,
     slug: gameSlug,

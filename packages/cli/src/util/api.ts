@@ -58,6 +58,8 @@ type CompleteResponse = {
   versionsURL: string | null
   /** What each capability of the build's server bundle offers, by name, when one was uploaded */
   serverBundle: Record<string, string> | null
+  /** What Puzzmo noticed about the server bundle without refusing it, such as a live rule reading a fact it dropped */
+  serverBundleWarnings: string[]
   error?: string
 }
 
@@ -216,6 +218,7 @@ export const uploadFiles = async (
 
   // Step 3: The server bundle, before completing, so a bundle Puzzmo refuses fails the upload rather than live play
   let serverBundleResult: Record<string, string> | null = null
+  let serverBundleWarnings: string[] = []
   if (serverBundle) {
     const step = "server bundle upload"
     const bundleURL = `${apiURL}/cliUpload/${init.sessionID}/serverBundle?encoding=base64`
@@ -229,13 +232,15 @@ export const uploadFiles = async (
       step,
       verbose,
     )
-    serverBundleResult = ((await readResponse(res, bundleURL, step, verbose)) as { capabilities: Record<string, string> }).capabilities
+    const checked = (await readResponse(res, bundleURL, step, verbose)) as { capabilities: Record<string, string>; warnings?: string[] }
+    serverBundleResult = checked.capabilities
+    serverBundleWarnings = checked.warnings ?? []
   }
 
   // Step 4: Complete
   const complete = (await jsonPost(`${apiURL}/cliUpload/${init.sessionID}/complete`, token, {}, "upload complete", verbose)) as Omit<
     CompleteResponse,
-    "integrationsChanged" | "iconChanged" | "helpChanged" | "gameURL" | "versionsURL" | "serverBundle"
+    "integrationsChanged" | "iconChanged" | "helpChanged" | "gameURL" | "versionsURL" | "serverBundle" | "serverBundleWarnings"
   >
   if (verbose) console.log(`  Assets base: ${complete.assetsBase}`)
   return {
@@ -246,5 +251,6 @@ export const uploadFiles = async (
     gameURL: init.gameURL ?? null,
     versionsURL: init.versionsURL ?? null,
     serverBundle: serverBundleResult,
+    serverBundleWarnings,
   }
 }
