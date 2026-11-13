@@ -805,6 +805,17 @@ export type MessagesSentFromEmbed = {
   }
 
   /**
+   * A deal resumed after a reload picks its round back up. `events` is the whole log the game saved for the deal; the
+   * host asks the server for the open round on `puzzleKey` and sends only what the server lacks. With no such round,
+   * or a server holding more than the game saved, the deal plays on without one and its win counts as an untracked
+   * run. Send via `sdk.rounds.resume()`.
+   */
+  RESUME_REPEATABLE_ROUND: {
+    puzzleKey?: string
+    events: (readonly [number, ...(number | boolean | string | null)[]])[]
+  }
+
+  /**
    * Events for the round in progress's log, starting at index `from`, which the host batches up to the
    * server. Each is `[msSinceRoundStart, ...up to 7 numbers, booleans, nulls or strings of 64 characters]`;
    * the host drops any other. Send via `sdk.rounds.log()`.

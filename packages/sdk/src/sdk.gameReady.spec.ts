@@ -135,6 +135,27 @@ describe("a repeatable game with a puzzle pool", () => {
     expect(lastSent("APPEND_REPEATABLE_ROUND_LOG")).toEqual({ from: 0, events: [[10, "d"]] })
   })
 
+  it("resumes a round with its saved log, and carries on logging from where it ends", () => {
+    const sdk = createPuzzmoSDK()
+    sdk.rounds.resume({
+      puzzleKey: "v2/3/18",
+      events: [
+        [0, "d"],
+        [120, "m", 3, 4],
+      ],
+    })
+    expect(lastSent("RESUME_REPEATABLE_ROUND")).toEqual({
+      puzzleKey: "v2/3/18",
+      events: [
+        [0, "d"],
+        [120, "m", 3, 4],
+      ],
+    })
+
+    sdk.rounds.log([300, "u"])
+    expect(lastSent("APPEND_REPEATABLE_ROUND_LOG")).toEqual({ from: 2, events: [[300, "u"]] })
+  })
+
   it("hands the game the achievements a round unlocked", () => {
     const sdk = createPuzzmoSDK()
     const heard: unknown[] = []

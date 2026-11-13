@@ -99,6 +99,12 @@ export interface SDKRounds {
   start: (opts: { reason: "new" | "reset"; puzzleKey?: string }) => void
   /** Adds events to the round's log, in the order they happened. The host sends them on in batches. */
   log: (...events: SDKRoundEvent[]) => void
+  /**
+   * Picks the round back up for a deal resumed after a reload, instead of `start()`: `events` is the whole log saved
+   * with the deal, and later `log()` calls carry on from it. Save the log with the deal for this. When the server has
+   * no round on that key, or more of it than was saved, the deal plays on without a round and its win still counts.
+   */
+  resume: (opts: { puzzleKey?: string; events: readonly SDKRoundEvent[] }) => void
 }
 
 /** An achievement the server decided a round unlocked, as the `achievementsUnlocked` event hands it over */
@@ -297,6 +303,7 @@ export type SupportedOutgoingMessages = Pick<
   | "UPDATE_GAME_USER_STATE"
   | "COMPLETE_REPEATABLE_RUN"
   | "START_REPEATABLE_ROUND"
+  | "RESUME_REPEATABLE_ROUND"
   | "APPEND_REPEATABLE_ROUND_LOG"
   | "REQUEST_PUZZLE"
   | "HIT_CHECKPOINT"
@@ -866,6 +873,13 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
       start: (opts) => {
         roundLogLength = 0
         hostAPI.sendMessage("START_REPEATABLE_ROUND", { reason: opts.reason, ...(opts.puzzleKey ? { puzzleKey: opts.puzzleKey } : {}) })
+      },
+      resume: (opts) => {
+        roundLogLength = opts.events.length
+        hostAPI.sendMessage("RESUME_REPEATABLE_ROUND", {
+          events: opts.events.map((ev) => [...ev]),
+          ...(opts.puzzleKey ? { puzzleKey: opts.puzzleKey } : {}),
+        })
       },
       log: (...events) => {
         if (!events.length) return

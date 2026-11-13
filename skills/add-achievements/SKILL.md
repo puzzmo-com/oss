@@ -18,6 +18,7 @@ The user's access tokens live in `~/.puzzmo/config.json` as `pzt-`-prefixed JWTs
 2. Log rounds in the game client with the SDK:
    - `sdk.rounds.start({ reason: "new", puzzleKey })` as each puzzle begins, `reason: "reset"` when the player restarts it.
    - `sdk.rounds.log([msSinceRoundStart, "move", 3, 7])` for everything needed to replay the round: each move, draw, undo. An event is its time, then up to seven numbers, booleans, nulls or strings of at most 64 characters. Put the event's kind first after the time.
+   - `sdk.rounds.resume({ puzzleKey, events })` instead of `start` when the game restores a deal in progress after a reload, with the events it logged for that deal so far (save them alongside the deal in `sdk.storage`). The host sends the server whatever it's missing; without this, a reload loses the round and the win counts without achievements.
    - `sdk.completeRepeatableRun()` on a win.
 
 3. Write `src/serverBundle.ts`. Import from `@puzzmo/sdk/bundles`, not `@puzzmo/sdk`, as it doesn't run in a browser:

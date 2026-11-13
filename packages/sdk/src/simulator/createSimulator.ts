@@ -602,6 +602,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     if (type === "COMPLETE_REPEATABLE_RUN") console.log("Simulator: Repeatable run completed", data)
     // A round's log is replayed by the API, so the simulator only notes where rounds begin
     if (type === "START_REPEATABLE_ROUND") console.log("Simulator: Repeatable round started", data)
+    if (type === "RESUME_REPEATABLE_ROUND") console.log("Simulator: Repeatable round resumed", data)
 
     if (type === "REQUEST_PUZZLE") {
       wrappedSendToGame("PUZZLE_DATA", drawFixturePuzzle(data))
