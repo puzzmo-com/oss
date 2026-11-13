@@ -276,14 +276,43 @@ The `h` function is a JSX factory that creates virtual DOM nodes, and `render` c
 
 ## Editor Integration
 
-For games that support puzzle editing in Puzzmo Workshop, you will need an Editor Bundle:
+An editor bundle tells Puzzmo Workshop two things about your game: how to check that a puzzle is valid, and which settings an embed can change.
+
+Create `src/editorBundle.ts` in your game, next to the rest of its source, and make an `EditorBundle` its default export:
 
 ```ts
-import type { EditorBundle, ValidationReport } from "@puzzmo/sdk"
+// src/editorBundle.ts
+import type { EditorBundle } from "@puzzmo/sdk"
 
-export const validator = {
-  validate(data) {
-    return { success: true, issues: [] }
+const bundle: EditorBundle = {
+  // Required. Workshop runs this on every puzzle someone edits or uploads.
+  validator: {
+    validate(data) {
+      return { success: true, issues: [] }
+    },
   },
-} satisfies EditorBundle
+  // Optional. The form shown on an embed's settings page, and each setting's starting value.
+  settings: {
+    components: [{ id: "my-game-hard-mode", type: "boolean", name: "hardMode", title: "Hard mode", defaultValue: false }],
+    defaults: { hardMode: false },
+  },
+}
+
+export default bundle
 ```
+
+Then add `editorBundlePlugin` to your Vite config. After the main build it compiles that file into `dist/editor-bundle.js`:
+
+```ts
+// vite.config.ts
+import { editorBundlePlugin } from "@puzzmo/sdk/vite"
+import { defineConfig } from "vite"
+
+export default defineConfig({
+  plugins: [editorBundlePlugin()],
+})
+```
+
+The source file's name is only the plugin's default: it looks for `src/editorBundle.js`, then `.ts`, in the folder you run the build from. To keep it somewhere else, pass `editorBundlePlugin({ entry: "path/to/file.ts" })`.
+
+The output name is not flexible. Workshop finds the bundle by looking for `editor-bundle.js` at the top of the build you upload, so leave `outputFile` alone. There is nothing else to set up: upload a build containing that file and Workshop loads it.
