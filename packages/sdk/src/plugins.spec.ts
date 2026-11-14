@@ -6,12 +6,15 @@ import type { SDKPlugin } from "./plugins"
 // Must be set up before the sdk module is imported, as it wires its listener at import time.
 const listeners: ((event: { data: any }) => void)[] = []
 const sentToHost: { type: string; json: any }[] = []
+// While set, posts queue here rather than reaching listeners, as a real window delivers them a task later.
+let heldDeliveries: any[] | null = null
 
 const windowStub: any = {
   addEventListener: (_type: string, fn: (event: { data: any }) => void) => listeners.push(fn),
   postMessage: (message: any) => {
     if (message?.private) sentToHost.push({ type: message.type, json: message.json })
-    listeners.forEach((fn) => fn({ data: message }))
+    if (heldDeliveries) heldDeliveries.push(message)
+    else listeners.forEach((fn) => fn({ data: message }))
   },
 }
 windowStub.parent = windowStub
@@ -60,6 +63,48 @@ describe("sdk plugins", () => {
 
     expect(sdk.plugins.probe.received).toEqual(["start"])
     expect(sdk.plugins.probe.bootstrapID()).toBe("gp-1")
+  })
+
+  it("lets a plugin watch the game's own sends as they happen, ahead of the window echo", () => {
+    const relayPlugin: SDKPlugin<"relay", { seen: string[] }> = {
+      name: "relay",
+      setup: (ctx) => {
+        const seen: string[] = []
+        ctx.onSend?.("UPLOAD_NEW_GAME_STATE", (json) => {
+          seen.push(json.input.boardState)
+          ctx.send("PROBE_RELAY", json.input.boardState)
+        })
+        return { seen }
+      },
+    }
+    const sdk = createPuzzmoSDK({ plugins: [relayPlugin] })
+    sendFromHost("READY_DATA", { startOrFindGameplay: { gamePlayed: { id: "gp-1", puzzle: { puzzle: "p" } } } })
+
+    heldDeliveries = []
+    try {
+      sdk.updateGameState("A_C")
+    } finally {
+      heldDeliveries = null
+    }
+
+    expect(sdk.plugins.relay.seen).toEqual(["A_C"])
+    expect(sentToHost.map((m) => m.type)).toEqual(["UPLOAD_NEW_GAME_STATE", "PROBE_RELAY"])
+  })
+
+  it("still sends a message when one of its watchers throws", () => {
+    const throwingPlugin: SDKPlugin<"throwing", { fire: () => void }> = {
+      name: "throwing",
+      setup: (ctx) => {
+        ctx.onSend?.("PROBE_MESSAGE", () => {
+          throw new Error("watcher bug")
+        })
+        return { fire: () => ctx.send("PROBE_MESSAGE", "hello") }
+      },
+    }
+    const sdk = createPuzzmoSDK({ plugins: [throwingPlugin] })
+
+    expect(() => sdk.plugins.throwing.fire()).not.toThrow()
+    expect(sentToHost.find((m) => m.type === "PROBE_MESSAGE")?.json).toBe("hello")
   })
 
   it("defaults to an empty plugins map when none are passed", () => {

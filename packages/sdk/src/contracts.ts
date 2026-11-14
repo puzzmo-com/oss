@@ -59,6 +59,12 @@ export interface SDKPluginContext {
   send: (type: string, json: unknown) => void
   /** Subscribe to a host message by type. Returns an unsubscribe function. */
   on: (type: string, handler: (data: any) => void) => () => void
+  /**
+   * Watch the game's own outgoing messages by type. Handlers run synchronously as each is sent, so
+   * anything they send reaches the host before the game's next message. `on` only sees these via the
+   * window echo, a task later. Optional because a plugin can run against an older SDK.
+   */
+  onSend?: (type: string, handler: (json: any) => void) => () => void
   /** The SDK-owned timer (read-only for plugins; the SDK still drives it). */
   timer: SDKTimer
   /** The resolved bootstrap payload, or null until `gameReady()` has resolved. */

@@ -156,6 +156,15 @@ describe("a repeatable game with a puzzle pool", () => {
     expect(lastSent("APPEND_REPEATABLE_ROUND_LOG")).toEqual({ from: 2, events: [[300, "u"]] })
   })
 
+  it("tells the host what the table sees, with the puzzle only when the game passes one", () => {
+    const sdk = createPuzzmoSDK()
+    sdk.table.updateGameState("state-1", { puzzleString: '{"deal":1}' })
+    expect(lastSent("UPDATE_TABLE_GAME_STATE")).toEqual({ inputString: "state-1", puzzleString: '{"deal":1}' })
+
+    sdk.table.updateGameState("state-2")
+    expect(lastSent("UPDATE_TABLE_GAME_STATE")).toEqual({ inputString: "state-2" })
+  })
+
   it("hands the game the achievements a round unlocked", () => {
     const sdk = createPuzzmoSDK()
     const heard: unknown[] = []

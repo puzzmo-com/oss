@@ -107,6 +107,20 @@ export interface SDKRounds {
   resume: (opts: { puzzleKey?: string; events: readonly SDKRoundEvent[] }) => void
 }
 
+/**
+ * The table: other players playing alone together see this player's game beside theirs, drawn by the host from the
+ * game's own thumbnail renderer, as anywhere else Puzzmo shows a thumbnail.
+ */
+export interface SDKTable {
+  /**
+   * What other players at the table see of this game: the same strings your thumbnail renderer takes, the input as
+   * `updateGameState()` takes it. Nothing is stored, so keep saving as you do. Pass `puzzleString` on the first call
+   * and whenever the puzzle changes (a new deal), and leave it out otherwise. Call it on every change; the host sends
+   * the latest at most once a second.
+   */
+  updateGameState: (inputString: string, opts?: { puzzleString?: string }) => void
+}
+
 /** An achievement the server decided a round unlocked, as the `achievementsUnlocked` event hands it over */
 export type SDKUnlockedAchievement = {
   stableID: string
@@ -262,6 +276,9 @@ export interface PuzzmoSDK<Plugins extends readonly SDKPlugin[] = []> {
   /** The rounds of repeat play, logged for the server to replay. See `SDKRounds`. */
   rounds: SDKRounds
 
+  /** What other players at the table see of this game. See `SDKTable`. */
+  table: SDKTable
+
   /**
    * Ask the host for another puzzle from the game's pool, for a repeatable game whose puzzles come from
    * the host (the first arrives with `gameReady()`). Leave `buckets` out to draw from the whole pool, and
@@ -304,6 +321,7 @@ export type SupportedOutgoingMessages = Pick<
   | "COMPLETE_REPEATABLE_RUN"
   | "START_REPEATABLE_ROUND"
   | "RESUME_REPEATABLE_ROUND"
+  | "UPDATE_TABLE_GAME_STATE"
   | "APPEND_REPEATABLE_ROUND_LOG"
   | "REQUEST_PUZZLE"
   | "HIT_CHECKPOINT"
@@ -469,6 +487,7 @@ function createTimer(
 
 function createHostAPI() {
   const messageHandlers = new Map<string, Set<(data: any) => void>>()
+  const sendWatchers = new Map<string, Set<(json: any) => void>>()
 
   const sendMessage = <T extends keyof SupportedOutgoingMessages>(type: T, json: SupportedOutgoingMessages[T]) => {
     const message = { type, json, _: "p", __: "mp", private: true }
@@ -485,6 +504,15 @@ function createHostAPI() {
       (window as any).ReactNativeWebView.postMessage(JSON.stringify(message))
 
     if (type !== "TIMER_TICK" && type !== "TIMER_SYNC") console.log("[Puzzmo SDK] sent:", type, json)
+
+    // A watcher runs inside the game's own call, so one that throws must not break it.
+    sendWatchers.get(type)?.forEach((watcher) => {
+      try {
+        watcher(json)
+      } catch (error) {
+        console.error(`[Puzzmo SDK] a watcher of ${type} threw:`, error)
+      }
+    })
   }
 
   const onMessage = <T extends keyof SupportedIncomingMessages>(type: T, handler: MessageHandler<T>) => {
@@ -493,6 +521,16 @@ function createHostAPI() {
 
     return () => {
       messageHandlers.get(type)?.delete(handler)
+    }
+  }
+
+  /** Runs `watcher` synchronously each time a message of `type` is sent. Returns an unsubscribe function. */
+  const onSend = (type: string, watcher: (json: any) => void) => {
+    if (!sendWatchers.has(type)) sendWatchers.set(type, new Set())
+    sendWatchers.get(type)!.add(watcher)
+
+    return () => {
+      sendWatchers.get(type)?.delete(watcher)
     }
   }
 
@@ -509,7 +547,7 @@ function createHostAPI() {
     })
   }
 
-  return { sendMessage, onMessage }
+  return { sendMessage, onMessage, onSend }
 }
 
 /**
@@ -716,6 +754,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   const pluginContext: SDKPluginContext = {
     send: (type, json) => hostAPI.sendMessage(type as keyof SupportedOutgoingMessages, json as never),
     on: (type, handler) => hostAPI.onMessage(type as keyof SupportedIncomingMessages, handler),
+    onSend: hostAPI.onSend,
     timer,
     bootstrap: () => readyData,
   }
@@ -885,6 +924,15 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
         if (!events.length) return
         hostAPI.sendMessage("APPEND_REPEATABLE_ROUND_LOG", { from: roundLogLength, events: events.map((ev) => [...ev]) })
         roundLogLength += events.length
+      },
+    },
+
+    table: {
+      updateGameState: (inputString, opts) => {
+        hostAPI.sendMessage("UPDATE_TABLE_GAME_STATE", {
+          inputString,
+          ...(opts?.puzzleString !== undefined ? { puzzleString: opts.puzzleString } : {}),
+        })
       },
     },
 

@@ -805,6 +805,16 @@ export type MessagesSentFromEmbed = {
   }
 
   /**
+   * What other players at the table see of this game, which the host draws with the game's thumbnail renderer:
+   * `inputString` as `UPLOAD_NEW_GAME_STATE` carries it, and `puzzleString` on the first call and whenever the puzzle
+   * changes. Nothing is stored. The host sends the latest at most once a second. Send via `sdk.table.updateGameState()`.
+   */
+  UPDATE_TABLE_GAME_STATE: {
+    inputString: string
+    puzzleString?: string
+  }
+
+  /**
    * A deal resumed after a reload picks its round back up. `events` is the whole log the game saved for the deal; the
    * host asks the server for the open round on `puzzleKey` and sends only what the server lacks. With no such round,
    * or a server holding more than the game saved, the deal plays on without one and its win counts as an untracked
