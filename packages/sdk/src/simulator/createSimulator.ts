@@ -463,6 +463,8 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
 
   // Create READY_DATA payload
   const createReadyData = (puzzle: string | null): BootstrapGameData => {
+    // The real slug when known, so slug-keyed host context (an embed's settings overrides) reads as it does in production
+    const game = config.slug ? { ...simulatorGame, slug: config.slug, stableSlug: config.slug } : simulatorGame
     const gameplay = {
       additionalTimeAddedSecs: 0,
       boardState: state.currentInputStr,
@@ -483,7 +485,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     return {
       userState: {
         // Keyed by game slug, matching the shape real hosts send
-        gameSettings: { "proto-game": state.gameSettings },
+        gameSettings: { [game.slug]: state.gameSettings },
         id: "simulator-user",
         ownerID: "simulator-owner",
       },
@@ -495,7 +497,7 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
         type: "User",
         roles: "",
       },
-      game: simulatorGame,
+      game,
       session,
       viewerStorage: state.userStorage,
       theme: state.selectedTheme,

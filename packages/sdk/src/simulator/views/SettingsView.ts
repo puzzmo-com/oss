@@ -101,6 +101,9 @@ export function createSettingsView(): SimulatorView {
 
 /** Renders a single settings UI component as HTML, reading its current value from `settings` */
 function renderComponent(component: GameSettingsUIComponents, settings: Record<string, any>): string {
+  // Hidden settings still apply, hosts just never draw them
+  if (component.hidden) return ""
+
   switch (component.type) {
     case "title":
       return `<div class="sim-settings-heading">${escapeHTML(component.value)}</div>`

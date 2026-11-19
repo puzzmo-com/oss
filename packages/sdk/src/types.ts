@@ -763,6 +763,16 @@ export type GameSettingsUIComponents =
   | { id: string; type: "split"; content: GameSettingsUIComponents[]; hidden?: boolean }
 
 /**
+ * A patch an embed makes to one of a game's settings components, matched by `id`. Embeds list them
+ * in their host context at `[gameSlug].settingsUIOverrides`, and `sdk.settings.initialize` applies them.
+ */
+export type SettingsUIOverride = {
+  id: string
+  /** Hides the setting from the player and locks it to its `defaultValue` */
+  omit?: true
+} & Partial<GameSettingsUIComponents>
+
+/**
  * The haptics a game can ask the host for. Named after the iOS generators they map onto, since
  * that is the only platform which can render them faithfully; other hosts approximate.
  *

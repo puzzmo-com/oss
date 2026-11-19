@@ -52,6 +52,7 @@ export type {
   KeyStyleRule,
   KeyStyles,
   GameSettingsUIComponents,
+  SettingsUIOverride,
   AvailableHaptics,
   HostContext,
   AppHostContext,

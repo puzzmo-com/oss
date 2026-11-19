@@ -13,6 +13,7 @@ import type {
   GameOverMessageUIComponent,
   KeyboardConfig,
   GameSettingsUIComponents,
+  SettingsUIOverride,
   AvailableHaptics,
 } from "./types"
 
@@ -140,12 +141,21 @@ export interface SDKSettings {
    * underneath the player's saved values, the host shows the components in its settings panel,
    * and the resolved settings object is returned. Listen for the `settingsUpdate` event to
    * react to the player changing values. Call after `gameReady()`.
+   *
+   * In an embed, the partner's `settingsUIOverrides` for this game are applied first: an override
+   * replaces fields of the component with its `id` (a new `defaultValue`, say), and `omit` hides
+   * the component and locks the setting to its default, over anything the player saved.
    */
   initialize: (components: GameSettingsUIComponents[]) => any
   /** Get the current resolved settings object. */
   get: () => any
   /** Merge changes into the current settings and persist them to the host. Returns the updated settings. */
   update: (changes: any) => any
+  /**
+   * The components from `initialize()` with the embed's overrides applied, omitted ones marked
+   * `hidden`. Draw an in-game settings UI from these rather than from your own list.
+   */
+  components: () => GameSettingsUIComponents[]
 }
 
 /** The host-rendered on-screen keyboard, for games that take text or symbol input on touch devices. */
@@ -597,6 +607,11 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
   // The resolved settings object — seeded from READY_DATA's saved values, then component
   // defaults are merged underneath when the game calls settings.initialize
   let currentSettings: any | null = null
+  // What settings.initialize registered, after an embed's overrides
+  let settingsComponents: GameSettingsUIComponents[] = []
+  // Settings an embed has hidden, held at these values whatever the player saved
+  let lockedSettings: Record<string, unknown> = {}
+  const resolvedSettings = () => ({ ...currentSettings, ...lockedSettings })
 
   // ClickHouse game analytics — sends the same lifecycle events the runtime tracks
   // (page_view, gameplay_active, active_30s, completed, link_click). Disabled on localhost.
@@ -668,7 +683,7 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
 
   hostAPI.onMessage("SETTINGS_UPDATE", (data) => {
     currentSettings = { ...currentSettings, ...data }
-    emit("settingsUpdate", currentSettings)
+    emit("settingsUpdate", resolvedSettings())
   })
 
   hostAPI.onMessage("KEYBOARD_KEY_PRESS", (data) => emit("keyboardKeyPress", data))
@@ -979,16 +994,23 @@ export const createPuzzmoSDK = <const Plugins extends readonly SDKPlugin[] = []>
 
     settings: {
       initialize: (components: GameSettingsUIComponents[]) => {
-        currentSettings = { ...settingsDefaultsFromComponents(components), ...currentSettings }
-        hostAPI.sendMessage("INITIALIZE_SETTINGS", { components, settings: currentSettings })
-        return currentSettings
+        const overridden = applySettingsOverrides(components, embedSettingsOverrides(readyData))
+        settingsComponents = overridden.components
+        lockedSettings = overridden.locked
+        currentSettings = { ...settingsDefaultsFromComponents(settingsComponents), ...currentSettings }
+        const settings = resolvedSettings()
+        hostAPI.sendMessage("INITIALIZE_SETTINGS", { components: settingsComponents, settings })
+        return settings
       },
-      get: () => currentSettings ?? {},
+      get: resolvedSettings,
       update: (changes: any) => {
-        currentSettings = { ...currentSettings, ...changes }
+        // Locked values stay out of what is saved, so the player's own choice outlives the embed's
+        const unlocked = Object.entries(changes ?? {}).filter(([name]) => !(name in lockedSettings))
+        currentSettings = { ...currentSettings, ...Object.fromEntries(unlocked) }
         hostAPI.sendMessage("UPDATE_SETTINGS_FROM_EMBED", { settings: currentSettings })
-        return currentSettings
+        return resolvedSettings()
       },
+      components: () => settingsComponents,
     },
 
     keyboard: {
@@ -1026,6 +1048,38 @@ function settingsDefaultsFromComponents(components: GameSettingsUIComponents[]):
     else if ("name" in component) defaults[component.name] = component.defaultValue
   }
   return defaults
+}
+
+/** The settings overrides an embed's host context holds for this game, under the game's slug */
+function embedSettingsOverrides(data: MessagesReceived["READY_DATA"] | null): SettingsUIOverride[] {
+  const embed = data?.hostContext?.find((context) => context.type === "embed")
+  const gameSlug = data?.game?.slug
+  if (!embed || !gameSlug) return []
+
+  const forGame = (embed as Record<string, unknown>)[gameSlug] as { settingsUIOverrides?: unknown } | undefined
+  return Array.isArray(forGame?.settingsUIOverrides) ? forGame.settingsUIOverrides : []
+}
+
+/**
+ * Applies an embed's overrides to the components they match by `id`, recursing into split groups.
+ * `omit` marks the component `hidden`, and `locked` holds the value each omitted setting is kept at.
+ */
+function applySettingsOverrides(components: GameSettingsUIComponents[], overrides: SettingsUIOverride[]) {
+  const locked: Record<string, unknown> = {}
+  if (!overrides.length) return { components, locked }
+
+  const apply = (component: GameSettingsUIComponents, parentOmitted: boolean): GameSettingsUIComponents => {
+    const { omit, ...patch } = overrides.find((override) => override.id === component.id) ?? { id: component.id }
+    const omitted = parentOmitted || Boolean(omit)
+    // The cast is for the spread, which widens the discriminated union
+    const patched = { ...component, ...patch, ...(omitted ? { hidden: true } : {}) } as GameSettingsUIComponents
+
+    if (patched.type === "split") return { ...patched, content: patched.content.map((inner) => apply(inner, omitted)) }
+    if (omitted && "name" in patched) locked[patched.name] = patched.defaultValue
+    return patched
+  }
+
+  return { components: components.map((component) => apply(component, false)), locked }
 }
 
 /** The largest state `sdk.storage.set()` takes, matching the API's cap */

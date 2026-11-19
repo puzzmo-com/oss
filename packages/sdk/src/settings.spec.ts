@@ -117,6 +117,89 @@ describe("sdk.settings", () => {
     expect(sdk.settings.get()).toEqual(updated)
   })
 
+  describe("in an embed with settingsUIOverrides", () => {
+    const embedReadyData = (settingsForGame: any, settingsUIOverrides: any[]) => ({
+      ...readyDataWithSettings(settingsForGame),
+      hostContext: [{ type: "embed", typeshift: { settingsUIOverrides } }],
+    })
+
+    it("uses an override's defaultValue until the player saves their own", () => {
+      const override = { id: "typeshift-highlight-core-words", defaultValue: true }
+
+      const fresh = createPuzzmoSDK()
+      sendFromHost("READY_DATA", embedReadyData({}, [override]))
+      expect(fresh.settings.initialize(components)).toMatchObject({ highlightCoreWords: true })
+      expect(fresh.settings.components().find((c) => c.id === override.id)).toMatchObject({
+        defaultValue: true,
+        title: "Highlight core words",
+      })
+
+      const returning = createPuzzmoSDK()
+      sendFromHost("READY_DATA", embedReadyData({ highlightCoreWords: false }, [override]))
+      expect(returning.settings.initialize(components)).toMatchObject({ highlightCoreWords: false })
+    })
+
+    it("hides an omitted setting and locks it over the player's saved value", () => {
+      const sdk = createPuzzmoSDK()
+      sendFromHost("READY_DATA", embedReadyData({ confirmSubmit: false }, [{ id: "typeshift-safe-mode", defaultValue: true, omit: true }]))
+
+      expect(sdk.settings.initialize(components)).toMatchObject({ confirmSubmit: true })
+      expect(sdk.settings.components().map((c) => Boolean(c.hidden))).toEqual([true, false, false])
+      expect(sentToHost.find((m) => m.type === "INITIALIZE_SETTINGS")?.json.components).toEqual(sdk.settings.components())
+
+      let emitted: any
+      sdk.on("settingsUpdate", (data) => (emitted = data))
+      sendFromHost("SETTINGS_UPDATE", { confirmSubmit: false, highlightCoreWords: true })
+      expect(emitted).toMatchObject({ confirmSubmit: true, highlightCoreWords: true })
+    })
+
+    it("locks an omitted setting to the game's default when the override gives none", () => {
+      const sdk = createPuzzmoSDK()
+      sendFromHost(
+        "READY_DATA",
+        embedReadyData({ skipSingleLetterColumns: false }, [{ id: "typeshift-skip-single-letter-columns", omit: true }]),
+      )
+
+      expect(sdk.settings.initialize(components)).toMatchObject({ skipSingleLetterColumns: true })
+    })
+
+    it("keeps locked values out of what update() saves", () => {
+      const sdk = createPuzzmoSDK()
+      sendFromHost("READY_DATA", embedReadyData({ confirmSubmit: false }, [{ id: "typeshift-safe-mode", defaultValue: true, omit: true }]))
+      sdk.settings.initialize(components)
+
+      const updated = sdk.settings.update({ confirmSubmit: true, highlightCoreWords: true })
+      expect(updated).toEqual({ confirmSubmit: true, highlightCoreWords: true, skipSingleLetterColumns: true })
+
+      const sent = sentToHost.find((m) => m.type === "UPDATE_SETTINGS_FROM_EMBED")
+      expect(sent?.json.settings).toEqual({ confirmSubmit: false, highlightCoreWords: true, skipSingleLetterColumns: true })
+    })
+
+    it("overrides and omits components inside split groups", () => {
+      const sdk = createPuzzmoSDK()
+      sendFromHost("READY_DATA", embedReadyData({ size: 1 }, [{ id: "d", defaultValue: 2, omit: true }]))
+
+      const split: GameSettingsUIComponents = {
+        id: "c",
+        type: "split",
+        content: [{ id: "d", type: "number", name: "size", defaultValue: 3, values: [1, 2, 3], title: "Size" }],
+      }
+      expect(sdk.settings.initialize([split])).toEqual({ size: 2 })
+      expect(sdk.settings.components()).toEqual([{ ...split, content: [{ ...split.content[0], defaultValue: 2, hidden: true }] }])
+    })
+
+    it("ignores overrides for another game and outside an embed", () => {
+      const sdk = createPuzzmoSDK()
+      sendFromHost("READY_DATA", {
+        ...readyDataWithSettings({}),
+        hostContext: [{ type: "embed", sudoku: { settingsUIOverrides: [{ id: "typeshift-safe-mode", defaultValue: true, omit: true }] } }],
+      })
+
+      expect(sdk.settings.initialize(components)).toMatchObject({ confirmSubmit: false })
+      expect(sdk.settings.components()).toBe(components)
+    })
+  })
+
   it("skips display-only components and recurses into split groups when merging defaults", () => {
     const sdk = createPuzzmoSDK()
     sendFromHost("READY_DATA", readyDataWithSettings({}))
