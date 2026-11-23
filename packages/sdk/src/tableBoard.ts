@@ -760,7 +760,11 @@ const parseColor = (value: string): RGB => {
   let rgb = colors.get(value)
   if (rgb) return rgb
   // An offscreen canvas where there is one, as a worker has no document
-  colorContext ??= (typeof OffscreenCanvas === "undefined" ? document.createElement("canvas") : new OffscreenCanvas(1, 1)).getContext("2d")!
+  // getContext is called on each canvas type, as TS 5.x can't resolve the "2d" overload on the union
+  colorContext ??=
+    typeof OffscreenCanvas === "undefined"
+      ? document.createElement("canvas").getContext("2d")!
+      : new OffscreenCanvas(1, 1).getContext("2d")!
   colorContext.fillStyle = "#000"
   colorContext.fillStyle = value
   const normal = String(colorContext.fillStyle)
