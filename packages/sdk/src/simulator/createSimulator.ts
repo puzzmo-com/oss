@@ -13,6 +13,7 @@ import {
   createCheckpointsView,
   createChecklistView,
   createThumbView,
+  createPmmgView,
   createThemeView,
   createHostView,
   createAuthView,
@@ -122,6 +123,8 @@ export function createSimulator(config: SimulatorConfig = {}): SimulatorInstance
     createCheckpointsView(),
     createChecklistView(config.integrations?.checklists ?? []),
     thumbView,
+    // Only for a game with a pmmg bundle, which the Vite plugin finds
+    ...(config.pmmgBundle ? [createPmmgView(config.pmmgBundle)] : []),
     createThemeView(),
     createHostView(config.hostContextPresets),
     createAuthView(),

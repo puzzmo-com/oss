@@ -32,6 +32,9 @@ export type ThumbnailFontName = keyof typeof fontURLMap
 /** Every font the SDK can serve to thumbnails. Pass to `svgFontFaceCSS`/`svgFontFaceCSSRaw` to declare them all. */
 export const thumbnailFontNames = Object.keys(fontURLMap) as ThumbnailFontName[]
 
+/** A font's file, by the name a thumbnail or client bundle uses for it */
+export const thumbnailFontURL = (name: ThumbnailFontName): string => fontURLMap[name]
+
 /** Generates an SVG `<style>` block with `@font-face` declarations for the given font names. */
 export function svgFontFaceCSS(fontNames: ThumbnailFontName[]): string {
   return `<style>${fontFaceRules(fontNames)}</style>`

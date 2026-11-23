@@ -60,6 +60,8 @@ export type GameInfo = {
   displayName: string
   /** Vite-root-relative path to app bundle entry, if it exists */
   appBundlePath: string | null
+  /** Vite-root-relative path to the pmmg bundle entry, if it exists, for the simulator's Pmmg tab */
+  pmmgBundlePath?: string | null
   /** `integrations` from the puzzmo.json, passed to simulator tabs that preview them */
   integrations?: SimulatorIntegrations
 }
@@ -79,14 +81,15 @@ export function discoverGames(viteRoot: string): Map<string, GameInfo> {
     try {
       const data = JSON.parse(fs.readFileSync(path.join(dir, "puzzmo.json"), "utf-8"))
       if (!data?.game?.slug) continue
-      const bundleEntry = resolveBundleEntry(dir, "src/appBundle")
-      let appBundle: string | null = null
-      if (bundleEntry) {
-        const relative = path.relative(viteRoot, bundleEntry)
-        appBundle = "/" + relative.split(path.sep).join("/")
-      }
       const integrations = data.integrations && typeof data.integrations === "object" ? data.integrations : undefined
-      games.set(data.game.slug, { dir, slug: data.game.slug, displayName: data.game.displayName, appBundlePath: appBundle, integrations })
+      games.set(data.game.slug, {
+        dir,
+        slug: data.game.slug,
+        displayName: data.game.displayName,
+        appBundlePath: viteRootPath(viteRoot, resolveBundleEntry(dir, "src/appBundle")),
+        pmmgBundlePath: viteRootPath(viteRoot, resolveBundleEntry(dir, "src/pmmgBundle")),
+        integrations,
+      })
     } catch {
       // skip invalid files
     }
@@ -149,6 +152,8 @@ export function generateSimulatorCode(options: PuzzmoSimulatorPluginOptions, gam
   const configEntries = Object.entries(simConfig).filter(([, v]) => v !== undefined)
   const configParts = configEntries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
   if (fixturesGlob) configParts.push("fixtures")
+  // Loaded when the Pmmg tab opens, so a game page that never looks at it never imports it
+  if (game?.pmmgBundlePath) configParts.push(`pmmgBundle: () => import(${JSON.stringify(game.pmmgBundlePath)})`)
   if (viewFactories?.length) configParts.push(`views: [${viewFactories.map((v) => `${v.export}()`).join(", ")}]`)
 
   lines.push(`createSimulator({ ${configParts.join(", ")} })`)
@@ -288,6 +293,10 @@ function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
 /** Strip the trailing extension from a default entry path so we can probe siblings. */
 const stripBundleExt = (p: string) => p.replace(/\.[jt]sx?$/i, "")
 
+/** An absolute file as the path the dev server serves it at, or null for no file */
+const viteRootPath = (viteRoot: string, file: string | null) =>
+  file ? "/" + path.relative(viteRoot, file).split(path.sep).join("/") : null
+
 /** Returns the absolute path to the first matching extension under `dir`, or null. */
 const resolveBundleEntry = (dir: string, baseRelative: string): string | null => {
   // JSX last: a bundle written as JSX still needs the plain entry to win if both somehow exist.
@@ -333,6 +342,76 @@ export const serverBundlePlugin = createBundlePlugin("server-bundle", {
   outputFile: "server-bundle.js",
   outDir: "dist-server",
 })
+
+export type PmmgBundlePluginOptions = {
+  /** Entry file for the pmmg bundle (default: `src/pmmgBundle.js`, or `.ts`) */
+  entry?: string
+  /** Output file name (default: `pmmg-bundle.js`) */
+  outputFile?: string
+}
+
+const buildPmmgBundle = createBundlePlugin("pmmg-bundle", { entry: "src/pmmgBundle.js", outputFile: "pmmg-bundle.js", outDir: "dist" })
+
+/**
+ * Vite plugins for the game's pmmg bundle (see `PmmgBundle`), such as its boards at the table. After the main build
+ * they produce dist/pmmg-bundle.js, which is public and served with the rest of `dist`. In dev, `/pmmg-bundle.js` on
+ * the game's dev server is built from source on each request, so a Puzzmo page running with `?dev` draws boards from
+ * the code being worked on.
+ *
+ * Puzzmo imports it from an opaque-origin sandbox, so that one response answers any origin. It's a whole build rather
+ * than the dev server's modules, since letting `Origin: null` read those would let any page read the game's source.
+ */
+export const pmmgBundlePlugin = (options: PmmgBundlePluginOptions = {}): Plugin[] => [
+  buildPmmgBundle(options),
+  {
+    name: "pmmg-bundle-dev",
+    apply: "serve",
+    configureServer(server) {
+      // Requests that arrive while a build runs share it
+      let building: Promise<string> | undefined
+      server.middlewares.use((req, res, next) => {
+        if (!/^\/pmmg-bundle\.js(?:\?.*)?$/.test(req.url || "")) return next()
+        const entry = options.entry ?? resolveBundleEntry(server.config.root, "src/pmmgBundle")
+        if (!entry) return next()
+        building ??= buildPmmgBundleSource(path.resolve(server.config.root, entry)).finally(() => (building = undefined))
+        building.then(
+          (code) => {
+            res.setHeader("Content-Type", "text/javascript")
+            res.setHeader("Access-Control-Allow-Origin", "*")
+            res.setHeader("Cache-Control", "no-store")
+            res.end(code)
+          },
+          (error) => {
+            server.config.logger.error(`[pmmg-bundle] build failed: ${error?.message ?? error}`)
+            res.statusCode = 500
+            res.end()
+          },
+        )
+      })
+    },
+  },
+]
+
+/** The pmmg bundle built as production builds it, as one file's source for the dev route */
+export const buildPmmgBundleSource = async (entry: string): Promise<string> => {
+  const result = await build({
+    configFile: false,
+    logLevel: "warn",
+    build: {
+      write: false,
+      copyPublicDir: false,
+      minify: false,
+      sourcemap: "inline",
+      lib: { entry, formats: ["es"], fileName: () => "pmmg-bundle.js" },
+      // One file, as the route serves only the one
+      rolldownOptions: { output: { codeSplitting: false } },
+    },
+  })
+  const outputs = Array.isArray(result) ? result : "output" in result ? [result] : []
+  const chunk = outputs.flatMap((output) => output.output).find((file) => file.type === "chunk" && file.isEntry)
+  if (!chunk || chunk.type !== "chunk") throw new Error(`Building ${entry} made no bundle`)
+  return chunk.code
+}
 
 export type EditorBundlePluginOptions = {
   /** Entry file for the editor bundle (default: `src/editorBundle.js`) */

@@ -59,10 +59,10 @@
       "import": "./dist/vite.js",
       "require": "./dist/vite.cjs"
     },
-    "./thumbnail-motion": {
-      "types": "./dist/thumbnailMotion.d.ts",
-      "import": "./dist/thumbnailMotion.js",
-      "require": "./dist/thumbnailMotion.cjs"
+    "./table-board": {
+      "types": "./dist/tableBoard.d.ts",
+      "import": "./dist/tableBoard.js",
+      "require": "./dist/tableBoard.cjs"
     }
   },
   "files": [

@@ -15,7 +15,7 @@ export default defineConfig({
         svgJSX: resolve(import.meta.dirname, "src/svgJSX.ts"),
         "pico8/index": resolve(import.meta.dirname, "src/pico8/index.ts"),
         vite: resolve(import.meta.dirname, "src/vite.ts"),
-        thumbnailMotion: resolve(import.meta.dirname, "src/thumbnailMotion.ts"),
+        tableBoard: resolve(import.meta.dirname, "src/tableBoard.ts"),
       },
       formats: ["es", "cjs"],
       fileName: (format, entryName) => {

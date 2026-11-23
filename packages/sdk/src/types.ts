@@ -498,6 +498,192 @@ export type RoundReplayInput = {
 /** A round's measurements, or why its log can't be trusted. An invalid round earns nothing. */
 export type RoundReplayResult = { valid: true; facts: Record<string, number | boolean | string> } | { valid: false; reason: string }
 
+/**
+ * Code Puzzmo's own pages run for a game's passively massively multiplayer side (pmmg), such as its boards at the
+ * table, built by `pmmgBundlePlugin` into dist/pmmg-bundle.js. It's
+ * public like the app bundle, but runs in a stricter sandbox: a worker in an opaque-origin frame, with no network and
+ * no page to reach. Each member is a capability, Puzzmo calls the ones it knows, and a missing one is a feature the
+ * game doesn't offer. Write it with `createPmmgBundle`.
+ */
+export type PmmgBundle = {
+  /** Neighbours' boards at the table: a player's latest input as a scene Puzzmo draws and animates */
+  table?: TableBoardCapability
+}
+
+/**
+ * Draws a neighbour's board at the table. Puzzmo calls `render` when the neighbour's input changes and the board is
+ * due to show it; it never calls it per frame. The scene says what's on the board and how the change from `previous`
+ * animates, and Puzzmo does the animating, for every board at the table at once.
+ */
+export type TableBoardCapability = {
+  /** The version of this contract the bundle implements */
+  contract: 1
+  /** Puzzmo fonts the sprites draw text with, by name from `@puzzmo/sdk/fonts`; they're loaded before the first render */
+  fonts?: string[]
+  /** The board after one update. Make any sprites it uses with `sprites` before returning. */
+  render(update: TableBoardUpdate, sprites: TableBoardSprites): TableBoardScene
+}
+
+export type TableBoardUpdate = {
+  /** Steady for as long as this board is on the table, for the renderer's own caches. Opaque. */
+  board: string
+  puzzle: string
+  input: string
+  /** What the board is showing now, which the change animates from; absent the first time it's drawn */
+  previous?: { puzzle: string; input: string }
+  /** Updates Puzzmo passed over between `previous` and this one, because the board was behind or out of sight */
+  skipped: number
+  theme: Theme
+  /**
+   * How much detail the board is shown with: "high" for a neighbour beside the player, "low" for a board seen in passing,
+   * like an ambient table or the lobby's. A low board might drop illustrations for line art, say.
+   */
+  fidelity: TableBoardFidelity
+  /** Whether what's behind the board is dark or light. That's the theme's unless the game paints a felt of its own. */
+  backgroundStyle: TableBoardBackgroundStyle
+  /** Device pixels per board unit: the resolution sprites are made at */
+  pixelsPerUnit: number
+}
+
+export type TableBoardFidelity = "high" | "low"
+
+export type TableBoardBackgroundStyle = "dark" | "light"
+
+export type TableBoardScene = {
+  /** The board's size in board units; it can change between updates */
+  width: number
+  height: number
+  /**
+   * A size in board units that should land on whole device pixels, like a tile's in a grid of tiles. Puzzmo draws the
+   * board a little smaller where it must so that it does, which keeps tiles that meet in line with no seam between them
+   */
+  grid?: number
+  /** Everything on the board, drawn in this order */
+  nodes: TableBoardNode[]
+  /** How a change to a node animates when it doesn't say. Without one, changes are instant. */
+  transition?: TableBoardTiming
+  /** One-off animations this change sets off, like a pulse when a tile locks */
+  effects?: TableBoardEffect[]
+}
+
+/**
+ * One thing on the board. A node keeps its key from update to update, and that's what animates: when its position,
+ * rotation, scale, opacity, tint or brightness changes, it moves from the old value to the new one.
+ */
+export type TableBoardNode = {
+  key: string
+  /** What it shows; none for a node that only carries its children. A new sprite shows at once: use a keyframe's to time it. */
+  sprite?: string
+  /** A node this one moves, turns and scales with. Its x and y are then from the parent's position. */
+  parent?: string
+  /** Where the sprite's anchor sits, in board units */
+  x: number
+  y: number
+  /** Degrees clockwise about the anchor. Never wrapped: from 270 to 360 turns a quarter, where 270 to 0 turns three. */
+  rotation?: number
+  /** About the anchor; [1, 1] by default */
+  scale?: [number, number]
+  opacity?: number
+  /** Multiplies the sprite's colour, so a white sprite takes any colour: CSS colour */
+  tint?: string
+  /** 1 draws the sprite as it is; 2 is twice as bright */
+  brightness?: number
+  /** How the sprite mixes with what's under it, as CSS's mix-blend-mode; normal by default */
+  blend?: TableBoardBlend
+  /**
+   * Its children blend only with each other, not with what's under the node, as CSS's `isolation: isolate`. They're
+   * drawn together first, then put down as one. They must come straight after it in the scene's nodes.
+   */
+  isolate?: boolean
+  /** How this node's changes animate, over the scene's; false for an instant change */
+  transition?: TableBoardTiming | false
+  /** Plays when the node first appears, from the keyframes to its own values */
+  enter?: TableBoardAnimation
+  /** Plays when the node is gone from the next scene, from its last values; it's removed when this ends */
+  exit?: TableBoardAnimation
+}
+
+/** CSS's blend modes, which a canvas draws the same way */
+export type TableBoardBlend =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "darken"
+  | "lighten"
+  | "color-dodge"
+  | "color-burn"
+  | "hard-light"
+  | "soft-light"
+  | "difference"
+  | "exclusion"
+  | "hue"
+  | "saturation"
+  | "color"
+  | "luminosity"
+
+/** An animation on one node, played over whatever it's doing: see `TableBoardKeyframe` */
+export type TableBoardAnimation = TableBoardTiming & { keyframes: TableBoardKeyframe[] }
+
+export type TableBoardEffect = TableBoardAnimation & {
+  /** The node it plays on */
+  key: string
+  /** Plays this many times; Infinity loops while the node is there (Puzzmo may pause it) */
+  iterations?: number
+}
+
+/**
+ * A moment in an animation, at `offset` from 0 to 1. Values are relative to the node's own, so an animation plays
+ * over a move: x, y and rotation add to it, scale, opacity and brightness multiply it, and tint and sprite replace it.
+ * A value missing from a keyframe is the node's own there.
+ */
+export type TableBoardKeyframe = {
+  offset: number
+  /** How the animation eases from this keyframe to the next */
+  easing?: string
+  x?: number
+  y?: number
+  rotation?: number
+  scale?: [number, number]
+  opacity?: number
+  brightness?: number
+  tint?: string
+  /** Swaps the sprite from this keyframe on, like a card's face showing halfway through a flip */
+  sprite?: string
+}
+
+export type TableBoardTiming = {
+  duration: number
+  delay?: number
+  /** A CSS easing: a keyword, cubic-bezier() or linear() */
+  easing?: string
+}
+
+/**
+ * Makes the sprites a scene draws, in the sandbox, as pictures Puzzmo keeps. A sprite is made once per resolution and
+ * kept for as long as the game is on the table, so an ID must always mean the same picture: put anything that changes
+ * the picture, like theme colours, fidelity or background style, into it.
+ */
+export type TableBoardSprites = {
+  /** Whether a sprite has been made at this resolution already, so its picture needn't be worked out again */
+  has(id: string): boolean
+  /** Paints a sprite on a canvas, in board units */
+  draw(id: string, box: TableBoardSpriteBox, paint: (ctx: OffscreenCanvasRenderingContext2D) => void): void
+  /**
+   * A sprite from SVG markup in board units, drawn from (0, 0). The fonts named in `fonts` work in it. `defs` is markup
+   * the sprite refers to (clip paths, filters, a `<style>` with the game's own `@font-face`), sent and decoded once for
+   * every sprite passing the same string, so it can be large.
+   */
+  svg(id: string, box: TableBoardSpriteBox, svg: string, defs?: string): void
+}
+
+export type TableBoardSpriteBox = {
+  width: number
+  height: number
+  /** The point placed at a node's x and y, and turned and scaled about, from the sprite's top left; its centre by default */
+  anchor?: [number, number]
+}
+
 /** Configuration passed to thumbnail renderers */
 export type ThumbnailConfig = {
   theme: Theme

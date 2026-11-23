@@ -37,6 +37,11 @@ export interface SimulatorConfig {
   views?: SimulatorView[]
   /** The game's puzzmo.json `integrations`, for tabs that preview them (e.g. Cklst renders `checklists`) */
   integrations?: SimulatorIntegrations
+  /**
+   * Imports the game's pmmg bundle (`src/pmmgBundle`). The Vite plugin sets it when the game has one, and the Pmmg tab,
+   * which draws the bundle's table board with its sprites and scene, only shows when it's set.
+   */
+  pmmgBundle?: () => Promise<unknown>
 }
 
 /** Loosely typed puzzmo.json `integrations`; only the parts a simulator tab reads are spelled out. */

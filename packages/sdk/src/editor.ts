@@ -66,10 +66,33 @@ export interface RelatedWord {
   position: "preceding" | "following"
 }
 
-/** Result of fetching a URL from within the editor */
+/** One redirect followed while fetching a URL from within the editor */
+export interface EditorFetchURLRedirect {
+  /** The redirect's status code (301, 302, 307, ...) */
+  status: number
+  /** The URL which answered with the redirect */
+  url: string
+}
+
+/**
+ * Result of fetching a URL from within the editor. It resolves for any HTTP status, so check
+ * `status` before trusting `body`; it only rejects when no response arrived at all.
+ */
 export interface EditorFetchURLResult {
   status: number
   body: string
+  /** The reason phrase sent with the status, often empty over HTTP/2 */
+  statusText?: string
+  /** Response headers, with lower-cased names */
+  headers?: Record<string, string>
+  /** The URL which answered, after any redirects */
+  url?: string
+  /** Each redirect followed on the way to `url`, in order */
+  redirects?: EditorFetchURLRedirect[]
+  /** Milliseconds from the first request to the end of the body */
+  durationMs?: number
+  /** Size of the response body in bytes */
+  bodyBytes?: number
 }
 
 /** Config passed to an editor bundle's mount() */

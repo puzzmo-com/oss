@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import fs from "fs"
+import { createServer as createHttpServer, type Server } from "http"
+import type { AddressInfo } from "net"
 import path from "path"
 import os from "os"
+import { createServer, type ViteDevServer } from "vite"
 
-import { findPuzzmoJsonDirs, discoverGames, resolveGameFromReferer, generateSimulatorCode } from "./vite"
+import { findPuzzmoJsonDirs, discoverGames, resolveGameFromReferer, generateSimulatorCode, pmmgBundlePlugin } from "./vite"
 import type { GameInfo } from "./vite"
 
 /** Create a temp directory with a given file tree. Keys are relative paths, values are file contents. */
@@ -148,6 +151,17 @@ describe("discoverGames", () => {
     expect(games.get("with-tsx-bundle")!.appBundlePath).toBe("/src/appBundle.tsx")
   })
 
+  it("detects a pmmg bundle beside the app bundle", () => {
+    tmpRoot = createTempTree({
+      "games/foo/puzzmo.json": puzzmoJson("foo"),
+      "games/foo/src/pmmgBundle.ts": "export default { table: { contract: 1, render() {} } }",
+      "games/bar/puzzmo.json": puzzmoJson("bar"),
+    })
+    const games = discoverGames(tmpRoot)
+    expect(games.get("foo")!.pmmgBundlePath).toBe("/games/foo/src/pmmgBundle.ts")
+    expect(games.get("bar")!.pmmgBundlePath).toBeNull()
+  })
+
   it("prefers .js over .ts when both exist", () => {
     tmpRoot = createTempTree({
       "puzzmo.json": puzzmoJson("dual"),
@@ -262,6 +276,18 @@ describe("generateSimulatorCode", () => {
     expect(code).toContain("globalThis.getShareString = m.getShareString")
   })
 
+  it("hands the simulator a loader for the pmmg bundle when the game has one, so it gets a Pmmg tab", () => {
+    const game: GameInfo = {
+      dir: "/tmp/foo",
+      slug: "my-game",
+      displayName: "My Game",
+      appBundlePath: null,
+      pmmgBundlePath: "/games/foo/src/pmmgBundle.ts",
+    }
+    expect(generateSimulatorCode({}, game)).toContain('pmmgBundle: () => import("/games/foo/src/pmmgBundle.ts")')
+    expect(generateSimulatorCode({}, { ...game, pmmgBundlePath: null })).not.toContain("pmmgBundle")
+  })
+
   it("disables fixtures when fixturesGlob is false", () => {
     const code = generateSimulatorCode({ fixturesGlob: false }, undefined)
     expect(code).not.toContain("import.meta.glob")
@@ -287,5 +313,45 @@ describe("generateSimulatorCode", () => {
     const code = generateSimulatorCode({ autoStart: false, collapsed: false }, undefined)
     expect(code).toContain("autoStart: false")
     expect(code).toContain("collapsed: false")
+  })
+})
+
+// -------------------------------------------------------------------
+// pmmgBundlePlugin
+// -------------------------------------------------------------------
+
+describe("pmmgBundlePlugin in dev", () => {
+  let server: ViteDevServer | undefined
+  let http: Server | undefined
+  afterEach(async () => {
+    http?.close()
+    await server?.close()
+  })
+
+  it("serves one built file to the sandbox's opaque origin, and none of the dev server's modules", async () => {
+    tmpRoot = createTempTree({
+      "src/pmmgBundle.ts": 'import { size } from "./board"\nexport default { table: { contract: 1, render: () => ({ width: size }) } }',
+      "src/board.ts": "export const size: number = 412",
+    })
+    server = await createServer({
+      configFile: false,
+      root: tmpRoot,
+      logLevel: "silent",
+      plugins: pmmgBundlePlugin(),
+      server: { middlewareMode: true, ws: false },
+    })
+    http = createHttpServer(server.middlewares).listen(0)
+    await new Promise((resolve) => http!.once("listening", resolve))
+    const base = `http://127.0.0.1:${(http.address() as AddressInfo).port}`
+
+    const bundle = await fetch(`${base}/pmmg-bundle.js`, { headers: { origin: "null" } })
+    expect(bundle.status).toBe(200)
+    expect(bundle.headers.get("access-control-allow-origin")).toBe("*")
+    const code = await bundle.text()
+    expect(code).toContain("412")
+    expect(code).not.toMatch(/^import /m)
+
+    const source = await fetch(`${base}/src/board.ts`, { headers: { origin: "null" } })
+    expect(source.headers.get("access-control-allow-origin")).toBeNull()
   })
 })

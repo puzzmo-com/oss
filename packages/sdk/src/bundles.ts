@@ -8,15 +8,24 @@
  *
  * // src/serverBundle.ts, built by serverBundlePlugin
  * export default createServerBundle({ achievements: { describe, replayRound } })
+ *
+ * // src/pmmgBundle.ts, built by pmmgBundlePlugin
+ * export default createPmmgBundle({ table: { contract: 1, render } })
  * ```
  */
-import type { AppBundle, ServerBundle } from "./types"
+import type { AppBundle, PmmgBundle, ServerBundle } from "./types"
 
 /** Types a game's app bundle: the public code Puzzmo and players' browsers call, such as its thumbnail renderer */
 export const createAppBundle = <T extends AppBundle>(bundle: T): T => bundle
 
 /** Types a game's server bundle: the private code only Puzzmo calls, such as the replay achievements read */
 export const createServerBundle = <T extends ServerBundle>(bundle: T): T => bundle
+
+/**
+ * Types a game's pmmg bundle: public code Puzzmo's pages run in a strict sandbox for its passively massively multiplayer side, like its
+ * boards at the table
+ */
+export const createPmmgBundle = <T extends PmmgBundle>(bundle: T): T => bundle
 
 export type {
   AchievementCounterDescription,
@@ -25,10 +34,24 @@ export type {
   AchievementsDescription,
   AchievementsServerCapability,
   AppBundle,
+  PmmgBundle,
   RoundReplayInput,
   RoundReplayResult,
   ServerBundle,
   ServerCallConfig,
+  TableBoardAnimation,
+  TableBoardBackgroundStyle,
+  TableBoardBlend,
+  TableBoardCapability,
+  TableBoardEffect,
+  TableBoardFidelity,
+  TableBoardKeyframe,
+  TableBoardNode,
+  TableBoardScene,
+  TableBoardSpriteBox,
+  TableBoardSprites,
+  TableBoardTiming,
+  TableBoardUpdate,
   ThumbnailConfig,
   ThumbnailResult,
 } from "./types"

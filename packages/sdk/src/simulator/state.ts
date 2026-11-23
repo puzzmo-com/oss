@@ -14,6 +14,7 @@ const storageKeys = {
   gameSettings: "simulator-game-settings",
   hostContext: "simulator-host-context",
   keyboardDocked: "simulator-keyboard-docked",
+  pmmg: "simulator-pmmg",
 } as const
 
 /**
@@ -95,6 +96,57 @@ function getStoredKeyboardDocked(): boolean {
 
 export function persistKeyboardDocked(docked: boolean): void {
   localStorage.setItem(storageKeys.keyboardDocked, String(docked))
+}
+
+/**
+ * The Pmmg tab's choices: the part showing, whether the board follows the game, the overlay's marks, the backdrop, and
+ * the look the board is rendered for
+ */
+export type PmmgPrefs = {
+  subtab: "layout" | "sprites" | "scene"
+  follow: boolean
+  bounds: boolean
+  grid: boolean
+  boxes: boolean
+  anchors: boolean
+  keys: boolean
+  backdrop: "checker" | "theme" | "black" | "white"
+  fidelity: "high" | "low"
+  /** "theme" follows the selected theme's type, as Puzzmo does where the game paints no felt */
+  backgroundStyle: "theme" | "dark" | "light"
+}
+
+const defaultPmmgPrefs: PmmgPrefs = {
+  subtab: "layout",
+  follow: true,
+  bounds: true,
+  grid: false,
+  boxes: false,
+  anchors: false,
+  keys: false,
+  backdrop: "checker",
+  fidelity: "high",
+  backgroundStyle: "theme",
+}
+
+export function getStoredPmmgPrefs(): PmmgPrefs {
+  const prefs = { ...defaultPmmgPrefs }
+  try {
+    const stored = JSON.parse(localStorage.getItem(storageKeys.pmmg) ?? "{}")
+    if (["layout", "sprites", "scene"].includes(stored.subtab)) prefs.subtab = stored.subtab
+    if (["checker", "theme", "black", "white"].includes(stored.backdrop)) prefs.backdrop = stored.backdrop
+    if (["high", "low"].includes(stored.fidelity)) prefs.fidelity = stored.fidelity
+    if (["theme", "dark", "light"].includes(stored.backgroundStyle)) prefs.backgroundStyle = stored.backgroundStyle
+    for (const key of ["follow", "bounds", "grid", "boxes", "anchors", "keys"] as const)
+      if (typeof stored[key] === "boolean") prefs[key] = stored[key]
+  } catch {
+    // Unreadable or corrupt: the defaults
+  }
+  return prefs
+}
+
+export function persistPmmgPrefs(prefs: PmmgPrefs): void {
+  localStorage.setItem(storageKeys.pmmg, JSON.stringify(prefs))
 }
 
 function getStoredGameSettings(): Record<string, any> {
