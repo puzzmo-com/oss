@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import fs from "fs"
 import { createServer as createHttpServer, type Server } from "http"
 import type { AddressInfo } from "net"
@@ -6,7 +6,15 @@ import path from "path"
 import os from "os"
 import { createServer, type ViteDevServer } from "vite"
 
-import { findPuzzmoJsonDirs, discoverGames, resolveGameFromReferer, generateSimulatorCode, pmmgBundlePlugin } from "./vite"
+import {
+  findPuzzmoJsonDirs,
+  discoverGames,
+  resolveGameFromReferer,
+  generateSimulatorCode,
+  pmmgBundlePlugin,
+  appBundlePlugin,
+  buildPmmgBundleSource,
+} from "./vite"
 import type { GameInfo } from "./vite"
 
 /** Create a temp directory with a given file tree. Keys are relative paths, values are file contents. */
@@ -313,6 +321,50 @@ describe("generateSimulatorCode", () => {
     const code = generateSimulatorCode({ autoStart: false, collapsed: false }, undefined)
     expect(code).toContain("autoStart: false")
     expect(code).toContain("collapsed: false")
+  })
+})
+
+// -------------------------------------------------------------------
+// Bundle builds
+// -------------------------------------------------------------------
+
+describe("bundle builds", () => {
+  // Stands in for immer/reselect, which check NODE_ENV at load and would throw where there's no `process`
+  const nodeEnvEntry = "export const mode = process.env.NODE_ENV === 'production' ? 'prod' : 'dev'"
+
+  it("bakes NODE_ENV into the app bundle, as thumbnails run it where there is no process", async () => {
+    tmpRoot = createTempTree({ "src/appBundle.ts": nodeEnvEntry })
+    const outDir = path.join(tmpRoot, "dist")
+    const plugin = appBundlePlugin({ entry: path.join(tmpRoot, "src/appBundle.ts"), outDir })
+    await (plugin.closeBundle as () => Promise<void>)()
+
+    const code = fs.readFileSync(path.join(outDir, "app-bundle.js"), "utf8")
+    expect(code).not.toContain("process.env")
+  })
+
+  it("bakes NODE_ENV into the pmmg bundle", async () => {
+    tmpRoot = createTempTree({ "src/pmmgBundle.ts": nodeEnvEntry })
+    const code = await buildPmmgBundleSource(path.join(tmpRoot, "src/pmmgBundle.ts"))
+    expect(code).not.toContain("process.env")
+  })
+
+  it("fails the app bundle's build when React ends up in it, saying which import brought it", async () => {
+    tmpRoot = createTempTree({
+      "node_modules/react/package.json": JSON.stringify({ name: "react", type: "module", main: "index.js" }),
+      "node_modules/react/index.js": "export const createElement = () => 1",
+      "src/thumb.ts": 'import { createElement } from "react"\nexport const draw = () => createElement()',
+      "src/appBundle.ts": 'export { draw as renderThumbnail } from "./thumb"',
+    })
+    const plugin = appBundlePlugin({ entry: path.join(tmpRoot, "src/appBundle.ts"), outDir: path.join(tmpRoot, "dist") })
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const error = await (plugin.closeBundle as () => Promise<void>)().catch((e: Error) => e)
+    quiet.mockRestore()
+
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toMatch(/^\[app-bundle\] react can't be in .*app-bundle\.js[\s\S]*thumb\.ts > react\/index\.js/)
+    // Printed alone, not inside rolldown's stack
+    expect((error as Error).stack).toBe((error as Error).message)
   })
 })
 

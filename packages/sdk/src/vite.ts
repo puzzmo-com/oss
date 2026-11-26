@@ -2,6 +2,7 @@ import type { Plugin, ResolvedConfig } from "vite"
 import { build } from "vite"
 import path from "path"
 import fs from "fs"
+import { bundleChecks, pageBundleLimits, type BundleLimits } from "./bundleChecks"
 import type { HostContext } from "./types"
 import type { HostContextPreset, SimulatorIntegrations } from "./simulator/types"
 
@@ -254,9 +255,10 @@ type BundlePluginOptions = {
   outDir: string
 }
 
-function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
+function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions, limits: BundleLimits = {}) {
   return (options: Partial<BundlePluginOptions> = {}): Plugin => {
     const { entry, outputFile, outDir } = { ...defaults, ...options }
+    const fileName = path.relative(process.cwd(), path.resolve(outDir, outputFile))
     return {
       name: pluginName,
       apply: "build",
@@ -267,10 +269,13 @@ function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
             ? entry
             : path.resolve(process.cwd(), entry)
           : (resolveBundleEntry(process.cwd(), stripBundleExt(entry)) ?? path.resolve(process.cwd(), entry))
+        const checks = bundleChecks(fileName, limits)
         try {
           await build({
             configFile: false,
             logLevel: "warn",
+            define: bundleDefine,
+            plugins: [checks],
             build: {
               lib: {
                 entry: resolvedEntry,
@@ -282,6 +287,8 @@ function createBundlePlugin(pluginName: string, defaults: BundlePluginOptions) {
             },
           })
         } catch (error) {
+          // A failed check explains itself, so it goes up alone rather than inside rolldown's stack
+          if (checks.api.failure) throw messageOnlyError(`[${pluginName}] ${checks.api.failure}`)
           console.error(`[${pluginName}] build failed:`, error)
           throw error
         }
@@ -321,7 +328,11 @@ export type AppBundlePluginOptions = {
  * returning the SVG and its dimensions (`{ svg, width, height }`), used by the Puzzmo
  * platform for puzzle previews.
  */
-export const appBundlePlugin = createBundlePlugin("app-bundle", { entry: "src/appBundle.js", outputFile: "app-bundle.js", outDir: "dist" })
+export const appBundlePlugin = createBundlePlugin(
+  "app-bundle",
+  { entry: "src/appBundle.js", outputFile: "app-bundle.js", outDir: "dist" },
+  pageBundleLimits("Puzzmo's pages wherever the game's thumbnails show"),
+)
 
 export type ServerBundlePluginOptions = {
   /** Entry file for the server bundle (default: `src/serverBundle.js`, or `.ts`) */
@@ -350,7 +361,11 @@ export type PmmgBundlePluginOptions = {
   outputFile?: string
 }
 
-const buildPmmgBundle = createBundlePlugin("pmmg-bundle", { entry: "src/pmmgBundle.js", outputFile: "pmmg-bundle.js", outDir: "dist" })
+const buildPmmgBundle = createBundlePlugin(
+  "pmmg-bundle",
+  { entry: "src/pmmgBundle.js", outputFile: "pmmg-bundle.js", outDir: "dist" },
+  pageBundleLimits("Puzzmo's pages for every board at the table"),
+)
 
 /**
  * Vite plugins for the game's pmmg bundle (see `PmmgBundle`), such as its boards at the table. After the main build
@@ -397,6 +412,7 @@ export const buildPmmgBundleSource = async (entry: string): Promise<string> => {
   const result = await build({
     configFile: false,
     logLevel: "warn",
+    define: bundleDefine,
     build: {
       write: false,
       copyPublicDir: false,
@@ -451,3 +467,12 @@ export const findPuzzmoJsonDirs = (root: string, maxDepth: number, depth = 0): s
   }
   return results
 }
+
+/**
+ * Lib mode leaves `process.env.*` for a consumer's bundler to replace, but these bundles are run as-is in browsers and
+ * isolates with no `process`, so a dependency's `NODE_ENV` check (immer, reselect, React) would throw on load
+ */
+const bundleDefine = { "process.env.NODE_ENV": JSON.stringify("production") }
+
+/** An error whose stack is only its message, for a failure the bundler's internals add nothing to */
+const messageOnlyError = (message: string) => Object.assign(new Error(message), { stack: message })
